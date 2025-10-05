@@ -1,0 +1,197 @@
+_schema-version: '3.1'
+ID: cap-java-project
+version: 1.0.0
+description: "SAP CAP Java Application with HR Admin"
+
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+  # ===================================
+  # Backend Service (Java/Spring Boot)
+  # ===================================
+  - name: cap-java-srv
+    type: java
+    path: srv
+    parameters:
+      buildpack: sap_java_buildpack
+      memory: 1024M
+      disk-quota: 512M
+    properties:
+      SPRING_PROFILES_ACTIVE: cloud
+      JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
+      JBP_CONFIG_SAP_MACHINE_JRE: '{ version: 17.+ }'
+      TARGET_RUNTIME: tomcat
+    build-parameters:
+      builder: custom
+      commands:
+        - mvn clean package -DskipTests=true
+      build-result: target/*.jar
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: cap-java-db
+      - name: cap-java-auth
+      - name: cap-java-destination
+      - name: cap-java-connectivity
+      - name: cap-java-logging
+
+  # ===================================
+  # Database Deployer (HDI Container)
+  # ===================================
+  - name: cap-java-db-deployer
+    type: hdb
+    path: db
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 512M
+    requires:
+      - name: cap-java-db
+
+  # ===================================
+  # Frontend App (UI5/Fiori)
+  # ===================================
+  - name: cap-java-app-hr-admin
+    type: html5
+    path: app/hr-admin
+    build-parameters:
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build
+      build-result: dist
+      supported-platforms: []
+    requires:
+      - name: cap-java-html5-repo-runtime
+      - name: cap-java-auth
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api
+          url: ~{srv-url}
+          forwardAuthToken: true
+
+  # ===================================
+  # App Router (Central Entry Point)
+  # ===================================
+  - name: cap-java-approuter
+    type: approuter.nodejs
+    path: approuter
+    parameters:
+      disk-quota: 256M
+      memory: 256M
+      keep-existing-routes: true
+    properties:
+      TENANT_HOST_PATTERN: "^(.*)-${default-uri}"
+    requires:
+      - name: cap-java-html5-repo-runtime
+      - name: cap-java-auth
+      - name: cap-java-destination
+      - name: srv-api
+        group: destinations
+        properties:
+          name: backend
+          url: ~{srv-url}
+          forwardAuthToken: true
+          timeout: 600000
+    provides:
+      - name: app-api
+        properties:
+          app-url: ${default-url}
+
+  # ===================================
+  # HTML5 Application Repository (Upload)
+  # ===================================
+  - name: cap-java-app-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: cap-java-html5-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: cap-java-app-hr-admin
+          artifacts:
+            - dist/*.zip
+          target-path: resources/
+
+# ===================================
+# Resources (Services)
+# ===================================
+resources:
+  # HDI Container (HANA Database)
+  - name: cap-java-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+    properties:
+      hdi-service-name: ${service-name}
+
+  # XSUAA (Authentication & Authorization)
+  - name: cap-java-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: cap-java-${org}-${space}
+        tenant-mode: dedicated
+        role-collections:
+          - name: "HRAdmin"
+            description: "HR Administrator"
+            role-template-references:
+              - $XSAPPNAME.Admin
+          - name: "HRUser"
+            description: "HR User"
+            role-template-references:
+              - $XSAPPNAME.User
+
+  # Destination Service
+  - name: cap-java-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+
+  # Connectivity Service
+  - name: cap-java-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite
+
+  # HTML5 Application Repository (Host)
+  - name: cap-java-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+
+  # HTML5 Application Repository (Runtime)
+  - name: cap-java-html5-repo-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime
+
+  # Application Logging Service
+  - name: cap-java-logging
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: application-logs
+      service-plan: lite

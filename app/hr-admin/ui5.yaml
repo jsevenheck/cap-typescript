@@ -1,0 +1,36 @@
+specVersion: "4.0"
+type: application
+metadata:
+  name: hr.admin
+
+framework:
+  name: OpenUI5
+  version: "1.126.1"
+  libraries:
+    - name: sap.ui.core
+    - name: sap.m
+    - name: themelib_sap_horizon
+
+resources:
+  configuration:
+    paths:
+      webapp: webapp
+
+builder:
+  customTasks:
+    - name: ui5-tooling-transpile-task
+      afterTask: replaceVersion
+
+server:
+  settings:
+    httpPort: 8081
+  customMiddleware:
+    - name: ui5-tooling-transpile-middleware
+      afterMiddleware: compression
+    - name: ui5-middleware-simpleproxy
+      afterMiddleware: compression
+      mountPath: /odata
+      configuration:
+        baseUri: "http://localhost:8080/odata"
+        httpHeaders:
+          Authorization: "Basic ZGV2OmRldg=="

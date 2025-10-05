@@ -1,0 +1,64 @@
+# --- OS / IDE
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+out/
+
+# --- Java/Maven
+**/target/
+*.log
+*.tmp
+*.swp
+*.h2.db
+*.mv.db
+*.trace.db
+.mvn/wrapper/maven-wrapper.jar
+
+# --- CAP Java: generiert
+/db/src/gen/
+# alle generierten Java/Resourcen
+/srv/src/gen/
+# generierte OData/CSN-Artefakte
+/srv/src/main/resources/edmx/
+/srv/src/main/resources/csn.json
+# generiertes Schema aus cds deploy --to h2 --dry
+/srv/src/main/resources/schema.sql
+
+# Falls Build woanders Ressourcen ablegt (seltener)
+**/src/main/resources/**/edmx/
+**/src/main/resources/**/csn.json
+**/src/main/resources/odata/
+
+# --- Node/UI5/TS
+**/node_modules/
+**/dist/
+**/.ui5/
+**/.cache/
+**/.eslintcache
+**/.parcel-cache/
+**/.npm/
+**/.pnpm-store/
+app/**/*.tsbuildinfo
+/srv/node_modules/
+npm-debug.log*
+
+# --- Env/Secrets
+.env
+.env.*
+default-env.json
+
+# --- CF/MTA
+mta_archives/
+mta_op/
+
+# Approuter
+approuter/node_modules/
+approuter/resources/
+approuter/default-env.json
+approuter/package-lock.json

@@ -1,0 +1,317 @@
+<mvc:View
+        controllerName="hr.admin.controller.Main"
+        xmlns:mvc="sap.ui.core.mvc"
+        displayBlock="true"
+        xmlns="sap.m"
+        xmlns:core="sap.ui.core">
+
+    <App id="app">
+        <pages>
+            <Page id="mainPage" title="Client Management">
+                <content>
+                    <VBox class="sapUiSmallMargin">
+                        <Title text="Manage Clients" level="H2"/>
+                        <Text text="Create, review, update, and delete client records."/>
+                        <List
+                                id="clientsList"
+                                mode="SingleSelectMaster"
+                                includeItemInSelection="true"
+                                items="{path: '/Clients'}"
+                                growing="false"
+                                selectionChange=".onSelectionChange"
+                                itemPress=".onClientPress">
+                            <headerToolbar>
+                                <Toolbar>
+                                    <Title text="Clients" level="H3"/>
+                                    <ToolbarSpacer/>
+                                    <Button
+                                            type="Emphasized"
+                                            text="Add"
+                                            icon="sap-icon://add"
+                                            press=".onAddClient"/>
+                                    <Button
+                                            text="Edit"
+                                            icon="sap-icon://edit"
+                                            enabled="{= !!${view>/selectedClientId}}"
+                                            press=".onEditClient"/>
+                                    <Button
+                                            text="Delete"
+                                            icon="sap-icon://delete"
+                                            type="Transparent"
+                                            enabled="{= !!${view>/selectedClientId}}"
+                                            press=".onDeleteClient"/>
+                                    <Button
+                                            text="Refresh"
+                                            icon="sap-icon://refresh"
+                                            press=".onRefresh"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                        title="{name}"
+                                        description="{= (${companyId} || '') + (${country/name} ? ' • ' + ${country/name} : '') }"
+                                        info="{country/code}"
+                                        type="Active"/>
+                            </items>
+                        </List>
+                    </VBox>
+                </content>
+            </Page>
+            <Page
+                    id="employeesPage"
+                    title="Employees"
+                    showNavButton="true"
+                    navButtonPress=".onBackToClients">
+                <content>
+                    <VBox class="sapUiSmallMargin">
+                        <Title level="H2" text="{= ${view>/selectedClientName} ? 'Employees of ' + ${view>/selectedClientName} : 'Employees'}"/>
+                        <Text
+                                visible="{= !!${view>/selectedClientCompanyId}}"
+                                text="{= ${view>/selectedClientCompanyId} ? 'Company ID: ' + ${view>/selectedClientCompanyId} : ''}"/>
+                        <Text
+                                text="Manage employees assigned to the selected client."/>
+                        <List
+                                id="employeesList"
+                                mode="SingleSelectMaster"
+                                includeItemInSelection="true"
+                                items="{path: 'employees'}"
+                                growing="false"
+                                selectionChange=".onEmployeesSelectionChange">
+                            <headerToolbar>
+                                <Toolbar>
+                                    <Title text="Employees" level="H3"/>
+                                    <ToolbarSpacer/>
+                                    <Button
+                                            text="Cost Centers"
+                                            icon="sap-icon://collections-management"
+                                            press=".onNavigateToCostCenters"/>
+                                    <Button
+                                            type="Emphasized"
+                                            text="Add"
+                                            icon="sap-icon://add"
+                                            press=".onAddEmployee"/>
+                                    <Button
+                                            text="Edit"
+                                            icon="sap-icon://edit"
+                                            enabled="{= !!${view>/selectedEmployeeId}}"
+                                            press=".onEditEmployee"/>
+                                    <Button
+                                            text="Delete"
+                                            icon="sap-icon://delete"
+                                            type="Transparent"
+                                            enabled="{= !!${view>/selectedEmployeeId}}"
+                                            press=".onDeleteEmployee"/>
+                                    <Button
+                                            text="Refresh"
+                                            icon="sap-icon://refresh"
+                                            press=".onRefreshEmployees"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                        title="{= (${firstName} || '') + ' ' + (${lastName} || '') }"
+                                        description="{= (${email} || '') + (${employmentType} ? ' • ' + (${employmentType} === 'external' ? 'External' : 'Internal') : '') }"
+                                        info="{= ${status} === 'inactive' ? 'Inactive' : 'Active'}"
+                                        infoState="{= ${status} === 'inactive' ? 'Warning' : 'Success'}"/>
+                            </items>
+                        </List>
+                    </VBox>
+                </content>
+            </Page>
+            <Page
+                    id="costCentersPage"
+                    title="Cost Centers"
+                    showNavButton="true"
+                    navButtonPress=".onBackToEmployees">
+                <content>
+                    <VBox class="sapUiSmallMargin">
+                        <Title level="H2" text="{= ${view>/selectedClientName} ? 'Cost Centers of ' + ${view>/selectedClientName} : 'Cost Centers'}"/>
+                        <Text
+                                visible="{= !!${view>/selectedClientCompanyId}}"
+                                text="{= ${view>/selectedClientCompanyId} ? 'Company ID: ' + ${view>/selectedClientCompanyId} : ''}"/>
+                        <Text text="Manage cost centers for the selected client."/>
+                        <List
+                                id="costCentersList"
+                                mode="SingleSelectMaster"
+                                includeItemInSelection="true"
+                                items="{path: 'costCenters'}"
+                                growing="false"
+                                selectionChange=".onCostCentersSelectionChange">
+                            <headerToolbar>
+                                <Toolbar>
+                                    <Title text="Cost Centers" level="H3"/>
+                                    <ToolbarSpacer/>
+                                    <Button
+                                            type="Emphasized"
+                                            text="Add"
+                                            icon="sap-icon://add"
+                                            press=".onAddCostCenter"/>
+                                    <Button
+                                            text="Edit"
+                                            icon="sap-icon://edit"
+                                            enabled="{= !!${view>/selectedCostCenterId}}"
+                                            press=".onEditCostCenter"/>
+                                    <Button
+                                            text="Delete"
+                                            icon="sap-icon://delete"
+                                            type="Transparent"
+                                            enabled="{= !!${view>/selectedCostCenterId}}"
+                                            press=".onDeleteCostCenter"/>
+                                    <Button
+                                            text="Refresh"
+                                            icon="sap-icon://refresh"
+                                            press=".onRefreshCostCenters"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                        title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
+                                        description="{responsible/firstName} {responsible/lastName}"/>
+                            </items>
+                        </List>
+                    </VBox>
+                </content>
+            </Page>
+        </pages>
+    </App>
+
+    <Dialog
+            id="clientDialog"
+            title="{dialog>/title}"
+            stretchOnPhone="true"
+            afterClose=".onDialogAfterClose">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="Company ID" required="true" labelFor="companyIdInput"/>
+                <Input id="companyIdInput" value="{dialog>/client/companyId}" placeholder="e.g. C-1000"/>
+                <Label text="Name" required="true" labelFor="clientNameInput"/>
+                <Input id="clientNameInput" value="{dialog>/client/name}" placeholder="Client Name"/>
+                <Label text="Country" labelFor="clientCountrySelect"/>
+                <Select
+                        id="clientCountrySelect"
+                        items="{path: '/Countries'}"
+                        selectedKey="{dialog>/client/country_code}"
+                        forceSelection="false"
+                        required="true"
+                        templateShareable="false">
+                    <core:Item
+                            key="{code}"
+                            text="{= ${name} ? ${name} + ' (' + ${code} + ')' : ${code}}"/>
+                </Select>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="Save" type="Emphasized" press=".onSaveClient"/>
+        </beginButton>
+        <endButton>
+            <Button text="Cancel" press=".onCancelClient"/>
+        </endButton>
+    </Dialog>
+
+    <Dialog
+            id="employeeDialog"
+            title="{employeeDialog>/title}"
+            stretchOnPhone="true"
+            afterClose=".onEmployeeDialogAfterClose">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="Employee ID" labelFor="employeeIdInput"/>
+                <Input
+                        id="employeeIdInput"
+                        value="{employeeDialog>/employee/employeeId}"
+                        editable="false"
+                        placeholder="Will be generated automatically"/>
+                <Label text="First Name" required="true" labelFor="employeeFirstName"/>
+                <Input id="employeeFirstName" value="{employeeDialog>/employee/firstName}" placeholder="First name"/>
+                <Label text="Last Name" required="true" labelFor="employeeLastName"/>
+                <Input id="employeeLastName" value="{employeeDialog>/employee/lastName}" placeholder="Last name"/>
+                <Label text="Email" required="true" labelFor="employeeEmail"/>
+                <Input id="employeeEmail" type="Email" value="{employeeDialog>/employee/email}" placeholder="name@example.com"/>
+                <Label text="Cost Center" labelFor="employeeCostCenter"/>
+                <Select
+                        id="employeeCostCenter"
+                        items="{path: 'costCenters'}"
+                        change=".onEmployeeCostCenterChange"
+                        selectedKey="{employeeDialog>/employee/costCenter_ID}">
+                    <core:Item key="{ID}" text="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"/>
+                </Select>
+                <Label text="Manager" labelFor="employeeManager"/>
+                <Input id="employeeManager" value="{employeeDialog>/employee/managerName}" editable="false" placeholder="Manager is derived from the cost center"/>
+                <Label text="Location" labelFor="employeeLocation"/>
+                <Input id="employeeLocation" value="{employeeDialog>/employee/location}" placeholder="Office location"/>
+                <Label text="Position Level" labelFor="employeePosition"/>
+                <Input id="employeePosition" value="{employeeDialog>/employee/positionLevel}" placeholder="e.g. Senior"/>
+                <Label text="Entry Date" required="true" labelFor="employeeEntryDate"/>
+                <DatePicker
+                        id="employeeEntryDate"
+                        value="{employeeDialog>/employee/entryDate}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="Select entry date"/>
+                <Label text="Exit Date" labelFor="employeeExitDate"/>
+                <DatePicker
+                        id="employeeExitDate"
+                        value="{employeeDialog>/employee/exitDate}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="Select exit date"/>
+                <Label text="Status" required="true" labelFor="employeeStatus"/>
+                <Select
+                        id="employeeStatus"
+                        items="{statusOptions>/}"
+                        selectedKey="{employeeDialog>/employee/status}"
+                        forceSelection="true"
+                        required="true"
+                        templateShareable="false">
+                    <core:Item key="{statusOptions>key}" text="{statusOptions>text}"/>
+                </Select>
+                <Label text="Employment Type" required="true" labelFor="employeeEmploymentType"/>
+                <Select
+                        id="employeeEmploymentType"
+                        items="{employmentTypeOptions>/}"
+                        selectedKey="{employeeDialog>/employee/employmentType}"
+                        forceSelection="true"
+                        required="true"
+                        templateShareable="false">
+                    <core:Item key="{employmentTypeOptions>key}" text="{employmentTypeOptions>text}"/>
+                </Select>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="Save" type="Emphasized" press=".onSaveEmployee"/>
+        </beginButton>
+        <endButton>
+            <Button text="Cancel" press=".onCancelEmployee"/>
+        </endButton>
+    </Dialog>
+
+    <Dialog
+            id="costCenterDialog"
+            title="{costCenterDialog>/title}"
+            stretchOnPhone="true"
+            afterClose=".onCostCenterDialogAfterClose">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="Code" required="true" labelFor="costCenterCode"/>
+                <Input id="costCenterCode" value="{costCenterDialog>/costCenter/code}" placeholder="e.g. CC-100"/>
+                <Label text="Name" required="true" labelFor="costCenterName"/>
+                <Input id="costCenterName" value="{costCenterDialog>/costCenter/name}" placeholder="Cost Center Name"/>
+                <Label text="Description" labelFor="costCenterDescription"/>
+                <Input id="costCenterDescription" value="{costCenterDialog>/costCenter/description}" placeholder="Short description"/>
+                <Label text="Responsible" required="true" labelFor="costCenterResponsible"/>
+                <Select
+                        id="costCenterResponsible"
+                        items="{path: 'employees'}"
+                        selectedKey="{costCenterDialog>/costCenter/responsible_ID}">
+                    <core:Item key="{ID}" text="{= (${firstName} || '') + ' ' + (${lastName} || '') }"/>
+                </Select>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="Save" type="Emphasized" press=".onSaveCostCenter"/>
+        </beginButton>
+        <endButton>
+            <Button text="Cancel" press=".onCancelCostCenter"/>
+        </endButton>
+    </Dialog>
+</mvc:View>

@@ -1,0 +1,7 @@
+{
+  "name": "srv",
+  "private": true,
+  "devDependencies": {
+    "@sap/cds-dk": "^9.3.2"
+  }
+}

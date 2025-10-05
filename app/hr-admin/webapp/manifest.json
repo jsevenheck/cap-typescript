@@ -1,0 +1,56 @@
+{
+  "_version": "1.78.0",
+  "sap.app": {
+    "id": "hr.admin",
+    "type": "application",
+    "title": "{{appTitle}}",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [""],
+      "fallbackLocale": ""
+    },
+    "applicationVersion": { "version": "1.0.0" },
+    "dataSources": {
+      "mainService": {
+        "uri": "/odata/v4/clients/",
+        "type": "OData",
+        "settings": { "odataVersion": "4.0" }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
+  },
+  "sap.ui5": {
+    "rootView": { "viewName": "hr.admin.view.Main", "type": "XML", "async": true },
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": {
+        "sap.ui.core": {},
+        "sap.m": {}
+      }
+    },
+    "contentDensities": { "compact": true, "cozy": true },
+    "models": {
+      "": {
+        "dataSource": "mainService",
+        "type": "sap.ui.model.odata.v4.ODataModel",
+        "settings": {
+          "synchronizationMode": "None",
+          "operationMode": "Server",
+          "autoExpandSelect": true
+        }
+      },
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleUrl": "i18n/i18n.properties",
+          "supportedLocales": [""],
+          "fallbackLocale": ""
+        }
+      }
+    },
+    "routing": { "targets": {} }
+  }
+}
