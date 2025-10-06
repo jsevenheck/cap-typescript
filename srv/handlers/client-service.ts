@@ -195,7 +195,7 @@ const ensureUniqueEmployeeId = async (req: EmployeeRequest): Promise<boolean> =>
       SELECT.one
         .from('clientmgmt.Employees')
         .columns('ID')
-        .where({ employeeId: req.data.employeeId }),
+        .where({ employeeId: req.data.employeeId, client_ID: clientId }),
     )) as EmployeeEntity | undefined;
     if (existing && existing.ID !== currentEmployeeId) {
       req.error(409, `Employee ID ${req.data.employeeId} already exists.`);
