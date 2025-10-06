@@ -2,7 +2,7 @@
   "welcomeFile": "/index.html",
   "authenticationMethod": "route",
   "routes": [
-    { "source": "^/(.*)$", "target": "$1", "service": "html5-apps-repo-rt" },
-    { "source": "^/odata/(.*)$", "target": "/odata/$1", "destination": "srv-api" }
+    { "source": "^/odata/(.*)$", "target": "/odata/$1", "destination": "srv-api" },
+    { "source": "^/(.*)$", "target": "$1", "service": "html5-apps-repo-rt" }
   ]
 }

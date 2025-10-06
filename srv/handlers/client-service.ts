@@ -11,6 +11,7 @@ type ClientService = Service;
 
 interface ExtendedRequest<T> extends Request {
   data: Partial<T>;
+  params?: Array<Record<string, unknown>>;
 }
 
 type EmployeeRequest = ExtendedRequest<EmployeeEntity>;
@@ -53,7 +54,29 @@ const ensureClientExists = async (req: EmployeeRequest, clientId?: string): Prom
 
 const ensureEmployeeAssignment = async (req: EmployeeRequest): Promise<void> => {
   const tx = cds.transaction(req);
-  const { client_ID: clientId } = req.data;
+  let { client_ID: clientId } = req.data;
+
+  if (!clientId && req.event === 'UPDATE') {
+    const employeeKey =
+      req.data.ID ?? (Array.isArray(req.params) && req.params.length > 0 ? req.params[0]?.ID : undefined);
+    if (!employeeKey) {
+      req.error(400, 'Employee identifier is required.');
+      return;
+    }
+
+    const existingEmployee = (await tx.run(
+      SELECT.one.from('clientmgmt.Employees').columns('client_ID').where({ ID: employeeKey }),
+    )) as EmployeeEntity | undefined;
+
+    if (!existingEmployee) {
+      req.error(404, `Employee ${employeeKey} not found.`);
+      return;
+    }
+
+    clientId = existingEmployee.client_ID;
+    req.data.client_ID = clientId;
+  }
+
   const exists = await ensureClientExists(req, clientId);
   if (!exists) {
     return;

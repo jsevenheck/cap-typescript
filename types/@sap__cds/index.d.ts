@@ -20,6 +20,7 @@ declare namespace CDSQL {
 
   interface QL {
     SELECT: {
+      from(entity: string): BaseQuery;
       one: {
         from(entity: string): BaseQuery;
       };
