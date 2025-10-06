@@ -62,7 +62,7 @@ const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
   const normalizedCompany = normalizeCompanyId(client?.companyId);
   if (normalizedCompany) {
-    return normalizedCompany;
+    return normalizedCompany.slice(0, 8);
   }
 
   const sanitizedClientId = sanitizeIdentifier(clientId);
