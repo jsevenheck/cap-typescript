@@ -22,8 +22,11 @@ entity Clients : managed, cuid {
   costCenters: Composition of many CostCenters on costCenters.client = $self;
 }
 
+@assert.unique: [
+  { name: 'Employees_employeeId_unique', fields: ['employeeId'] },
+  { name: 'Employees_client_employeeId_unique', fields: ['client', 'employeeId'] }
+]
 entity Employees : managed, cuid {
-  @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
   firstName     : String(60)  not null;
   lastName      : String(60)  not null;

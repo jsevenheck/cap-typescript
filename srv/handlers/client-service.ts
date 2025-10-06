@@ -1,5 +1,6 @@
 import cds from '@sap/cds';
 import type { Request, Service } from '@sap/cds';
+import { createHash } from 'crypto';
 import type {
   ClientEntity,
   CostCenterEntity,
@@ -29,11 +30,72 @@ declare global {
 
 const { SELECT, INSERT, UPDATE } = cds.ql;
 
+const MAX_EMPLOYEE_ID_RETRIES = 5;
+
 const normalizeCompanyId = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
 
 const normalizeCostCenterCode = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
+
+interface EntityWithId {
+  ID?: string;
+}
+
+const deriveRequestEntityId = <T extends EntityWithId>(req: ExtendedRequest<T>): string | undefined => {
+  if (req.data?.ID) {
+    return req.data.ID;
+  }
+
+  if (Array.isArray(req.params) && req.params.length > 0) {
+    const lastParam = req.params[req.params.length - 1];
+    if (lastParam && typeof lastParam === 'object' && 'ID' in lastParam) {
+      return lastParam.ID as string | undefined;
+    }
+  }
+
+  return undefined;
+};
+
+const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
+  const normalizedCompany = normalizeCompanyId(client?.companyId);
+  if (normalizedCompany) {
+    return normalizedCompany.slice(0, 8);
+  }
+
+  const sanitizedClientId = sanitizeIdentifier(clientId);
+  if (sanitizedClientId.length >= 4) {
+    return sanitizedClientId.slice(0, 8);
+  }
+
+  const hashed = createHash('sha256').update(clientId).digest('hex').toUpperCase();
+  return (sanitizedClientId + hashed).slice(0, 8);
+};
+
+const isUniqueConstraintError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const { code, errno, message } = error as { code?: string; errno?: number; message?: string };
+  if (code === '23505' || code === 'SQLITE_CONSTRAINT' || code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    return true;
+  }
+  if (typeof errno === 'number' && errno === 1062) {
+    return true;
+  }
+  return typeof message === 'string' && /unique|constraint/i.test(message);
+};
+
+const withRowLock = <T extends object>(query: T): T => {
+  const forUpdate = (query as T & { forUpdate?: () => T }).forUpdate;
+  if (typeof forUpdate === 'function') {
+    return forUpdate.call(query);
+  }
+  return query;
+};
 
 const ensureClientExists = async (req: EmployeeRequest, clientId?: string): Promise<boolean> => {
   if (!clientId) {
@@ -57,8 +119,7 @@ const ensureEmployeeAssignment = async (req: EmployeeRequest): Promise<void> => 
   let { client_ID: clientId } = req.data;
 
   if (!clientId && req.event === 'UPDATE') {
-    const employeeKey =
-      req.data.ID ?? (Array.isArray(req.params) && req.params.length > 0 ? req.params[0]?.ID : undefined);
+    const employeeKey = deriveRequestEntityId(req);
     if (!employeeKey) {
       req.error(400, 'Employee identifier is required.');
       return;
@@ -120,52 +181,73 @@ const ensureEmployeeAssignment = async (req: EmployeeRequest): Promise<void> => 
   }
 };
 
-const ensureUniqueEmployeeId = async (req: EmployeeRequest): Promise<void> => {
+const ensureUniqueEmployeeId = async (req: EmployeeRequest): Promise<boolean> => {
   const tx = cds.transaction(req);
   const { client_ID: clientId } = req.data;
+  const currentEmployeeId = deriveRequestEntityId(req);
   if (!clientId) {
-    return;
+    return false;
   }
 
   if (req.data.employeeId) {
     req.data.employeeId = req.data.employeeId.trim().toUpperCase();
     const existing = (await tx.run(
-      SELECT.one.from('clientmgmt.Employees')
+      SELECT.one
+        .from('clientmgmt.Employees')
         .columns('ID')
-        .where({ employeeId: req.data.employeeId }),
+        .where({ employeeId: req.data.employeeId, client_ID: clientId }),
     )) as EmployeeEntity | undefined;
-    if (existing && existing.ID !== req.data.ID) {
+    if (existing && existing.ID !== currentEmployeeId) {
       req.error(409, `Employee ID ${req.data.employeeId} already exists.`);
     }
-    return;
+    return false;
   }
-
-  const counter = (await tx.run(
-    SELECT.one.from('clientmgmt.EmployeeIdCounters').where({ client_ID: clientId }),
-  )) as EmployeeIdCounterEntity | undefined;
 
   const client = (await tx.run(
     SELECT.one.from('clientmgmt.Clients').columns('companyId').where({ ID: clientId }),
   )) as ClientEntity | undefined;
 
-  const prefix = normalizeCompanyId(client?.companyId) ?? 'EMP';
-  const nextCounter = (counter?.lastCounter ?? 0) + 1;
-  req.data.employeeId = `${prefix}-${String(nextCounter).padStart(4, '0')}`;
+  for (let attempt = 0; attempt < MAX_EMPLOYEE_ID_RETRIES; attempt += 1) {
+    try {
+      const counterQuery = SELECT.one
+        .from('clientmgmt.EmployeeIdCounters')
+        .columns('lastCounter')
+        .where({ client_ID: clientId }) as unknown as Record<string, unknown>;
 
-  if (counter) {
-    await tx.run(
-      UPDATE('clientmgmt.EmployeeIdCounters')
-        .set({ lastCounter: nextCounter })
-        .where({ client_ID: clientId }),
-    );
-  } else {
-    await tx.run(
-      INSERT.into('clientmgmt.EmployeeIdCounters').entries({
-        client_ID: clientId,
-        lastCounter: nextCounter,
-      }),
-    );
+      const counter = (await tx.run(withRowLock(counterQuery))) as EmployeeIdCounterEntity | undefined;
+
+      const nextCounter = (counter?.lastCounter ?? 0) + 1;
+      const prefix = deriveClientPrefix(client, clientId);
+      const generatedId = `${prefix}-${String(nextCounter).padStart(4, '0')}`;
+      req.data.employeeId = generatedId;
+
+      if (counter) {
+        await tx.run(
+          UPDATE('clientmgmt.EmployeeIdCounters')
+            .set({ lastCounter: nextCounter })
+            .where({ client_ID: clientId }),
+        );
+      } else {
+        await tx.run(
+          INSERT.into('clientmgmt.EmployeeIdCounters').entries({
+            client_ID: clientId,
+            lastCounter: nextCounter,
+          }),
+        );
+      }
+      return true;
+    } catch (error) {
+      if (isUniqueConstraintError(error) && attempt < MAX_EMPLOYEE_ID_RETRIES - 1) {
+        // Retry the generation to obtain a fresh counter value.
+        delete req.data.employeeId;
+        continue;
+      }
+      throw error;
+    }
   }
+
+  req.error(500, 'Failed to generate a unique employee identifier.');
+  return false;
 };
 
 const registerClientHandlers = (service: ClientService): void => {
@@ -174,13 +256,20 @@ const registerClientHandlers = (service: ClientService): void => {
       req.data.companyId = normalizeCompanyId(req.data.companyId);
     }
 
-    if (req.event === 'CREATE' && req.data.companyId) {
+    if (req.data.companyId) {
       const tx = cds.transaction(req);
+      const whereClause: Record<string, unknown> = { companyId: req.data.companyId };
+      const currentClientId = deriveRequestEntityId(req);
+
+      if (req.event === 'UPDATE' && currentClientId) {
+        whereClause.ID = { '!=': currentClientId };
+      }
+
       const existing = (await tx.run(
         SELECT.one
           .from('clientmgmt.Clients')
           .columns('ID')
-          .where({ companyId: req.data.companyId }),
+          .where(whereClause),
       )) as ClientEntity | undefined;
       if (existing) {
         req.error(409, `Company ID ${req.data.companyId} already exists.`);
@@ -190,9 +279,31 @@ const registerClientHandlers = (service: ClientService): void => {
 };
 
 const registerEmployeeHandlers = (service: ClientService): void => {
-  service.before('CREATE', 'Employees', async (req: EmployeeRequest) => {
-    await ensureEmployeeAssignment(req);
-    await ensureUniqueEmployeeId(req);
+  const serviceWithOn = service as ClientService & {
+    on: (
+      event: string | string[],
+      entity: string,
+      handler: (req: EmployeeRequest, next: () => Promise<unknown>) => Promise<unknown> | void,
+    ) => unknown;
+  };
+
+  serviceWithOn.on('CREATE', 'Employees', async (req: EmployeeRequest, next) => {
+    for (let attempt = 0; attempt < MAX_EMPLOYEE_ID_RETRIES; attempt += 1) {
+      let generatedEmployeeId = false;
+      try {
+        await ensureEmployeeAssignment(req);
+        generatedEmployeeId = await ensureUniqueEmployeeId(req);
+        return await next();
+      } catch (error) {
+        if (generatedEmployeeId && isUniqueConstraintError(error) && attempt < MAX_EMPLOYEE_ID_RETRIES - 1) {
+          delete req.data.employeeId;
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    req.error(500, 'Failed to create employee after multiple attempts.');
   });
 
   service.before('UPDATE', 'Employees', async (req: EmployeeRequest) => {
@@ -210,7 +321,32 @@ const registerCostCenterHandlers = (service: ClientService): void => {
     }
 
     const tx = cds.transaction(req);
-    const { client_ID: clientId, responsible_ID: responsibleId } = req.data;
+    let { client_ID: clientId } = req.data;
+    const { responsible_ID: responsibleId } = req.data;
+
+    if (!clientId && req.event === 'UPDATE') {
+      const costCenterId = deriveRequestEntityId(req);
+      if (!costCenterId) {
+        req.error(400, 'Cost center identifier is required.');
+        return;
+      }
+
+      const existingCostCenter = (await tx.run(
+        SELECT.one
+          .from('clientmgmt.CostCenters')
+          .columns('client_ID')
+          .where({ ID: costCenterId }),
+      )) as CostCenterEntity | undefined;
+
+      if (!existingCostCenter) {
+        req.error(404, `Cost center ${costCenterId} not found.`);
+        return;
+      }
+
+      clientId = existingCostCenter.client_ID;
+      req.data.client_ID = clientId;
+    }
+
     if (!clientId) {
       req.error(400, 'Client reference is required.');
       return;
