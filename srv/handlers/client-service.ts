@@ -42,8 +42,20 @@ interface EntityWithId {
   ID?: string;
 }
 
-const deriveRequestEntityId = <T extends EntityWithId>(req: ExtendedRequest<T>): string | undefined =>
-  req.data.ID ?? (Array.isArray(req.params) && req.params.length > 0 ? (req.params[0]?.ID as string | undefined) : undefined);
+const deriveRequestEntityId = <T extends EntityWithId>(req: ExtendedRequest<T>): string | undefined => {
+  if (req.data?.ID) {
+    return req.data.ID;
+  }
+
+  if (Array.isArray(req.params) && req.params.length > 0) {
+    const lastParam = req.params[req.params.length - 1];
+    if (lastParam && typeof lastParam === 'object' && 'ID' in lastParam) {
+      return lastParam.ID as string | undefined;
+    }
+  }
+
+  return undefined;
+};
 
 const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
