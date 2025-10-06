@@ -31,6 +31,4 @@ server:
       afterMiddleware: compression
       mountPath: /odata
       configuration:
-        baseUri: "http://localhost:8080/odata"
-        httpHeaders:
-          Authorization: "Basic ZGV2OmRldg=="
+        baseUri: "http://localhost:4004/odata"

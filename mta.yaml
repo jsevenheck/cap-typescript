@@ -1,7 +1,7 @@
 _schema-version: '3.1'
-ID: cap-java-project
+ID: cap-typescript
 version: 1.0.0
-description: "SAP CAP Java Application with HR Admin"
+description: "SAP CAP TypeScript Application with HR Admin"
 
 parameters:
   enable-parallel-deployments: true
@@ -12,44 +12,40 @@ build-parameters:
     - builder: custom
       commands:
         - npm ci
-        - npx cds build --production
+        - npm run build
 
 modules:
   # ===================================
-  # Backend Service (Java/Spring Boot)
+  # Backend Service (Node.js CAP)
   # ===================================
-  - name: cap-java-srv
-    type: java
+  - name: cap-ts-srv
+    type: nodejs
     path: srv
     parameters:
-      buildpack: sap_java_buildpack
-      memory: 1024M
+      buildpack: nodejs_buildpack
+      memory: 512M
       disk-quota: 512M
-    properties:
-      SPRING_PROFILES_ACTIVE: cloud
-      JBP_CONFIG_COMPONENTS: "jres: ['com.sap.xs.java.buildpack.jre.SAPMachineJRE']"
-      JBP_CONFIG_SAP_MACHINE_JRE: '{ version: 17.+ }'
-      TARGET_RUNTIME: tomcat
     build-parameters:
       builder: custom
       commands:
-        - mvn clean package -DskipTests=true
-      build-result: target/*.jar
+        - npm ci
+        - npm run build
+      ignore: ["test", "types"]
     provides:
       - name: srv-api
         properties:
           srv-url: ${default-url}
     requires:
-      - name: cap-java-db
-      - name: cap-java-auth
-      - name: cap-java-destination
-      - name: cap-java-connectivity
-      - name: cap-java-logging
+      - name: cap-ts-db
+      - name: cap-ts-auth
+      - name: cap-ts-destination
+      - name: cap-ts-connectivity
+      - name: cap-ts-logging
 
   # ===================================
   # Database Deployer (HDI Container)
   # ===================================
-  - name: cap-java-db-deployer
+  - name: cap-ts-db-deployer
     type: hdb
     path: db
     parameters:
@@ -57,12 +53,12 @@ modules:
       memory: 256M
       disk-quota: 512M
     requires:
-      - name: cap-java-db
+      - name: cap-ts-db
 
   # ===================================
   # Frontend App (UI5/Fiori)
   # ===================================
-  - name: cap-java-app-hr-admin
+  - name: cap-ts-app-hr-admin
     type: html5
     path: app/hr-admin
     build-parameters:
@@ -73,8 +69,8 @@ modules:
       build-result: dist
       supported-platforms: []
     requires:
-      - name: cap-java-html5-repo-runtime
-      - name: cap-java-auth
+      - name: cap-ts-html5-repo-runtime
+      - name: cap-ts-auth
       - name: srv-api
         group: destinations
         properties:
@@ -85,7 +81,7 @@ modules:
   # ===================================
   # App Router (Central Entry Point)
   # ===================================
-  - name: cap-java-approuter
+  - name: cap-ts-approuter
     type: approuter.nodejs
     path: approuter
     parameters:
@@ -95,9 +91,9 @@ modules:
     properties:
       TENANT_HOST_PATTERN: "^(.*)-${default-uri}"
     requires:
-      - name: cap-java-html5-repo-runtime
-      - name: cap-java-auth
-      - name: cap-java-destination
+      - name: cap-ts-html5-repo-runtime
+      - name: cap-ts-auth
+      - name: cap-ts-destination
       - name: srv-api
         group: destinations
         properties:
@@ -113,17 +109,17 @@ modules:
   # ===================================
   # HTML5 Application Repository (Upload)
   # ===================================
-  - name: cap-java-app-deployer
+  - name: cap-ts-app-deployer
     type: com.sap.application.content
     path: .
     requires:
-      - name: cap-java-html5-repo-host
+      - name: cap-ts-html5-repo-host
         parameters:
           content-target: true
     build-parameters:
       build-result: resources
       requires:
-        - name: cap-java-app-hr-admin
+        - name: cap-ts-app-hr-admin
           artifacts:
             - dist/*.zip
           target-path: resources/
@@ -133,7 +129,7 @@ modules:
 # ===================================
 resources:
   # HDI Container (HANA Database)
-  - name: cap-java-db
+  - name: cap-ts-db
     type: com.sap.xs.hdi-container
     parameters:
       service: hana
@@ -142,55 +138,55 @@ resources:
       hdi-service-name: ${service-name}
 
   # XSUAA (Authentication & Authorization)
-  - name: cap-java-auth
+  - name: cap-ts-auth
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
       config:
-        xsappname: cap-java-${org}-${space}
+        xsappname: cap-ts-${org}-${space}
         tenant-mode: dedicated
         role-collections:
-          - name: "HRAdmin"
-            description: "HR Administrator"
+          - name: "ClientAdministrators"
+            description: "Client management administrators"
             role-template-references:
-              - $XSAPPNAME.Admin
-          - name: "HRUser"
-            description: "HR User"
+              - $XSAPPNAME.ClientEditor
+          - name: "ClientViewers"
+            description: "Client management viewers"
             role-template-references:
-              - $XSAPPNAME.User
+              - $XSAPPNAME.ClientViewer
 
   # Destination Service
-  - name: cap-java-destination
+  - name: cap-ts-destination
     type: org.cloudfoundry.managed-service
     parameters:
       service: destination
       service-plan: lite
 
   # Connectivity Service
-  - name: cap-java-connectivity
+  - name: cap-ts-connectivity
     type: org.cloudfoundry.managed-service
     parameters:
       service: connectivity
       service-plan: lite
 
   # HTML5 Application Repository (Host)
-  - name: cap-java-html5-repo-host
+  - name: cap-ts-html5-repo-host
     type: org.cloudfoundry.managed-service
     parameters:
       service: html5-apps-repo
       service-plan: app-host
 
   # HTML5 Application Repository (Runtime)
-  - name: cap-java-html5-repo-runtime
+  - name: cap-ts-html5-repo-runtime
     type: org.cloudfoundry.managed-service
     parameters:
       service: html5-apps-repo
       service-plan: app-runtime
 
   # Application Logging Service
-  - name: cap-java-logging
+  - name: cap-ts-logging
     type: org.cloudfoundry.managed-service
     parameters:
       service: application-logs

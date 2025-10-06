@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "ui5 serve --open index.html",
+    "dev": "ui5 serve --config ui5.yaml --open index.html",
+    "start": "ui5 serve --config ui5.yaml --open index.html",
     "build": "ui5 build --all"
   },
   "devDependencies": {
     "@sap/ux-ui5-tooling": "^1.19.0",
     "@sapui5/types": "^1.140.0",
     "@ui5/cli": "^4.0.26",
-    "typescript": "^5.9.2",
+    "typescript": "^5.6.3",
     "ui5-middleware-simpleproxy": "^3.5.1",
     "ui5-tooling-transpile": "^3.9.2"
   },
