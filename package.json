@@ -1,0 +1,97 @@
+{
+  "name": "cap-typescript",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "srv",
+    "app/hr-admin"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run watch --workspace srv\" \"npm run dev --workspace app/hr-admin\"",
+    "build": "npm run build --workspace srv && npm run build --workspace app/hr-admin",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm run test --workspace srv",
+    "test:frontend": "playwright test",
+    "lint": "npm run lint --workspace srv",
+    "start": "npm run build && npm run start:runtime",
+    "start:runtime": "npm run start --workspace srv"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "concurrently": "^9.0.1",
+    "typescript": "^5.6.3",
+    "@cap-js/sqlite": "^2.0.3",
+    "@cap-js/cds-test": "^0.4.0"
+  },
+  "cds": {
+    "features": {
+      "typescript": true
+    },
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "database": "sqlite.db"
+        }
+      },
+      "auth": {
+        "kind": "mocked",
+        "credentials": {
+          "users": {
+            "dev": {
+              "password": "dev",
+              "roles": [
+                "ClientViewer",
+                "ClientEditor"
+              ]
+            }
+          }
+        },
+        "users": {
+          "dev": {
+            "password": "dev",
+            "roles": [
+              "ClientViewer",
+              "ClientEditor"
+            ]
+          }
+        }
+      }
+    },
+    "serve": {
+      "static": [
+        {
+          "path": "/",
+          "directory": "app/hr-admin/dist"
+        }
+      ]
+    },
+    "odata": {
+      "urlPath": "/odata/v4"
+    },
+    "[test]": {
+      "requires": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "database": ":memory:"
+          }
+        },
+        "auth": {
+          "kind": "mocked",
+          "credentials": {
+            "users": {
+              "dev": {
+                "password": "dev",
+                "roles": [
+                  "ClientViewer",
+                  "ClientEditor"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

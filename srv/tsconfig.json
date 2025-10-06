@@ -1,0 +1,21 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "./dist",
+    "types": ["node", "jest"],
+    "baseUrl": "./",
+    "paths": {
+      "@types/*": ["types/*"]
+    },
+    "typeRoots": ["../types", "../node_modules/@types", "./node_modules/@types"]
+  },
+  "include": [
+    "./**/*.ts",
+    "../db/**/*.cds",
+    "../types/**/*.d.ts"
+  ],
+  "exclude": [
+    "dist"
+  ]
+}

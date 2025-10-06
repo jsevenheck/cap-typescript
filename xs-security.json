@@ -2,19 +2,19 @@
   "xsappname": "hr-cap",
   "tenant-mode": "dedicated",
   "scopes": [
-    { "name": "$XSAPPNAME.HRViewer", "description": "Read HR master data" },
-    { "name": "$XSAPPNAME.HREditor", "description": "Maintain HR master data" }
+    { "name": "$XSAPPNAME.ClientViewer", "description": "Read client master data" },
+    { "name": "$XSAPPNAME.ClientEditor", "description": "Maintain client master data" }
   ],
   "role-templates": [
     {
-      "name": "HRViewer",
+      "name": "ClientViewer",
       "description": "Read access",
-      "scope-references": ["$XSAPPNAME.HRViewer"]
+      "scope-references": ["$XSAPPNAME.ClientViewer"]
     },
     {
-      "name": "HREditor",
+      "name": "ClientEditor",
       "description": "Create/Update/Delete access",
-      "scope-references": ["$XSAPPNAME.HRViewer", "$XSAPPNAME.HREditor"]
+      "scope-references": ["$XSAPPNAME.ClientViewer", "$XSAPPNAME.ClientEditor"]
     }
   ]
 }

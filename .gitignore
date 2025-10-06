@@ -20,7 +20,7 @@ out/
 *.trace.db
 .mvn/wrapper/maven-wrapper.jar
 
-# --- CAP Java: generiert
+# --- CAP Java: generated
 /db/src/gen/
 # alle generierten Java/Resourcen
 /srv/src/gen/
@@ -46,7 +46,7 @@ out/
 **/.pnpm-store/
 app/**/*.tsbuildinfo
 /srv/node_modules/
-npm-debug.log*
+/npm-debug.log*
 
 # --- Env/Secrets
 .env
@@ -62,3 +62,15 @@ approuter/node_modules/
 approuter/resources/
 approuter/default-env.json
 approuter/package-lock.json
+
+# TypeScript build artifacts
+**/*.tsbuildinfo
+srv/**/*.js
+srv/**/*.js.map
+
+# Playwright
+playwright-report/
+test-results/
+
+# SQLite runtime files
+sqlite.db

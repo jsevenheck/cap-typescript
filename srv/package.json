@@ -1,7 +1,65 @@
 {
-  "name": "srv",
+  "name": "@acme/cap-srv",
+  "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc --project tsconfig.json",
+    "watch": "concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register ./node_modules/@sap/cds/bin/cds.js watch\"",
+    "start": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register ./node_modules/@sap/cds/bin/cds.js run",
+    "lint": "eslint \"**/*.ts\"",
+    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --runInBand"
+  },
+  "dependencies": {
+    "@sap/cds": "^9.3.1",
+    "cross-env": "^7.0.3",
+    "ts-node": "^10.9.2"
+  },
   "devDependencies": {
-    "@sap/cds-dk": "^9.3.2"
+    "@sap/cds-dk": "^9.3.1",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.1",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "concurrently": "^9.0.1",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jest": "^29.7.0",
+    "rimraf": "^6.0.1",
+    "supertest": "^7.1.0",
+    "ts-jest": "^29.3.2",
+    "typescript": "^5.6.3"
+  },
+  "cds": {
+    "odata": {
+      "urlPath": "/odata/v4"
+    },
+    "requires": {
+      "auth": {
+        "kind": "mocked",
+        "credentials": {
+          "users": {
+            "dev": {
+              "password": "dev",
+              "roles": [
+                "ClientViewer",
+                "ClientEditor"
+              ]
+            }
+          }
+        },
+        "users": {
+          "dev": {
+            "password": "dev",
+            "roles": [
+              "ClientViewer",
+              "ClientEditor"
+            ]
+          }
+        }
+      }
+    }
   }
 }

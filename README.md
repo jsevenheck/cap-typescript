@@ -1,0 +1,89 @@
+# CAP TypeScript Monorepo
+
+This repository contains a full SAP Cloud Application Programming Model (CAP) stack that has been migrated from the Java runtime to the TypeScript/Node.js runtime. Both the backend services and the HR Admin UI are contained in the same repository and can be developed, tested, and deployed together.
+
+## Repository structure
+
+```
+/db                 # CDS data model and seed data
+/srv                # CAP TypeScript service implementation
+/app/hr-admin       # SAPUI5 HR administration frontend (TypeScript)
+/approuter          # Application router configuration for BTP
+/tests              # Cross-cutting integration and e2e tests
+```
+
+## Getting started
+
+```bash
+npm install
+npm run dev
+```
+
+The command above starts `cds watch` (with TypeScript support) and the UI5 dev server side-by-side via `concurrently`. The UI development server proxies `/odata` calls to the CAP service that runs on port **4004**.
+
+### Available scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Starts CAP (`cds watch`) and the UI5 dev server concurrently. |
+| `npm run build` | Builds the CAP TypeScript sources (`tsc`) and the UI5 application (`ui5 build`). |
+| `npm run start` | Builds the full stack and starts CAP in production mode (serving the static UI from `app/hr-admin/dist`). |
+| `npm test` | Runs Jest based service tests and Playwright e2e tests against an in-memory SQLite database. |
+| `npm run lint` | Runs ESLint with TypeScript rules for the CAP service. |
+
+### Backend specifics
+
+* **Runtime:** `@sap/cds` 9 with TypeScript handlers loaded through `ts-node`.
+* **Database:** Local development uses SQLite (`sqlite.db`). Tests run entirely in-memory.
+* **Security:** The CDS model keeps the original `@restrict` annotations. `xs-security.json` exposes the `ClientViewer` and `ClientEditor` scopes to match those annotations.
+* **Business logic:** Custom handlers in `srv/handlers/client-service.ts` perform validation, enforce cross-entity consistency, and generate sequential employee identifiers.
+* **Health endpoint:** `/health` responds with `{ status: 'ok' }` for platform readiness probes.
+
+### Frontend specifics
+
+* The UI5 app continues to consume the `/odata/v4/clients` service as before.
+* `ui5-middleware-simpleproxy` proxies OData calls to the CAP server during development.
+* Production builds (served by CAP or the approuter) live in `app/hr-admin/dist`.
+
+## Testing
+
+The test suite is split into three layers:
+
+1. **Service tests (Jest + Supertest)** – Validates business logic like automatic employee ID creation and authorisation checks via HTTP calls to the CAP service (`srv/test`).
+2. **End-to-end tests (Playwright)** – Uses the Playwright request API to interact with the running CAP service and verify that the published OData API is reachable (`tests/e2e`).
+3. **UI unit tests** – UI5 unit tests can be added under `app/hr-admin/webapp/test` (unchanged from the original Java project).
+
+Run all tests with `npm test`.
+
+To collect coverage for the backend run `npm run test --workspace srv -- --coverage`.
+
+## Deployment
+
+* `mta.yaml` has been rewritten for the Node.js runtime (`type: nodejs` for the service module) while keeping the existing database deployer, approuter, and HTML5 repository modules.
+* Static UI build artefacts are served by the CAP service and the approuter via the `srv-api` destination.
+* The approuter configuration forwards `/odata/*` to the CAP service and exposes the UI as the welcome route.
+
+## Java → TypeScript mapping
+
+| Former Java artifact | TypeScript replacement |
+| --- | --- |
+| `srv/src/main/java/com/acme/hr/Application.java` | `srv/server.ts` (exports `cds.server` with health check) |
+| Spring Boot handlers & services | `srv/handlers/client-service.ts` (CAP hooks with identical semantics) |
+| Maven build (`pom.xml`) | `package.json` workspaces + TypeScript toolchain |
+| Spring Security roles | `xs-security.json` scopes `ClientViewer` / `ClientEditor` |
+| JUnit tests | Jest service tests + Playwright e2e tests |
+
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `CDS_ENV` | Standard CAP profile selection (`test` profile uses in-memory SQLite). |
+| `NODE_ENV` | Influences CAP logging and caching (set to `production` for `npm run start`). |
+| `TS_NODE_TRANSPILE_ONLY` | Speeds up ts-node execution for dev/test (set by scripts). |
+
+## Notes
+
+* Remove `sqlite.db` if you want a fresh local database.
+* The repository intentionally keeps generated employee IDs deterministic within a tenant to guarantee backward compatibility with existing UI behavior.
+* Playwright uses the APIRequest client so no headless browser is required during CI, but you can enable browser-based UI flows if desired.
+

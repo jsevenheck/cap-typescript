@@ -2,7 +2,7 @@
 using { clientmgmt as db } from '../db/schema';
 using { sap.common.Countries as CommonCountries } from '@sap/cds/common';
 
-service ClientService @(path:'/clients') {
+service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-service.ts') {
   @restrict: [
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
