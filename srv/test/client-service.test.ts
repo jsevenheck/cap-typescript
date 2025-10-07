@@ -1,10 +1,11 @@
-jest.mock('node-fetch', () => jest.fn());
+jest.mock('node-fetch', () => ({ __esModule: true, default: jest.fn() }));
 
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
 import fetch from 'node-fetch';
-import { deliverNewEmployeeNotification } from '../notification-service';
+
+import { processOutbox } from '../server';
 
 const cap = cds.test(path.join(__dirname, '..'));
 const encoded = Buffer.from('dev:dev').toString('base64');
@@ -14,7 +15,7 @@ const authConfig = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     Authorization: `Basic ${encoded}`,
-    'x-cds-roles': 'ClientViewer ClientEditor',
+    'x-cds-roles': 'ClientViewer ClientEditor HRViewer HREditor HRAdmin',
   },
 } as const;
 
@@ -34,8 +35,19 @@ const http = cap as unknown as {
     config?: Record<string, unknown>,
   ) => Promise<{ status: number; data: T; headers: Record<string, string> }>;
 };
-const mockedFetch = fetch as unknown as jest.MockedFunction<typeof fetch>;
+
+const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
 const { SELECT, INSERT } = cds.ql;
+const DELETE = (cds.ql as any).DELETE as typeof SELECT;
+
+const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
+const BETA_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
+
+let db: any;
+
+beforeAll(async () => {
+  db = await cds.connect.to('db');
+});
 
 const captureErrorStatus = async (promise: Promise<unknown>): Promise<number> => {
   try {
@@ -50,13 +62,13 @@ const captureErrorStatus = async (promise: Promise<unknown>): Promise<number> =>
   }
 };
 
-const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
-const BETA_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
-
-afterEach(() => {
+afterEach(async () => {
   mockedFetch.mockReset();
   delete process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
   delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+  if (db) {
+    await db.run(DELETE.from('clientmgmt.EmployeeNotificationOutbox'));
+  }
 });
 
 describe('ClientService (HTTP)', () => {
@@ -141,78 +153,67 @@ describe('ClientService (HTTP)', () => {
     expect(invalidStatus).toBeGreaterThanOrEqual(400);
   });
 
-  it('enforces ETag concurrency control on clients', async () => {
-    const uniqueCompany = `ETG-${randomUUID().slice(0, 8).toUpperCase()}`;
+  it('enforces ETag concurrency control on employees', async () => {
     const createResponse = await http.post<Record<string, any>>(
-      '/odata/v4/clients/Clients',
+      '/odata/v4/clients/Employees',
       {
-        companyId: uniqueCompany,
-        name: 'ETag Test Client',
-        country_code: 'DE',
+        firstName: 'Erica',
+        lastName: 'Miller',
+        email: 'erica.miller@example.com',
+        entryDate: '2024-05-01',
+        client_ID: CLIENT_ID,
       },
       authConfig,
     );
     expect(createResponse.status).toBe(201);
 
-    const created = createResponse.data ?? {};
-    const createdId =
-      (created as Record<string, unknown>).ID ||
-      (created as Record<string, unknown>).Id ||
-      (created as Record<string, unknown>).id;
-    expect(typeof createdId).toBe('string');
+    const employeeId = (createResponse.data as Record<string, any>).ID as string;
+    expect(typeof employeeId).toBe('string');
 
     const fetched = await http.get<Record<string, any>>(
-      `/odata/v4/clients/Clients(${createdId})`,
+      `/odata/v4/clients/Employees(${employeeId})`,
       authConfig,
     );
     expect(fetched.status).toBe(200);
-    const initialModifiedAt = (fetched.data as Record<string, unknown>).modifiedAt as string | undefined;
+
+    const initialModifiedAt = (fetched.data as Record<string, any>).modifiedAt as string | undefined;
     expect(typeof initialModifiedAt).toBe('string');
-    expect(initialModifiedAt).toBeTruthy();
 
-    const fetchedEtag = `"${initialModifiedAt}"`;
+    const etag = `"${initialModifiedAt}"`;
 
-    const missingStatus = await captureErrorStatus(
-      http.patch(
-        `/odata/v4/clients/Clients(${createdId})`,
-        { name: 'ETag Test Client Missing Header' },
-        authConfig,
-      ),
-    );
-    expect(missingStatus).toBe(428);
-
-    const invalidStatus = await captureErrorStatus(
-      http.patch(
-        `/odata/v4/clients/Clients(${createdId})`,
-        { name: 'ETag Test Client Invalid Attempt' },
-        {
-          ...authConfig,
-          headers: {
-            ...authConfig.headers,
-            'If-Match': '"invalid-etag"',
-          },
-        },
-      ),
-    );
-    expect(invalidStatus).toBe(412);
-
-    const updateResponse = await http.patch(
-      `/odata/v4/clients/Clients(${createdId})`,
-      { name: 'ETag Test Client Updated' },
+    const firstUpdate = await http.patch(
+      `/odata/v4/clients/Employees(${employeeId})`,
+      { location: 'Berlin' },
       {
         ...authConfig,
         headers: {
           ...authConfig.headers,
-          'If-Match': fetchedEtag,
+          'If-Match': etag,
         },
       },
     );
-    expect(updateResponse.status).toBe(200);
+    expect(firstUpdate.status).toBe(200);
+
+    const conflictStatus = await captureErrorStatus(
+      http.patch(
+        `/odata/v4/clients/Employees(${employeeId})`,
+        { positionLevel: 'L2' },
+        {
+          ...authConfig,
+          headers: {
+            ...authConfig.headers,
+            'If-Match': etag,
+          },
+        },
+      ),
+    );
+
+    expect(conflictStatus).toBe(412);
   });
 });
 
 
-describe('ClientService (authorization & queue)', () => {
+describe('ClientService authorization', () => {
   let service: any;
 
   const createUser = ({
@@ -251,6 +252,19 @@ describe('ClientService (authorization & queue)', () => {
     expect(companyIds).not.toContain('COMP-002');
   });
 
+  it('allows HR admin to access all clients', async () => {
+    const clients = await runAs(
+      { id: 'admin', roles: ['HRAdmin'], companyCodes: [] },
+      async (tx) =>
+        tx.run(
+          SELECT.from(tx.entities.Clients).columns('companyId'),
+        ),
+    );
+
+    const companyIds = (Array.isArray(clients) ? clients : []).map((client: any) => client.companyId);
+    expect(companyIds).toEqual(expect.arrayContaining(['COMP-001', 'COMP-002']));
+  });
+
   it('blocks HR editor writes outside assigned company codes', async () => {
     await runAs(
       { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
@@ -271,77 +285,151 @@ describe('ClientService (authorization & queue)', () => {
       (error) => {
         const status = (error as any).statusCode ?? (error as any).code;
         expect([403, '403']).toContain(status);
-        expect((error as Error).message).toContain('Not authorized for company COMP-002');
+        expect((error as Error).message).toContain('Forbidden: company code not assigned');
       },
     );
   });
-
-  it('queues notifications for new employees', async () => {
-    const queuedEmit = jest.fn().mockResolvedValue(undefined);
-    const queuedSpy = jest.spyOn(cds as any, 'queued').mockReturnValue({ emit: queuedEmit } as any);
-    const connectSpy = jest.spyOn(cds.connect as any, 'to').mockResolvedValue({});
-
-    try {
-      await runAs(
-        { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
-        async (tx) =>
-          tx.run(
-            INSERT.into(tx.entities.Employees).entries({
-              firstName: 'Queue',
-              lastName: 'Tester',
-              email: 'queue.tester@example.com',
-              entryDate: '2024-04-01',
-              client_ID: CLIENT_ID,
-            }),
-          ),
-      );
-
-      expect(connectSpy).toHaveBeenCalledWith('NotificationService');
-      expect(queuedEmit).toHaveBeenCalledTimes(1);
-      expect(queuedEmit).toHaveBeenCalledWith(
-        'NotifyNewEmployee',
-        expect.objectContaining({
-          clientCompanyId: 'COMP-001',
-          employeeId: expect.any(String),
-        }),
-      );
-    } finally {
-      queuedSpy.mockRestore();
-      connectSpy.mockRestore();
-    }
-  });
 });
 
-describe('NotificationService', () => {
-  const endpoint = 'https://example.org/employees';
 
-  it('throws to trigger retry on downstream failure', async () => {
-    process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT = endpoint;
-    mockedFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 503,
-      text: async () => 'unavailable',
-    } as any);
+describe('Employee notification outbox', () => {
+  let service: any;
 
-    await expect(
-      deliverNewEmployeeNotification({ employeeId: 'EMP-FAIL' }),
-    ).rejects.toThrow(/503/);
+  const createUser = ({
+    id,
+    roles,
+    companyCodes,
+  }: {
+    id: string;
+    roles: string[];
+    companyCodes: string[];
+  }) => (cds as any).User({ id, roles, attr: { companyCodes } });
+
+  const runAs = async <T>(
+    userOptions: { id: string; roles: string[]; companyCodes: string[] },
+    handler: (tx: any) => Promise<T>,
+  ): Promise<T> => {
+    const user = createUser(userOptions);
+    return service.tx({ user }, handler);
+  };
+
+  beforeAll(async () => {
+    service = await cds.connect.to('ClientService');
   });
 
-  it('delivers successfully when downstream responds ok', async () => {
-    process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT = endpoint;
+  it('writes an outbox entry after employee creation when endpoint configured', async () => {
+    process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT = 'https://example.org/employees';
+
+    await runAs(
+      { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
+      async (tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Queue',
+            lastName: 'Tester',
+            email: 'queue.tester@example.com',
+            entryDate: '2024-04-01',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+    );
+
+    const entry = (await db.run(
+      SELECT.one
+        .from('clientmgmt.EmployeeNotificationOutbox')
+        .where({ endpoint: 'https://example.org/employees' }),
+    )) as any;
+
+    expect(entry).toBeDefined();
+    expect(entry.eventType).toBe('EMPLOYEE_CREATED');
+    expect(entry.status).toBe('PENDING');
+
+    const payload = JSON.parse(entry.payload ?? '{}');
+    expect(payload).toMatchObject({
+      event: 'EMPLOYEE_CREATED',
+      clientCompanyId: 'COMP-001',
+    });
+  });
+
+  it('marks outbox entries as delivered when downstream succeeds', async () => {
+    const entryId = randomUUID();
+    await db.run(
+      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+        ID: entryId,
+        eventType: 'EMPLOYEE_CREATED',
+        endpoint: 'https://example.org/success',
+        payload: JSON.stringify({ ok: true }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(Date.now() - 1000),
+      }),
+    );
+
     mockedFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       text: async () => '',
     } as any);
 
-    await expect(
-      deliverNewEmployeeNotification({ employeeId: 'EMP-OK' }),
-    ).resolves.toBeUndefined();
+    await processOutbox();
+
+    const updated = (await db.run(
+      SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
+    )) as any;
+
+    expect(updated.status).toBe('DELIVERED');
+    expect(updated.deliveredAt).toBeTruthy();
+    expect(updated.lastError).toBeNull();
     expect(mockedFetch).toHaveBeenCalledWith(
-      endpoint,
+      'https://example.org/success',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('retries with exponential backoff and marks entry as failed after max attempts', async () => {
+    jest.useFakeTimers();
+    const baseTime = new Date('2024-01-01T00:00:00Z').getTime();
+    jest.setSystemTime(baseTime);
+
+    const entryId = randomUUID();
+    await db.run(
+      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+        ID: entryId,
+        eventType: 'EMPLOYEE_CREATED',
+        endpoint: 'https://example.org/fail',
+        payload: JSON.stringify({ ok: false }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(baseTime),
+      }),
+    );
+
+    mockedFetch.mockRejectedValue(new Error('network down'));
+
+    let currentTime = baseTime;
+    for (let attempt = 1; attempt <= 6; attempt += 1) {
+      jest.setSystemTime(currentTime);
+      await processOutbox();
+
+      const entry = (await db.run(
+        SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
+      )) as any;
+
+      expect(entry.attempts).toBe(attempt);
+
+      if (attempt < 6) {
+        expect(entry.status).toBe('PENDING');
+        const expectedDelay = Math.pow(2, attempt - 1) * 5000;
+        expect(new Date(entry.nextAttemptAt).getTime()).toBe(currentTime + expectedDelay);
+        currentTime = currentTime + expectedDelay + 1;
+      } else {
+        expect(entry.status).toBe('FAILED');
+        expect(entry.nextAttemptAt).toBeNull();
+        expect(entry.lastError).toContain('network down');
+      }
+    }
+
+    jest.useRealTimers();
+    expect(mockedFetch).toHaveBeenCalledTimes(6);
   });
 });

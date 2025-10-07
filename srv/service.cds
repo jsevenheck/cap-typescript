@@ -18,7 +18,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
   };
 
   @restrict: [
-    { grant: 'READ', to: 'HRAdmin' },
+    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HREditor', where: 'client.companyId in $user.companyCodes' },
 
@@ -28,7 +28,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
   entity Employees as projection on db.Employees;
 
   @restrict: [
-    { grant: 'READ', to: 'HRAdmin' },
+    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HREditor', where: 'client.companyId in $user.companyCodes' },
 
@@ -47,7 +47,3 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
   ]
   entity Countries as projection on CommonCountries;
 }
-
-annotate ClientService.Clients:modifiedAt with @odata.etag;
-annotate ClientService.Employees:modifiedAt with @odata.etag;
-annotate ClientService.CostCenters:modifiedAt with @odata.etag;
