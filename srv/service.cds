@@ -3,7 +3,6 @@ using { clientmgmt as db } from '../db/schema';
 using { sap.common.Countries as CommonCountries } from '@sap/cds/common';
 
 service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-service.ts') {
-  @odata.etag: 'modifiedAt'
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: 'companyId in $user.companyCodes' },
@@ -18,7 +17,6 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
     costCenters: redirected to CostCenters
   };
 
-  @odata.etag: 'modifiedAt'
   @restrict: [
     { grant: 'READ', to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
@@ -29,7 +27,6 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
   ]
   entity Employees as projection on db.Employees;
 
-  @odata.etag: 'modifiedAt'
   @restrict: [
     { grant: 'READ', to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
@@ -51,6 +48,6 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
   entity Countries as projection on CommonCountries;
 }
 
-annotate ClientService.Clients with @odata.etag: 'modifiedAt';
-annotate ClientService.Employees with @odata.etag: 'modifiedAt';
-annotate ClientService.CostCenters with @odata.etag: 'modifiedAt';
+annotate ClientService.Clients:modifiedAt with @odata.etag;
+annotate ClientService.Employees:modifiedAt with @odata.etag;
+annotate ClientService.CostCenters:modifiedAt with @odata.etag;

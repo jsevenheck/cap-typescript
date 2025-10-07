@@ -2,7 +2,7 @@ import cds from '@sap/cds';
 import type { Request } from '@sap/cds';
 
 import fetch from 'node-fetch';
-import { createHash } from 'crypto';
+import { createHmac } from 'crypto';
 
 export interface NotifyNewEmployeePayload {
   employeeId?: string;
@@ -30,7 +30,7 @@ export const deliverNewEmployeeNotification = async (
 
   const secret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
   if (secret) {
-    const signature = createHash('sha256').update(body + secret).digest('hex');
+    const signature = createHmac('sha256', secret).update(body).digest('hex');
     headers['x-signature-sha256'] = signature;
   }
 
