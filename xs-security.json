@@ -3,7 +3,10 @@
   "tenant-mode": "dedicated",
   "scopes": [
     { "name": "$XSAPPNAME.ClientViewer", "description": "Read client master data" },
-    { "name": "$XSAPPNAME.ClientEditor", "description": "Maintain client master data" }
+    { "name": "$XSAPPNAME.ClientEditor", "description": "Maintain client master data" },
+    { "name": "$XSAPPNAME.HRViewer", "description": "Read HR data" },
+    { "name": "$XSAPPNAME.HREditor", "description": "Maintain HR data" },
+    { "name": "$XSAPPNAME.HRAdmin", "description": "Admin access to all clients" }
   ],
   "role-templates": [
     {
@@ -15,6 +18,23 @@
       "name": "ClientEditor",
       "description": "Create/Update/Delete access",
       "scope-references": ["$XSAPPNAME.ClientViewer", "$XSAPPNAME.ClientEditor"]
+    },
+    {
+      "name": "HRViewer",
+      "description": "Read access (filtered by companyCodes)",
+      "scope-references": ["$XSAPPNAME.HRViewer"],
+      "attribute-references": [{ "name": "companyCodes" }]
+    },
+    {
+      "name": "HREditor",
+      "description": "Create/Update/Delete (filtered by companyCodes)",
+      "scope-references": ["$XSAPPNAME.HRViewer", "$XSAPPNAME.HREditor"],
+      "attribute-references": [{ "name": "companyCodes" }]
+    },
+    {
+      "name": "HRAdmin",
+      "description": "Full access (no filter)",
+      "scope-references": ["$XSAPPNAME.HRViewer", "$XSAPPNAME.HREditor", "$XSAPPNAME.HRAdmin"]
     }
   ]
 }

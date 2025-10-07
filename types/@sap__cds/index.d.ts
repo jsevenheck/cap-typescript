@@ -37,6 +37,7 @@ declare namespace CDS {
     readonly event: string;
     data: Record<string, any>;
     error(status: number, message: string): void;
+    reject(status: number, message?: string): never;
   }
 
   interface Service {
