@@ -13,6 +13,10 @@ type EmploymentType : String enum {
   external;
 };
 
+@odata.etag: 'modifiedAt'
+@cds.persistence.indices: [
+  { name: 'Clients_companyId_idx', elements: ['companyId'] }
+]
 entity Clients : managed, cuid {
   @assert.unique: { name: 'Clients_companyId_unique' }
   companyId  : String(40) not null;
@@ -22,11 +26,9 @@ entity Clients : managed, cuid {
   costCenters: Composition of many CostCenters on costCenters.client = $self;
 }
 
-@assert.unique: [
-  { name: 'Employees_employeeId_unique', fields: ['employeeId'] },
-  { name: 'Employees_client_employeeId_unique', fields: ['client', 'employeeId'] }
-]
+@odata.etag: 'modifiedAt'
 entity Employees : managed, cuid {
+  @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
   firstName     : String(60)  not null;
   lastName      : String(60)  not null;
@@ -48,6 +50,7 @@ entity EmployeeIdCounters {
 }
 
 
+@odata.etag: 'modifiedAt'
 entity CostCenters : managed, cuid {
   code         : String(40)  not null;
   name         : String(120) not null;

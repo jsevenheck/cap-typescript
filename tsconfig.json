@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "typeRoots": ["./types", "./node_modules/@types"]
   },
-  "include": []
+  "include": ["types/**/*.d.ts"]
 }

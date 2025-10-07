@@ -3,6 +3,7 @@ declare module '@sap/cds' {
     readonly event: string;
     data: Record<string, unknown>;
     error(status: number, message: string): void;
+    reject(status: number, message?: string): never;
   }
 
   export interface Service {

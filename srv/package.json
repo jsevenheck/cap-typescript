@@ -11,8 +11,10 @@
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --runInBand"
   },
   "dependencies": {
+    "@cap-js/persistent-queue": "^1.0.0",
     "@sap/cds": "^9.3.1",
     "cross-env": "^7.0.3",
+    "node-fetch": "^2.7.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
   },
@@ -20,6 +22,7 @@
     "@sap/cds-dk": "^9.3.1",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
+    "@types/node-fetch": "^2.6.11",
     "@types/node": "^22.10.1",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
@@ -45,8 +48,32 @@
               "password": "dev",
               "roles": [
                 "ClientViewer",
-                "ClientEditor"
-              ]
+                "ClientEditor",
+                "HRViewer",
+                "HREditor",
+                "HRAdmin"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001", "COMP-002"]
+              }
+            },
+            "hrviewer": {
+              "password": "hrviewer",
+              "roles": [
+                "HRViewer"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001"]
+              }
+            },
+            "hreditor": {
+              "password": "hreditor",
+              "roles": [
+                "HREditor"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001"]
+              }
             }
           }
         },
@@ -55,10 +82,37 @@
             "password": "dev",
             "roles": [
               "ClientViewer",
-              "ClientEditor"
-            ]
+              "ClientEditor",
+              "HRViewer",
+              "HREditor",
+              "HRAdmin"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001", "COMP-002"]
+            }
+          },
+          "hrviewer": {
+            "password": "hrviewer",
+            "roles": [
+              "HRViewer"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001"]
+            }
+          },
+          "hreditor": {
+            "password": "hreditor",
+            "roles": [
+              "HREditor"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001"]
+            }
           }
         }
+      },
+      "queue": {
+        "kind": "persistent-queue"
       }
     }
   }

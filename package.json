@@ -42,8 +42,32 @@
               "password": "dev",
               "roles": [
                 "ClientViewer",
-                "ClientEditor"
-              ]
+                "ClientEditor",
+                "HRViewer",
+                "HREditor",
+                "HRAdmin"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001", "COMP-002"]
+              }
+            },
+            "hrviewer": {
+              "password": "hrviewer",
+              "roles": [
+                "HRViewer"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001"]
+              }
+            },
+            "hreditor": {
+              "password": "hreditor",
+              "roles": [
+                "HREditor"
+              ],
+              "attributes": {
+                "companyCodes": ["COMP-001"]
+              }
             }
           }
         },
@@ -52,10 +76,37 @@
             "password": "dev",
             "roles": [
               "ClientViewer",
-              "ClientEditor"
-            ]
+              "ClientEditor",
+              "HRViewer",
+              "HREditor",
+              "HRAdmin"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001", "COMP-002"]
+            }
+          },
+          "hrviewer": {
+            "password": "hrviewer",
+            "roles": [
+              "HRViewer"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001"]
+            }
+          },
+          "hreditor": {
+            "password": "hreditor",
+            "roles": [
+              "HREditor"
+            ],
+            "attributes": {
+              "companyCodes": ["COMP-001"]
+            }
           }
         }
+      },
+      "queue": {
+        "kind": "persistent-queue"
       }
     },
     "serve": {
@@ -85,8 +136,32 @@
                 "password": "dev",
                 "roles": [
                   "ClientViewer",
-                  "ClientEditor"
-                ]
+                  "ClientEditor",
+                  "HRViewer",
+                  "HREditor",
+                  "HRAdmin"
+                ],
+                "attributes": {
+                  "companyCodes": ["COMP-001", "COMP-002"]
+                }
+              },
+              "hrviewer": {
+                "password": "hrviewer",
+                "roles": [
+                  "HRViewer"
+                ],
+                "attributes": {
+                  "companyCodes": ["COMP-001"]
+                }
+              },
+              "hreditor": {
+                "password": "hreditor",
+                "roles": [
+                  "HREditor"
+                ],
+                "attributes": {
+                  "companyCodes": ["COMP-001"]
+                }
               }
             }
           }
