@@ -34,11 +34,29 @@ export const deliverNewEmployeeNotification = async (
     headers['x-signature-sha256'] = signature;
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body,
-  });
+  const timeoutMs = Number.parseInt(
+    process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS ?? '10000',
+    10,
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body,
+      signal: controller.signal,
+    });
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Notify request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const message = await response.text();

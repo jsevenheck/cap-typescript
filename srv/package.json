@@ -11,6 +11,7 @@
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --runInBand"
   },
   "dependencies": {
+    "@cap-js/persistent-queue": "^1.0.0",
     "@sap/cds": "^9.3.1",
     "cross-env": "^7.0.3",
     "node-fetch": "^2.7.0",
