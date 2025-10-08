@@ -11,6 +11,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
   ]
+  @description: 'Updating or deleting a client requires optimistic concurrency control: supply an If-Match header when the service exposes ETags or include the latest modifiedAt timestamp in the payload.'
   entity Clients as projection on db.Clients {
     *,
     employees: redirected to Employees,
@@ -25,6 +26,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
   ]
+  @description: 'Updating or deleting an employee requires either an If-Match header carrying the latest ETag or the modifiedAt value in the payload to satisfy optimistic concurrency checks.'
   entity Employees as projection on db.Employees;
 
   @restrict: [
@@ -35,6 +37,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
   ]
+  @description: 'Updating or deleting a cost center requires concurrency metadata: include an If-Match header if the entity publishes ETags or provide the current modifiedAt timestamp in the payload.'
   entity CostCenters as projection on db.CostCenters;
 
   @restrict: [

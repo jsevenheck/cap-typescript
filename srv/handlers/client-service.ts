@@ -168,27 +168,53 @@ const parseIfMatchHeader = (header: string): { wildcard: boolean; values: string
   return { wildcard, values };
 };
 
+const normalizeConcurrencyValue = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return undefined;
+};
+
+const getEntityConcurrencyField = (entityName: string): { etag?: string; field?: string } => {
+  const definition = cds.model?.definitions?.[entityName] as
+    | { ['@odata.etag']?: string; elements?: Record<string, unknown> }
+    | undefined;
+
+  const etagElement = typeof definition?.['@odata.etag'] === 'string' ? definition['@odata.etag'] : undefined;
+
+  if (etagElement) {
+    return { etag: etagElement, field: etagElement };
+  }
+
+  const hasModifiedAt = Boolean((definition as { elements?: Record<string, unknown> } | undefined)?.elements?.modifiedAt);
+
+  if (hasModifiedAt) {
+    return { field: 'modifiedAt' };
+  }
+
+  return {};
+};
+
 const ensureOptimisticConcurrency = async (
   req: ExtendedRequest<EntityWithId>,
   entityName: string,
 ): Promise<boolean> => {
+  const { etag, field } = getEntityConcurrencyField(entityName);
+
+  if (!field) {
+    return true;
+  }
+
   const header = getIfMatchHeader(req);
-  if (!header) {
-    // Without an If-Match header we cannot enforce optimistic locking. CAP stops
-    // emitting ETag values when the underlying entity is no longer annotated as
-    // an ETag, so we must accept the request rather than always rejecting it.
-    return true;
-  }
-
-  const { wildcard, values } = parseIfMatchHeader(header);
-  if (wildcard) {
-    return true;
-  }
-
-  if (values.length === 0) {
-    req.reject(400, 'Invalid If-Match header.');
-    return false;
-  }
 
   const targetId = deriveRequestEntityId(req);
   if (!targetId) {
@@ -198,15 +224,58 @@ const ensureOptimisticConcurrency = async (
 
   const tx = cds.transaction(req);
   const record = (await tx.run(
-    SELECT.one.from(entityName).columns('modifiedAt').where({ ID: targetId }),
-  )) as { modifiedAt?: string } | undefined;
+    SELECT.one.from(entityName).columns(field).where({ ID: targetId }),
+  )) as Record<string, unknown> | undefined;
 
   if (!record) {
     req.error(404, `Entity ${targetId} not found.`);
     return false;
   }
 
-  if (record.modifiedAt && !values.includes(record.modifiedAt)) {
+  const currentValue = normalizeConcurrencyValue(record[field]);
+
+  if (header) {
+    const { wildcard, values } = parseIfMatchHeader(header);
+    if (wildcard) {
+      return true;
+    }
+
+    if (values.length === 0) {
+      req.reject(400, 'Invalid If-Match header.');
+      return false;
+    }
+
+    if (currentValue === undefined) {
+      req.reject(412);
+      return false;
+    }
+
+    if (!values.includes(currentValue)) {
+      req.reject(412);
+      return false;
+    }
+
+    return true;
+  }
+
+  if (etag) {
+    req.reject(428, 'Precondition required: supply an If-Match header.');
+    return false;
+  }
+
+  const providedValue = normalizeConcurrencyValue((req.data as Record<string, unknown> | undefined)?.[field]);
+
+  if (!providedValue) {
+    req.reject(428, `Precondition required: include ${field} in the request payload.`);
+    return false;
+  }
+
+  if (currentValue === undefined) {
+    req.reject(412);
+    return false;
+  }
+
+  if (providedValue !== currentValue) {
     req.reject(412);
     return false;
   }
