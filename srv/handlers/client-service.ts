@@ -55,7 +55,7 @@ const canAccessCompany = (req: Request, companyId?: string | null): boolean => {
 
   const normalizedCompanyId = normalizeCompanyId(companyId);
   if (!normalizedCompanyId) {
-    return true;
+    return false;
   }
 
   const user = getRequestUser(req);

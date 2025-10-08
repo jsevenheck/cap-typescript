@@ -3,7 +3,7 @@ jest.mock('node-fetch', () => ({ __esModule: true, default: jest.fn() }));
 import path from 'node:path';
 import { createHmac, randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
-import fetch from 'node-fetch';
+import fetch, { type RequestInit } from 'node-fetch';
 
 import { processOutbox } from '../server';
 
@@ -265,9 +265,9 @@ describe('ClientService authorization', () => {
     expect(companyIds).toEqual(expect.arrayContaining(['COMP-001', 'COMP-002']));
   });
 
-  it('blocks HR editor writes outside assigned company codes', async () => {
-    await runAs(
-      { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
+  const expectCompanyRestriction = async (companyCodes: string[]) =>
+    runAs(
+      { id: 'editor', roles: ['HREditor'], companyCodes },
       async (tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
@@ -288,6 +288,17 @@ describe('ClientService authorization', () => {
         expect((error as Error).message).toContain('Forbidden: company code not assigned');
       },
     );
+
+  it('blocks HR editor writes outside assigned company codes', async () => {
+    await expectCompanyRestriction(['COMP-001']);
+  });
+
+  it('blocks HR editor writes when assigned invalid company codes', async () => {
+    await expectCompanyRestriction(['NOT-REAL']);
+  });
+
+  it('blocks HR editor writes when assigned whitespace company codes', async () => {
+    await expectCompanyRestriction(['   ']);
   });
 });
 
@@ -392,6 +403,55 @@ describe('Employee notification outbox', () => {
         }),
       }),
     );
+  });
+
+  it('aborts hanging outbox deliveries and schedules a retry', async () => {
+    jest.useFakeTimers();
+
+    const baseTime = Date.now();
+    jest.setSystemTime(baseTime);
+
+    const entryId = randomUUID();
+    await db.run(
+      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+        ID: entryId,
+        eventType: 'EMPLOYEE_CREATED',
+        endpoint: 'https://example.org/hang',
+        payload: JSON.stringify({ ok: true }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(baseTime - 1000),
+      }),
+    );
+
+    mockedFetch.mockImplementationOnce((_url, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'));
+        });
+      }),
+    );
+
+    const processing = processOutbox();
+
+    jest.advanceTimersByTime(20000);
+
+    await processing;
+
+    const updated = (await db.run(
+      SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
+    )) as any;
+
+    expect(updated.status).toBe('PENDING');
+    expect(updated.attempts).toBe(1);
+    expect(new Date(updated.nextAttemptAt).getTime()).toBeGreaterThan(baseTime);
+    expect(String(updated.lastError)).toContain('aborted');
+
+    const fetchOptions = mockedFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(fetchOptions?.signal).toBeDefined();
+
+    jest.useRealTimers();
   });
 
   it('retries with exponential backoff and marks entry as failed after max attempts', async () => {

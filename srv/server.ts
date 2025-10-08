@@ -7,6 +7,21 @@ const { SELECT, UPDATE } = cds.ql;
 
 const MAX_ATTEMPTS = 6;
 const BASE_DELAY_MS = 5000;
+const DEFAULT_OUTBOX_TIMEOUT_MS = 15000;
+
+const resolveOutboxTimeout = (): number => {
+  const raw = process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS;
+  if (!raw) {
+    return DEFAULT_OUTBOX_TIMEOUT_MS;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_OUTBOX_TIMEOUT_MS;
+  }
+
+  return parsed;
+};
 
 interface OutboxEntry {
   ID: string;
@@ -63,11 +78,15 @@ export const processOutbox = async (): Promise<void> => {
       headers['x-signature-sha256'] = signature;
     }
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), resolveOutboxTimeout());
+
     try {
       const response = await fetch(entry.endpoint, {
         method: 'POST',
         headers,
         body: entry.payload,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -99,6 +118,8 @@ export const processOutbox = async (): Promise<void> => {
           })
           .where({ ID: entry.ID }),
       );
+    } finally {
+      clearTimeout(timeout);
     }
   }
 };
