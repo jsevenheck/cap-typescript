@@ -104,9 +104,6 @@
             }
           }
         }
-      },
-      "queue": {
-        "kind": "persistent-queue"
       }
     },
     "serve": {

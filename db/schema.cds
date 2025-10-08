@@ -59,3 +59,14 @@ entity CostCenters : managed, cuid {
   responsible  : Association to Employees not null;
   employees    : Association to many Employees on employees.costCenter = $self;
 }
+
+entity EmployeeNotificationOutbox : managed, cuid {
+  eventType     : String(60)  not null;
+  endpoint      : String(500) not null;
+  payload       : LargeString not null;
+  status        : String(20)  default 'PENDING';
+  attempts      : Integer     default 0;
+  nextAttemptAt : Timestamp;
+  deliveredAt   : Timestamp;
+  lastError     : LargeString;
+}

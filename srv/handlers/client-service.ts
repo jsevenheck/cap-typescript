@@ -48,29 +48,37 @@ const HR_ADMIN_ROLE = 'HRAdmin';
 const HR_VIEWER_ROLE = 'HRViewer';
 const HR_EDITOR_ROLE = 'HREditor';
 
-const extractCompanyCodes = (req: Request): string[] => {
+const canAccessCompany = (req: Request, companyId?: string | null): boolean => {
+  if (!companyId) {
+    return true;
+  }
+
+  const normalizedCompanyId = normalizeCompanyId(companyId);
+  if (!normalizedCompanyId) {
+    return false;
+  }
+
   const user = getRequestUser(req);
+  if (user?.is?.(HR_ADMIN_ROLE)) {
+    return true;
+  }
+
   const attributeSource = user?.attr;
-  let valuesInput: string | string[] | undefined;
+  let rawValues: unknown;
 
   if (typeof attributeSource === 'function') {
-    valuesInput = attributeSource('companyCodes') as string | string[] | undefined;
+    rawValues = attributeSource.call(user, 'companyCodes');
   } else if (attributeSource && typeof attributeSource === 'object') {
-    valuesInput = (attributeSource as { companyCodes?: string | string[] }).companyCodes;
+    rawValues = (attributeSource as { companyCodes?: unknown }).companyCodes;
   }
 
-  if (!valuesInput) {
-    return [];
-  }
-
-  const values = Array.isArray(valuesInput) ? valuesInput : [valuesInput];
-  const normalized = values
-    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+  const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
+  const normalizedValues = values
+    .filter((value): value is string => typeof value === 'string')
     .map((value) => normalizeCompanyId(value))
     .filter((value): value is string => typeof value === 'string' && value.length > 0);
 
-  const distinct = normalized.filter((value, index, self) => self.indexOf(value) === index);
-  return distinct;
+  return normalizedValues.includes(normalizedCompanyId);
 };
 
 const hasHrScope = (req: Request): boolean => {
@@ -79,36 +87,15 @@ const hasHrScope = (req: Request): boolean => {
 };
 
 const ensureUserAuthorizedForCompany = (req: Request, companyId?: string | null): boolean => {
-  if (!companyId) {
-    return true;
-  }
-
-  const normalizedCompanyId = normalizeCompanyId(companyId);
-  if (!normalizedCompanyId) {
-    return true;
-  }
-
-  const user = getRequestUser(req);
-
-  if (user?.is?.(HR_ADMIN_ROLE)) {
-    return true;
-  }
-
   if (!hasHrScope(req)) {
     return true;
   }
 
-  const companyCodes = extractCompanyCodes(req);
-  if (companyCodes.length === 0) {
-    req.error(403, 'Missing company code assignments for HR user.');
-    return false;
-  }
-
-  if (companyCodes.includes(normalizedCompanyId)) {
+  if (canAccessCompany(req, companyId)) {
     return true;
   }
 
-  req.error(403, `Not authorized for company ${normalizedCompanyId}.`);
+  req.reject(403, 'Forbidden: company code not assigned');
   return false;
 };
 
@@ -181,25 +168,53 @@ const parseIfMatchHeader = (header: string): { wildcard: boolean; values: string
   return { wildcard, values };
 };
 
+const normalizeConcurrencyValue = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return undefined;
+};
+
+const getEntityConcurrencyField = (entityName: string): { etag?: string; field?: string } => {
+  const definition = cds.model?.definitions?.[entityName] as
+    | { ['@odata.etag']?: string; elements?: Record<string, unknown> }
+    | undefined;
+
+  const etagElement = typeof definition?.['@odata.etag'] === 'string' ? definition['@odata.etag'] : undefined;
+
+  if (etagElement) {
+    return { etag: etagElement, field: etagElement };
+  }
+
+  const hasModifiedAt = Boolean((definition as { elements?: Record<string, unknown> } | undefined)?.elements?.modifiedAt);
+
+  if (hasModifiedAt) {
+    return { field: 'modifiedAt' };
+  }
+
+  return {};
+};
+
 const ensureOptimisticConcurrency = async (
   req: ExtendedRequest<EntityWithId>,
   entityName: string,
 ): Promise<boolean> => {
-  const header = getIfMatchHeader(req);
-  if (!header) {
-    req.reject(428, 'If-Match header required.');
-    return false;
-  }
+  const { etag, field } = getEntityConcurrencyField(entityName);
 
-  const { wildcard, values } = parseIfMatchHeader(header);
-  if (wildcard) {
+  if (!field) {
     return true;
   }
 
-  if (values.length === 0) {
-    req.reject(400, 'Invalid If-Match header.');
-    return false;
-  }
+  const header = getIfMatchHeader(req);
 
   const targetId = deriveRequestEntityId(req);
   if (!targetId) {
@@ -209,15 +224,58 @@ const ensureOptimisticConcurrency = async (
 
   const tx = cds.transaction(req);
   const record = (await tx.run(
-    SELECT.one.from(entityName).columns('modifiedAt').where({ ID: targetId }),
-  )) as { modifiedAt?: string } | undefined;
+    SELECT.one.from(entityName).columns(field).where({ ID: targetId }),
+  )) as Record<string, unknown> | undefined;
 
   if (!record) {
     req.error(404, `Entity ${targetId} not found.`);
     return false;
   }
 
-  if (record.modifiedAt && !values.includes(record.modifiedAt)) {
+  const currentValue = normalizeConcurrencyValue(record[field]);
+
+  if (header) {
+    const { wildcard, values } = parseIfMatchHeader(header);
+    if (wildcard) {
+      return true;
+    }
+
+    if (values.length === 0) {
+      req.reject(400, 'Invalid If-Match header.');
+      return false;
+    }
+
+    if (currentValue === undefined) {
+      req.reject(412);
+      return false;
+    }
+
+    if (!values.includes(currentValue)) {
+      req.reject(412);
+      return false;
+    }
+
+    return true;
+  }
+
+  if (etag) {
+    req.reject(428, 'Precondition required: supply an If-Match header.');
+    return false;
+  }
+
+  const providedValue = normalizeConcurrencyValue((req.data as Record<string, unknown> | undefined)?.[field]);
+
+  if (!providedValue) {
+    req.reject(428, `Precondition required: include ${field} in the request payload.`);
+    return false;
+  }
+
+  if (currentValue === undefined) {
+    req.reject(412);
+    return false;
+  }
+
+  if (providedValue !== currentValue) {
     req.reject(412);
     return false;
   }
@@ -496,6 +554,26 @@ const registerClientHandlers = (service: ClientService): void => {
     if (!concurrencyOk) {
       return;
     }
+
+    const clientId = deriveRequestEntityId(req);
+    if (!clientId) {
+      req.error(400, 'Client identifier is required.');
+      return;
+    }
+
+    const tx = cds.transaction(req);
+    const client = (await tx.run(
+      SELECT.one.from('clientmgmt.Clients').columns('companyId').where({ ID: clientId }),
+    )) as ClientEntity | undefined;
+
+    if (!client) {
+      req.error(404, `Client ${clientId} not found.`);
+      return;
+    }
+
+    if (!ensureUserAuthorizedForCompany(req, client.companyId)) {
+      return;
+    }
   });
 };
 
@@ -519,32 +597,32 @@ const registerEmployeeHandlers = (service: ClientService): void => {
         generatedEmployeeId = await ensureUniqueEmployeeId(req, client);
         const result = await next();
 
-        const createdEmployee = Array.isArray(result) ? result[0] : result;
-        const cdsInstance = cds as unknown as {
-          context?: { on: (event: string, handler: () => void | Promise<void>) => void };
-          queued?: (service: unknown) => { emit: (event: string, payload: unknown) => Promise<unknown> };
-        };
-        const context = cdsInstance.context;
-        if (createdEmployee && context && client.companyId) {
+        const createdEmployee = (Array.isArray(result) ? result[0] : result) as EmployeeEntity | undefined;
+        const endpoint = process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
+        if (endpoint && createdEmployee && client.companyId) {
+          const tx = cds.transaction(req);
           const clientCompanyId = normalizeCompanyId(client.companyId) ?? client.companyId;
           const payload = {
-            employeeId: createdEmployee.employeeId,
-            employeeUUID: createdEmployee.ID,
+            event: 'EMPLOYEE_CREATED',
+            employeeId: createdEmployee.employeeId ?? req.data.employeeId,
+            employeeUUID: createdEmployee.ID ?? req.data.ID,
             clientCompanyId,
-            client_ID: createdEmployee.client_ID,
-            firstName: createdEmployee.firstName,
-            lastName: createdEmployee.lastName,
-            email: createdEmployee.email,
+            client_ID: createdEmployee.client_ID ?? req.data.client_ID ?? client.ID,
+            firstName: createdEmployee.firstName ?? req.data.firstName,
+            lastName: createdEmployee.lastName ?? req.data.lastName,
+            email: createdEmployee.email ?? req.data.email,
           };
 
-          context.on('succeeded', async () => {
-            const notificationService = await cds.connect.to('NotificationService');
-            const queue = cdsInstance.queued;
-            if (!queue) {
-              return;
-            }
-            await queue(notificationService).emit('NotifyNewEmployee', payload);
-          });
+          await tx.run(
+            INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+              eventType: 'EMPLOYEE_CREATED',
+              endpoint,
+              payload: JSON.stringify(payload),
+              status: 'PENDING',
+              attempts: 0,
+              nextAttemptAt: new Date(),
+            }),
+          );
         }
 
         return result;
@@ -578,6 +656,31 @@ const registerEmployeeHandlers = (service: ClientService): void => {
   service.before('DELETE', 'Employees', async (req: EmployeeRequest) => {
     const concurrencyOk = await ensureOptimisticConcurrency(req, 'clientmgmt.Employees');
     if (!concurrencyOk) {
+      return;
+    }
+
+    const employeeId = deriveRequestEntityId(req);
+    if (!employeeId) {
+      req.error(400, 'Employee identifier is required.');
+      return;
+    }
+
+    const tx = cds.transaction(req);
+    const employee = (await tx.run(
+      SELECT.one.from('clientmgmt.Employees').columns('client_ID').where({ ID: employeeId }),
+    )) as EmployeeEntity | undefined;
+
+    if (!employee) {
+      req.error(404, `Employee ${employeeId} not found.`);
+      return;
+    }
+
+    const client = await ensureClientExists(req, employee.client_ID);
+    if (!client) {
+      return;
+    }
+
+    if (!ensureUserAuthorizedForCompany(req, client.companyId)) {
       return;
     }
   });
@@ -656,6 +759,31 @@ const registerCostCenterHandlers = (service: ClientService): void => {
   service.before('DELETE', 'CostCenters', async (req: CostCenterRequest) => {
     const concurrencyOk = await ensureOptimisticConcurrency(req, 'clientmgmt.CostCenters');
     if (!concurrencyOk) {
+      return;
+    }
+
+    const costCenterId = deriveRequestEntityId(req);
+    if (!costCenterId) {
+      req.error(400, 'Cost center identifier is required.');
+      return;
+    }
+
+    const tx = cds.transaction(req);
+    const costCenter = (await tx.run(
+      SELECT.one.from('clientmgmt.CostCenters').columns('client_ID').where({ ID: costCenterId }),
+    )) as CostCenterEntity | undefined;
+
+    if (!costCenter) {
+      req.error(404, `Cost center ${costCenterId} not found.`);
+      return;
+    }
+
+    const client = await ensureClientExists(req, costCenter.client_ID);
+    if (!client) {
+      return;
+    }
+
+    if (!ensureUserAuthorizedForCompany(req, client.companyId)) {
       return;
     }
   });
