@@ -174,8 +174,10 @@ const ensureOptimisticConcurrency = async (
 ): Promise<boolean> => {
   const header = getIfMatchHeader(req);
   if (!header) {
-    req.reject(428, 'If-Match header required.');
-    return false;
+    // Without an If-Match header we cannot enforce optimistic locking. CAP stops
+    // emitting ETag values when the underlying entity is no longer annotated as
+    // an ETag, so we must accept the request rather than always rejecting it.
+    return true;
   }
 
   const { wildcard, values } = parseIfMatchHeader(header);
