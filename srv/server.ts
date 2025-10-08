@@ -1,6 +1,7 @@
 import cds from '@sap/cds';
 import type { Application } from 'express';
-import type { RequestInit, Response } from 'node-fetch';
+import { createHmac } from 'crypto';
+import fetch, { type RequestInit, type Response } from 'node-fetch';
 
 const { SELECT, UPDATE } = cds.ql;
 
@@ -16,22 +17,8 @@ interface OutboxEntry {
   nextAttemptAt?: Date | null;
 }
 
-type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
-
-let fetchLoader: Promise<FetchFn> | undefined;
-
-const getFetch = async (): Promise<FetchFn> => {
-  if (!fetchLoader) {
-    fetchLoader = import('node-fetch').then((module) => {
-      const candidate = (module as { default?: FetchFn }).default ?? (module as unknown as FetchFn);
-      return candidate;
-    });
-  }
-  return fetchLoader;
-};
-
 export const processOutbox = async (): Promise<void> => {
-  const db = await cds.connect.to('db');
+  const db = (cds as any).db ?? (await cds.connect.to('db'));
   if (!db) {
     return;
   }
@@ -47,8 +34,8 @@ export const processOutbox = async (): Promise<void> => {
       if (!entry.nextAttemptAt) {
         return true;
       }
-      const scheduledAt = new Date(entry.nextAttemptAt as unknown as string).getTime();
-      return Number.isFinite(scheduledAt) && scheduledAt <= now.getTime();
+      const scheduled = new Date(entry.nextAttemptAt as unknown as string).getTime();
+      return Number.isFinite(scheduled) && scheduled <= now.getTime();
     })
     .slice(0, 20);
 
@@ -56,13 +43,30 @@ export const processOutbox = async (): Promise<void> => {
     return;
   }
 
-  const fetch = await getFetch();
-
   for (const entry of pending) {
+    const claimResult = await db.run(
+      UPDATE('clientmgmt.EmployeeNotificationOutbox')
+        .set({ status: 'PROCESSING', nextAttemptAt: now })
+        .where({ ID: entry.ID, status: 'PENDING' }),
+    );
+
+    const claimed = typeof claimResult === 'number' ? claimResult : Array.isArray(claimResult) ? claimResult[0] : 0;
+
+    if (!claimed) {
+      continue;
+    }
+
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const secret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+    if (secret) {
+      const signature = createHmac('sha256', secret).update(String(entry.payload ?? '')).digest('hex');
+      headers['x-signature-sha256'] = signature;
+    }
+
     try {
       const response = await fetch(entry.endpoint, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: entry.payload,
       });
 
@@ -111,10 +115,21 @@ cds.on('served', () => {
   }
 
   const logger = (cds as any).log?.('outbox') ?? console;
-  setInterval(() => {
-    processOutbox().catch((error) => {
+  let running = false;
+
+  setInterval(async () => {
+    if (running) {
+      return;
+    }
+
+    running = true;
+    try {
+      await processOutbox();
+    } catch (error) {
       logger.error?.('Outbox processing failed:', error);
-    });
+    } finally {
+      running = false;
+    }
   }, 5000);
 });
 

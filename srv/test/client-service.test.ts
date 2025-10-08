@@ -1,7 +1,7 @@
 jest.mock('node-fetch', () => ({ __esModule: true, default: jest.fn() }));
 
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
 import fetch from 'node-fetch';
 
@@ -365,6 +365,8 @@ describe('Employee notification outbox', () => {
       }),
     );
 
+    process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'super-secret';
+
     mockedFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -382,7 +384,13 @@ describe('Employee notification outbox', () => {
     expect(updated.lastError).toBeNull();
     expect(mockedFetch).toHaveBeenCalledWith(
       'https://example.org/success',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+          'x-signature-sha256': createHmac('sha256', 'super-secret').update(JSON.stringify({ ok: true })).digest('hex'),
+        }),
+      }),
     );
   });
 
