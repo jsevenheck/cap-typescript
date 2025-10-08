@@ -9,6 +9,26 @@ const MAX_ATTEMPTS = 6;
 const BASE_DELAY_MS = 5000;
 const DEFAULT_OUTBOX_TIMEOUT_MS = 15000;
 
+const resolveAuthProviderName = (): string => {
+  const env = cds.env as any;
+  const authConfig = env?.requires?.auth;
+  const kind = typeof authConfig?.kind === 'string' ? authConfig.kind.toLowerCase() : undefined;
+
+  if (kind === 'mocked') {
+    return 'Mocked';
+  }
+
+  if (kind === 'ias' || kind === 'ias-auth' || kind === 'identity') {
+    return 'IAS';
+  }
+
+  if (env?.security?.identity?.enabled) {
+    return 'IAS';
+  }
+
+  return kind ?? 'Unknown';
+};
+
 const resolveOutboxTimeout = (): number => {
   const raw = process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS;
   if (!raw) {
@@ -131,6 +151,9 @@ cds.on('bootstrap', (app: Application) => {
 });
 
 cds.on('served', () => {
+  const authLogger = (cds as any).log?.('auth') ?? console;
+  authLogger.info?.(`Authentication provider: ${resolveAuthProviderName()}`);
+
   if (process.env.NODE_ENV === 'test') {
     return;
   }

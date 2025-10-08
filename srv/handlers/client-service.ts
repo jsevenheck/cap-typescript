@@ -64,21 +64,34 @@ const canAccessCompany = (req: Request, companyId?: string | null): boolean => {
   }
 
   const attributeSource = user?.attr;
-  let rawValues: unknown;
+  const attributeNames: Array<'CompanyCode' | 'companyCodes'> = ['CompanyCode', 'companyCodes'];
 
-  if (typeof attributeSource === 'function') {
-    rawValues = attributeSource.call(user, 'companyCodes');
-  } else if (attributeSource && typeof attributeSource === 'object') {
-    rawValues = (attributeSource as { companyCodes?: unknown }).companyCodes;
+  const collected = new Set<string>();
+
+  for (const attributeName of attributeNames) {
+    let rawValues: unknown;
+
+    if (typeof attributeSource === 'function') {
+      rawValues = attributeSource.call(user, attributeName);
+    } else if (attributeSource && typeof attributeSource === 'object') {
+      rawValues = (attributeSource as Record<string, unknown>)[attributeName];
+    }
+
+    const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
+
+    for (const value of values) {
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      const normalized = normalizeCompanyId(value);
+      if (normalized) {
+        collected.add(normalized);
+      }
+    }
   }
 
-  const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
-  const normalizedValues = values
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => normalizeCompanyId(value))
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
-
-  return normalizedValues.includes(normalizedCompanyId);
+  return collected.has(normalizedCompanyId);
 };
 
 const hasHrScope = (req: Request): boolean => {
@@ -185,7 +198,7 @@ const normalizeConcurrencyValue = (value: unknown): string | undefined => {
 };
 
 const getEntityConcurrencyField = (entityName: string): { etag?: string; field?: string } => {
-  const definition = cds.model?.definitions?.[entityName] as
+  const definition = (cds as any).model?.definitions?.[entityName] as
     | { ['@odata.etag']?: string; elements?: Record<string, unknown> }
     | undefined;
 

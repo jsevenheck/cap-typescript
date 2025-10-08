@@ -4,20 +4,24 @@
   "private": true,
   "scripts": {
     "clean": "rimraf dist",
-    "build": "npm run clean && tsc --project tsconfig.json",
+    "build": "npm run clean && npm run ams:generate && tsc --project tsconfig.json",
     "watch": "concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register ./node_modules/@sap/cds/bin/cds.js watch\"",
     "start": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=1 node -r ts-node/register ./node_modules/@sap/cds/bin/serve.js",
     "lint": "eslint \"**/*.ts\"",
-    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --runInBand"
+    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --runInBand",
+    "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
     "@sap/cds": "^9.3.1",
+    "@sap/xssec": "^4.1.0",
     "cross-env": "^7.0.3",
     "node-fetch": "^2.6.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
   },
   "devDependencies": {
+    "@sap/ams-dev": "^2",
+    "@sap/ams": "^3",
     "@sap/cds-dk": "^9.3.1",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
@@ -53,7 +57,8 @@
                 "HRAdmin"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001", "COMP-002"]
+                "companyCodes": ["COMP-001", "COMP-002"],
+                "CompanyCode": ["COMP-001", "COMP-002"]
               }
             },
             "hrviewer": {
@@ -62,7 +67,8 @@
                 "HRViewer"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"]
+                "companyCodes": ["COMP-001"],
+                "CompanyCode": ["COMP-001"]
               }
             },
             "hreditor": {
@@ -71,7 +77,8 @@
                 "HREditor"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"]
+                "companyCodes": ["COMP-001"],
+                "CompanyCode": ["COMP-001"]
               }
             }
           }
@@ -87,7 +94,8 @@
               "HRAdmin"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001", "COMP-002"]
+              "companyCodes": ["COMP-001", "COMP-002"],
+              "CompanyCode": ["COMP-001", "COMP-002"]
             }
           },
           "hrviewer": {
@@ -96,7 +104,8 @@
               "HRViewer"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"]
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
             }
           },
           "hreditor": {
@@ -105,9 +114,24 @@
               "HREditor"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"]
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
             }
           }
+        },
+        "ams": {
+          "dclRoot": "ams",
+          "dcnRoot": "gen/ams/dcn",
+          "dclGenerationPackage": "cap",
+          "generateDcl": true,
+          "generatePoliciesDeployer": false
+        }
+      }
+    },
+    "[production]": {
+      "requires": {
+        "auth": {
+          "kind": "ias"
         }
       }
     }

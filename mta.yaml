@@ -37,7 +37,8 @@ modules:
           srv-url: ${default-url}
     requires:
       - name: cap-ts-db
-      - name: cap-ts-auth
+      - name: cap-ts-ias
+      - name: cap-ts-ams
       - name: cap-ts-destination
       - name: cap-ts-connectivity
       - name: cap-ts-logging
@@ -70,7 +71,6 @@ modules:
       supported-platforms: []
     requires:
       - name: cap-ts-html5-repo-runtime
-      - name: cap-ts-auth
       - name: srv-api
         group: destinations
         properties:
@@ -92,7 +92,8 @@ modules:
       TENANT_HOST_PATTERN: "^(.*)-${default-uri}"
     requires:
       - name: cap-ts-html5-repo-runtime
-      - name: cap-ts-auth
+      - name: cap-ts-ias
+      - name: cap-ts-ams
       - name: cap-ts-destination
       - name: srv-api
         group: destinations
@@ -105,6 +106,29 @@ modules:
       - name: app-api
         properties:
           app-url: ${default-url}
+
+  - name: cap-ts-ams-deployer
+    type: javascript.nodejs
+    path: srv/ams
+    parameters:
+      buildpack: nodejs_buildpack
+      no-route: true
+      no-start: true
+      tasks:
+        - name: deploy-dcl
+          command: npm start
+          memory: 256M
+    build-parameters:
+      builder: custom
+      commands:
+        - npm ci --production
+    requires:
+      - name: cap-ts-ias
+        parameters:
+          config:
+            credential-type: X509_GENERATED
+            app-identifier: policy-deployer
+      - name: cap-ts-ams
 
   # ===================================
   # HTML5 Application Repository (Upload)
@@ -137,25 +161,19 @@ resources:
     properties:
       hdi-service-name: ${service-name}
 
-  # XSUAA (Authentication & Authorization)
-  - name: cap-ts-auth
+  # IAS (Authentication)
+  - name: cap-ts-ias
     type: org.cloudfoundry.managed-service
     parameters:
-      service: xsuaa
+      service: identity
       service-plan: application
-      path: ./xs-security.json
-      config:
-        xsappname: cap-ts-${org}-${space}
-        tenant-mode: dedicated
-        role-collections:
-          - name: "ClientAdministrators"
-            description: "Client management administrators"
-            role-template-references:
-              - $XSAPPNAME.ClientEditor
-          - name: "ClientViewers"
-            description: "Client management viewers"
-            role-template-references:
-              - $XSAPPNAME.ClientViewer
+
+  # AMS (Authorization)
+  - name: cap-ts-ams
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: authorization
+      service-plan: application
 
   # Destination Service
   - name: cap-ts-destination

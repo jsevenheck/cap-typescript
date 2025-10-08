@@ -35,7 +35,7 @@ The command above starts `cds watch` (with TypeScript support) and the UI5 dev s
 
 * **Runtime:** `@sap/cds` 9 with TypeScript handlers loaded through `ts-node`.
 * **Database:** Local development uses SQLite (`sqlite.db`). Tests run entirely in-memory.
-* **Security:** The CDS model keeps the original `@restrict` annotations. `xs-security.json` exposes the `ClientViewer` and `ClientEditor` scopes to match those annotations.
+* **Security:** Authentication relies on SAP Cloud Identity Services (IAS) and authorization decisions are delegated to the Authorization Management Service (AMS). Local development still uses mocked users so existing tests continue to run unchanged.
 * **Business logic:** Custom handlers in `srv/handlers/client-service.ts` perform validation, enforce cross-entity consistency, and generate sequential employee identifiers.
 * **Health endpoint:** `/health` responds with `{ status: 'ok' }` for platform readiness probes.
 
@@ -57,11 +57,17 @@ Run all tests with `npm test`.
 
 To collect coverage for the backend run `npm run test --workspace srv -- --coverage`.
 
+## Authentication & Authorization
+
+* Local profiles keep mocked users (including the HR roles and company attributes) so day-to-day development does not require cloud credentials.
+* The CAP runtime is configured for IAS (`cds.security.identity`) and AMS (`cds.requires.auth.ams`). The generated AMS DCL files live in `srv/ams`; run `npm run ams:generate --workspace srv` whenever CDS annotations change.
+* During deployment bind both the IAS (`identity` service, `application` plan) and AMS (`authorization` service, `application` plan) instances to the CAP service and approuter. The MTA project also ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
+
 ## Deployment
 
-* `mta.yaml` has been rewritten for the Node.js runtime (`type: nodejs` for the service module) while keeping the existing database deployer, approuter, and HTML5 repository modules.
+* `mta.yaml` now provisions `cap-ts-ias` and `cap-ts-ams` service instances alongside the existing database, destination, connectivity, HTML5 repo, and logging services.
 * Static UI build artefacts are served by the CAP service and the approuter via the `srv-api` destination.
-* The approuter configuration forwards `/odata/*` to the CAP service and exposes the UI as the welcome route.
+* The approuter configuration forwards `/odata/*` to the CAP service, enforces IAS authentication on all routes, and exposes the UI as the welcome route.
 
 ## Java → TypeScript mapping
 
@@ -80,6 +86,8 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 | `CDS_ENV` | Standard CAP profile selection (`test` profile uses in-memory SQLite). |
 | `NODE_ENV` | Influences CAP logging and caching (set to `production` for `npm run start`). |
 | `TS_NODE_TRANSPILE_ONLY` | Speeds up ts-node execution for dev/test (set by scripts). |
+| `IAS_TENANT`, `IAS_CLIENT_ID`, `IAS_CLIENT_SECRET` | Optional overrides to connect to IAS without Cloud Foundry bindings during local troubleshooting. |
+| `AMS_DCL_ROOT` | Overrides the folder in which the AMS DCL files are generated (defaults to `srv/ams`). |
 
 ## Notes
 

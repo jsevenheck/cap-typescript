@@ -1,0 +1,4 @@
+# Generated AMS policies
+/generated/
+schema.dcl
+node_modules/
