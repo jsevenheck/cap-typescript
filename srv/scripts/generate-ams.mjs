@@ -7,11 +7,12 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(projectRoot, '..');
 
 const candidateBins = [
-  path.resolve(projectRoot, '../node_modules/@sap/cds-dk/bin/cds.js'),
+  path.resolve(repoRoot, 'node_modules/@sap/cds-dk/bin/cds.js'),
   path.resolve(projectRoot, 'node_modules/@sap/cds-dk/bin/cds.js'),
-  path.resolve(projectRoot, '../node_modules/@sap/cds/bin/cds.js'),
+  path.resolve(repoRoot, 'node_modules/@sap/cds/bin/cds.js'),
   path.resolve(projectRoot, 'node_modules/@sap/cds/bin/cds.js'),
 ];
 
@@ -23,7 +24,7 @@ if (!cdsBin) {
 }
 
 const child = spawn(process.execPath, [cdsBin, 'build', '--for', 'ams'], {
-  cwd: projectRoot,
+  cwd: repoRoot,
   stdio: 'inherit',
   env: {
     ...process.env,

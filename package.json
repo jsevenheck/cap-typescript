@@ -113,8 +113,16 @@
               "CompanyCode": ["COMP-001"]
             }
           }
+        }
+      },
+      "ams": {
+        "kind": "enterprise-messaging",
+        "vcap": {
+          "label": "authorization",
+          "service": "authorization",
+          "plan": "application"
         },
-        "ams": {
+        "credentials": {
           "dclRoot": "srv/ams",
           "dcnRoot": "srv/gen/ams/dcn",
           "dclGenerationPackage": "cap",
@@ -188,8 +196,16 @@
                 }
               }
             }
+          }
+        },
+        "ams": {
+          "kind": "enterprise-messaging",
+          "vcap": {
+            "label": "authorization",
+            "service": "authorization",
+            "plan": "application"
           },
-          "ams": {
+          "credentials": {
             "dclRoot": "srv/ams",
             "dcnRoot": "srv/gen/ams/dcn",
             "dclGenerationPackage": "cap",
