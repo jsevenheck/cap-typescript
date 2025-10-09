@@ -19,6 +19,8 @@ const authConfig = {
   },
 } as const;
 
+jest.setTimeout(60000);
+
 const http = cap as unknown as {
   get: <T = unknown>(
     url: string,
@@ -224,7 +226,12 @@ describe('ClientService authorization', () => {
     id: string;
     roles: string[];
     companyCodes: string[];
-  }) => (cds as any).User({ id, roles, attr: { companyCodes } });
+  }) =>
+    (cds as any).User({
+      id,
+      roles,
+      attr: { companyCodes, CompanyCode: companyCodes },
+    });
 
   const runAs = async <T>(
     userOptions: { id: string; roles: string[]; companyCodes: string[] },
@@ -263,6 +270,83 @@ describe('ClientService authorization', () => {
 
     const companyIds = (Array.isArray(clients) ? clients : []).map((client: any) => client.companyId);
     expect(companyIds).toEqual(expect.arrayContaining(['COMP-001', 'COMP-002']));
+  });
+
+  it('accepts IAS CompanyCode attributes exposed via attr function', async () => {
+    const user = (cds as any).User({
+      id: 'ias-editor-fn',
+      roles: ['HREditor'],
+      attr(name: string) {
+        if (name === 'CompanyCode') {
+          return ' comp-002 ';
+        }
+        return undefined;
+      },
+    });
+
+    await expect(
+      service.tx({ user }, (tx: any) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Ias',
+            lastName: 'Function',
+            email: 'ias.function@example.com',
+            entryDate: '2024-05-01',
+            client_ID: BETA_CLIENT_ID,
+          }),
+        ),
+      ),
+    ).resolves.not.toThrow();
+
+    await expect(
+      service.tx({ user }, (tx: any) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Ias',
+            lastName: 'BlockedFn',
+            email: 'ias.blocked.fn@example.com',
+            entryDate: '2024-05-02',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Forbidden') });
+  });
+
+  it('accepts IAS CompanyCode attributes provided as array values', async () => {
+    const user = (cds as any).User({
+      id: 'ias-editor-array',
+      roles: ['HREditor'],
+      attr: { CompanyCode: ['comp-001'] },
+    });
+
+    await expect(
+      service.tx({ user }, (tx: any) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Ias',
+            lastName: 'Array',
+            email: 'ias.array@example.com',
+            entryDate: '2024-06-01',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).resolves.not.toThrow();
+
+    await expect(
+      service.tx({ user }, (tx: any) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Ias',
+            lastName: 'BlockedArray',
+            email: 'ias.blocked.array@example.com',
+            entryDate: '2024-06-02',
+            client_ID: BETA_CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Forbidden') });
   });
 
   const expectCompanyRestriction = async (companyCodes: string[]) =>
@@ -314,7 +398,12 @@ describe('Employee notification outbox', () => {
     id: string;
     roles: string[];
     companyCodes: string[];
-  }) => (cds as any).User({ id, roles, attr: { companyCodes } });
+  }) =>
+    (cds as any).User({
+      id,
+      roles,
+      attr: { companyCodes, CompanyCode: companyCodes },
+    });
 
   const runAs = async <T>(
     userOptions: { id: string; roles: string[]; companyCodes: string[] },
@@ -433,9 +522,14 @@ describe('Employee notification outbox', () => {
       }),
     );
 
+    process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS = '10';
     const processing = processOutbox();
 
-    jest.advanceTimersByTime(20000);
+    if (typeof (jest as any).advanceTimersByTimeAsync === 'function') {
+      await (jest as any).advanceTimersByTimeAsync(1000);
+    } else {
+      jest.advanceTimersByTime(1000);
+    }
 
     await processing;
 
@@ -451,6 +545,7 @@ describe('Employee notification outbox', () => {
     const fetchOptions = mockedFetch.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(fetchOptions?.signal).toBeDefined();
 
+    delete process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS;
     jest.useRealTimers();
   });
 

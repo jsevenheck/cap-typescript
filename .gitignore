@@ -24,6 +24,7 @@ out/
 /db/src/gen/
 # alle generierten Java/Resourcen
 /srv/src/gen/
+/srv/gen/
 # generierte OData/CSN-Artefakte
 /srv/src/main/resources/edmx/
 /srv/src/main/resources/csn.json

@@ -27,6 +27,10 @@
     "features": {
       "typescript": true
     },
+    "security": {
+      "identity": { "enabled": true },
+      "xsuaa": { "enabled": false }
+    },
     "requires": {
       "db": {
         "kind": "sqlite",
@@ -48,7 +52,8 @@
                 "HRAdmin"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001", "COMP-002"]
+                "companyCodes": ["COMP-001", "COMP-002"],
+                "CompanyCode": ["COMP-001", "COMP-002"]
               }
             },
             "hrviewer": {
@@ -57,7 +62,8 @@
                 "HRViewer"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"]
+                "companyCodes": ["COMP-001"],
+                "CompanyCode": ["COMP-001"]
               }
             },
             "hreditor": {
@@ -66,7 +72,8 @@
                 "HREditor"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"]
+                "companyCodes": ["COMP-001"],
+                "CompanyCode": ["COMP-001"]
               }
             }
           }
@@ -82,7 +89,8 @@
               "HRAdmin"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001", "COMP-002"]
+              "companyCodes": ["COMP-001", "COMP-002"],
+              "CompanyCode": ["COMP-001", "COMP-002"]
             }
           },
           "hrviewer": {
@@ -91,7 +99,8 @@
               "HRViewer"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"]
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
             }
           },
           "hreditor": {
@@ -100,9 +109,25 @@
               "HREditor"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"]
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
             }
           }
+        }
+      },
+      "ams": {
+        "kind": "authorization",
+        "vcap": {
+          "label": "authorization",
+          "service": "authorization",
+          "plan": "application"
+        },
+        "credentials": {
+          "dclRoot": "srv/ams",
+          "dcnRoot": "srv/gen/ams/dcn",
+          "dclGenerationPackage": "cap",
+          "generateDcl": true,
+          "generatePoliciesDeployer": false
         }
       }
     },
@@ -116,6 +141,13 @@
     },
     "odata": {
       "urlPath": "/odata/v4"
+    },
+    "[production]": {
+      "requires": {
+        "auth": {
+          "kind": "ias"
+        }
+      }
     },
     "[test]": {
       "requires": {
@@ -139,7 +171,8 @@
                   "HRAdmin"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001", "COMP-002"]
+                  "companyCodes": ["COMP-001", "COMP-002"],
+                  "CompanyCode": ["COMP-001", "COMP-002"]
                 }
               },
               "hrviewer": {
@@ -148,7 +181,8 @@
                   "HRViewer"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001"]
+                  "companyCodes": ["COMP-001"],
+                  "CompanyCode": ["COMP-001"]
                 }
               },
               "hreditor": {
@@ -157,10 +191,26 @@
                   "HREditor"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001"]
+                  "companyCodes": ["COMP-001"],
+                  "CompanyCode": ["COMP-001"]
                 }
               }
             }
+          }
+        },
+        "ams": {
+          "kind": "enterprise-messaging",
+          "vcap": {
+            "label": "authorization",
+            "service": "authorization",
+            "plan": "application"
+          },
+          "credentials": {
+            "dclRoot": "srv/ams",
+            "dcnRoot": "srv/gen/ams/dcn",
+            "dclGenerationPackage": "cap",
+            "generateDcl": true,
+            "generatePoliciesDeployer": false
           }
         }
       }

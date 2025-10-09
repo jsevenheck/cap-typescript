@@ -1,0 +1,14 @@
+{
+  "name": "cap-ts-ams-deployer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "deploy-dcl -d ."
+  },
+  "dependencies": {
+    "@sap/ams": "^3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

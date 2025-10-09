@@ -5,8 +5,12 @@ using { sap.common.Countries as CommonCountries } from '@sap/cds/common';
 service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-service.ts') {
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
-    { grant: 'READ', to: 'HRViewer',  where: 'companyId in $user.companyCodes' },
-    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HREditor', where: 'companyId in $user.companyCodes' },
+    { grant: 'READ', to: 'HRViewer',  where: '(companyId in $user.CompanyCode or companyId in $user.companyCodes)' },
+    {
+      grant: ['READ','CREATE','UPDATE','DELETE'],
+      to: 'HREditor',
+      where: '(companyId in $user.CompanyCode or companyId in $user.companyCodes)',
+    },
 
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
@@ -20,8 +24,16 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
 
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
-    { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
-    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HREditor', where: 'client.companyId in $user.companyCodes' },
+    {
+      grant: 'READ',
+      to: 'HRViewer',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
+    {
+      grant: ['READ','CREATE','UPDATE','DELETE'],
+      to: 'HREditor',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
 
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
@@ -31,8 +43,16 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
 
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
-    { grant: 'READ', to: 'HRViewer',  where: 'client.companyId in $user.companyCodes' },
-    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HREditor', where: 'client.companyId in $user.companyCodes' },
+    {
+      grant: 'READ',
+      to: 'HRViewer',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
+    {
+      grant: ['READ','CREATE','UPDATE','DELETE'],
+      to: 'HREditor',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
 
     { grant: 'READ', to: 'ClientViewer' },
     { grant: ['CREATE','UPDATE','DELETE'], to: 'ClientEditor' }
