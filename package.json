@@ -116,7 +116,7 @@
         }
       },
       "ams": {
-        "kind": "enterprise-messaging",
+        "kind": "authorization",
         "vcap": {
           "label": "authorization",
           "service": "authorization",
