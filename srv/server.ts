@@ -194,10 +194,24 @@ export const processOutbox = async (): Promise<void> => {
     }
 
     const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
+    const originalNextAttemptAt =
+      entry.nextAttemptAt === null || entry.nextAttemptAt === undefined ? null : entry.nextAttemptAt;
+
+    const where: Record<string, unknown> = {
+      ID: entry.ID,
+      status: expectedStatus,
+    };
+
+    if (originalNextAttemptAt === null) {
+      where.nextAttemptAt = null;
+    } else {
+      where.nextAttemptAt = originalNextAttemptAt;
+    }
+
     const claimResult = await db.run(
       UPDATE('clientmgmt.EmployeeNotificationOutbox')
         .set({ status: 'PROCESSING', nextAttemptAt: now })
-        .where({ ID: entry.ID, status: expectedStatus }),
+        .where(where),
     );
 
     const claimedCount =
