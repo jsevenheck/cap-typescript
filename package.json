@@ -45,8 +45,6 @@
             "dev": {
               "password": "dev",
               "roles": [
-                "ClientViewer",
-                "ClientEditor",
                 "HRViewer",
                 "HREditor",
                 "HRAdmin"
@@ -82,8 +80,6 @@
           "dev": {
             "password": "dev",
             "roles": [
-              "ClientViewer",
-              "ClientEditor",
               "HRViewer",
               "HREditor",
               "HRAdmin"
@@ -164,8 +160,6 @@
               "dev": {
                 "password": "dev",
                 "roles": [
-                  "ClientViewer",
-                  "ClientEditor",
                   "HRViewer",
                   "HREditor",
                   "HRAdmin"

@@ -1,14 +1,14 @@
 import { expect, request, test } from '@playwright/test';
 import { startCapServer } from '../utils/cap-server';
 
-test('Client list is accessible for viewer scope', async () => {
+test('Client list is accessible for HR viewer scope', async () => {
   const server = await startCapServer();
   try {
     const context = await request.newContext({
       baseURL: server.url,
       extraHTTPHeaders: {
         Authorization: 'Basic ZGV2OmRldg==',
-        'x-cds-roles': 'ClientViewer ClientEditor',
+        'x-cds-roles': 'HRViewer',
         'x-cds-user': 'dev'
       }
     });
