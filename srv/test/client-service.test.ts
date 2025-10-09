@@ -15,7 +15,7 @@ const authConfig = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     Authorization: `Basic ${encoded}`,
-    'x-cds-roles': 'ClientViewer ClientEditor HRViewer HREditor HRAdmin',
+    'x-cds-roles': 'HRViewer HREditor HRAdmin',
   },
 } as const;
 

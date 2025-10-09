@@ -76,7 +76,7 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 | `srv/src/main/java/com/acme/hr/Application.java` | `srv/server.ts` (exports `cds.server` with health check) |
 | Spring Boot handlers & services | `srv/handlers/client-service.ts` (CAP hooks with identical semantics) |
 | Maven build (`pom.xml`) | `package.json` workspaces + TypeScript toolchain |
-| Spring Security roles | `xs-security.json` scopes `ClientViewer` / `ClientEditor` |
+| Spring Security roles | IAS scopes `HRViewer` / `HREditor` / `HRAdmin` |
 | JUnit tests | Jest service tests + Playwright e2e tests |
 
 ## Environment variables
