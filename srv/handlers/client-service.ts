@@ -40,6 +40,9 @@ declare global {
 const { SELECT, INSERT, UPDATE } = cds.ql;
 
 const MAX_EMPLOYEE_ID_RETRIES = 5;
+const EMPLOYEE_ID_PREFIX_LENGTH = 8;
+const EMPLOYEE_ID_TOTAL_LENGTH = 14;
+const EMPLOYEE_ID_COUNTER_LENGTH = Math.max(1, EMPLOYEE_ID_TOTAL_LENGTH - EMPLOYEE_ID_PREFIX_LENGTH);
 
 const normalizeCompanyId = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
@@ -47,6 +50,58 @@ const normalizeCompanyId = (value?: string): string | undefined =>
 const HR_ADMIN_ROLE = 'HRAdmin';
 const HR_VIEWER_ROLE = 'HRViewer';
 const HR_EDITOR_ROLE = 'HREditor';
+
+const toDateValue = (value: unknown): Date | undefined => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  return undefined;
+};
+
+const normalizeIdentifier = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const isInactiveStatus = (value: unknown): boolean =>
+  typeof value === 'string' && value.trim().toLowerCase() === 'inactive';
+
+const normalizeForComparison = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed.toLowerCase() : undefined;
+};
+
+const identifiersMatch = (a: unknown, b: unknown): boolean =>
+  normalizeForComparison(a) === normalizeForComparison(b);
+
+const deriveCountryCodeFromCompanyId = (companyId?: string | null): string | undefined => {
+  const normalized = normalizeCompanyId(companyId ?? undefined);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const match = normalized.match(/(?:^|[^A-Z])([A-Z]{2})(?=[^A-Z]|$)/);
+  return match ? match[1] : undefined;
+};
+
+const isValidCountryCode = (value: string): boolean => /^[A-Z]{2}$/.test(value);
 
 const canAccessCompany = (req: Request, companyId?: string | null): boolean => {
   if (!companyId) {
@@ -119,6 +174,36 @@ interface EntityWithId {
   ID?: string;
 }
 
+const extractIdFromWhereClause = (where: unknown): string | undefined => {
+  if (!Array.isArray(where)) {
+    return undefined;
+  }
+
+  for (let index = 0; index < where.length; index += 1) {
+    const segment = where[index];
+    if (
+      segment &&
+      typeof segment === 'object' &&
+      'ref' in segment &&
+      Array.isArray((segment as { ref: unknown[] }).ref) &&
+      (segment as { ref: unknown[] }).ref.length === 1 &&
+      (segment as { ref: unknown[] }).ref[0] === 'ID'
+    ) {
+      const operator = where[index + 1];
+      const value = where[index + 2];
+
+      if (operator === '=' || operator === '==') {
+        if (value && typeof value === 'object' && 'val' in (value as Record<string, unknown>)) {
+          const resolved = (value as Record<string, unknown>).val;
+          return typeof resolved === 'string' ? resolved : undefined;
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
 const deriveRequestEntityId = <T extends EntityWithId>(req: ExtendedRequest<T>): string | undefined => {
   if (req.data?.ID) {
     return req.data.ID;
@@ -131,6 +216,15 @@ const deriveRequestEntityId = <T extends EntityWithId>(req: ExtendedRequest<T>):
     }
   }
 
+  const query = (req as { query?: { UPDATE?: { where?: unknown }; DELETE?: { where?: unknown } } }).query;
+  const where = query?.UPDATE?.where ?? query?.DELETE?.where;
+  if (where) {
+    const derived = extractIdFromWhereClause(where);
+    if (derived) {
+      return derived;
+    }
+  }
+
   return undefined;
 };
 
@@ -138,6 +232,7 @@ type HeaderMap = Record<string, unknown>;
 
 const getIfMatchHeader = (req: Request): string | undefined => {
   const headers = (req as Request & { headers?: HeaderMap }).headers;
+  const hasHttpHeaders = headers && Object.keys(headers).length > 0;
   if (!headers) {
     return undefined;
   }
@@ -227,7 +322,13 @@ const ensureOptimisticConcurrency = async (
     return true;
   }
 
+  const headers = (req as Request & { headers?: HeaderMap }).headers;
+  const hasHttpHeaders = headers && Object.keys(headers).length > 0;
   const header = getIfMatchHeader(req);
+
+  if (!hasHttpHeaders && !header) {
+    return true;
+  }
 
   const targetId = deriveRequestEntityId(req);
   if (!targetId) {
@@ -271,12 +372,18 @@ const ensureOptimisticConcurrency = async (
     return true;
   }
 
-  if (etag) {
+  const queryPayload = (req as {
+    query?: { UPDATE?: { data?: Record<string, unknown> }; DELETE?: Record<string, unknown> };
+  }).query?.UPDATE?.data;
+  const providedValue = normalizeConcurrencyValue(
+    (req.data as Record<string, unknown> | undefined)?.[field] ??
+      (queryPayload as Record<string, unknown> | undefined)?.[field],
+  );
+
+  if (etag && hasHttpHeaders) {
     req.reject(428, 'Precondition required: supply an If-Match header.');
     return false;
   }
-
-  const providedValue = normalizeConcurrencyValue((req.data as Record<string, unknown> | undefined)?.[field]);
 
   if (!providedValue) {
     req.reject(428, `Precondition required: include ${field} in the request payload.`);
@@ -299,18 +406,20 @@ const ensureOptimisticConcurrency = async (
 const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
-  const normalizedCompany = normalizeCompanyId(client?.companyId);
-  if (normalizedCompany) {
-    return normalizedCompany.slice(0, 8);
-  }
-
+  const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
   const sanitizedClientId = sanitizeIdentifier(clientId);
-  if (sanitizedClientId.length >= 4) {
-    return sanitizedClientId.slice(0, 8);
+  const hashSource = sanitizedClientId || clientId;
+  const hashed = createHash('sha256').update(hashSource).digest('hex').toUpperCase();
+
+  if (normalizedCompany) {
+    return (normalizedCompany + hashed).slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
   }
 
-  const hashed = createHash('sha256').update(clientId).digest('hex').toUpperCase();
-  return (sanitizedClientId + hashed).slice(0, 8);
+  if (sanitizedClientId) {
+    return (sanitizedClientId + hashed).slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
+  }
+
+  return hashed.slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
 };
 
 const isUniqueConstraintError = (error: unknown): boolean => {
@@ -470,23 +579,40 @@ const ensureUniqueEmployeeId = async (
 
       const nextCounter = (counter?.lastCounter ?? 0) + 1;
       const prefix = deriveClientPrefix(clientInfo, clientId);
-      const generatedId = `${prefix}-${String(nextCounter).padStart(4, '0')}`;
-      req.data.employeeId = generatedId;
+      const counterPart = String(nextCounter).padStart(EMPLOYEE_ID_COUNTER_LENGTH, '0');
+      const generatedId = `${prefix}${counterPart}`;
 
-      if (counter) {
-        await tx.run(
-          UPDATE('clientmgmt.EmployeeIdCounters')
-            .set({ lastCounter: nextCounter })
-            .where({ client_ID: clientId }),
-        );
-      } else {
-        await tx.run(
-          INSERT.into('clientmgmt.EmployeeIdCounters').entries({
-            client_ID: clientId,
-            lastCounter: nextCounter,
-          }),
-        );
+      const existingEmployeeWithId = (await tx.run(
+        SELECT.one
+          .from('clientmgmt.Employees')
+          .columns('ID')
+          .where({ employeeId: generatedId, client_ID: clientId }),
+      )) as EmployeeEntity | undefined;
+
+      const persistCounter = async () => {
+        if (counter) {
+          await tx.run(
+            UPDATE('clientmgmt.EmployeeIdCounters')
+              .set({ lastCounter: nextCounter })
+              .where({ client_ID: clientId }),
+          );
+        } else {
+          await tx.run(
+            INSERT.into('clientmgmt.EmployeeIdCounters').entries({
+              client_ID: clientId,
+              lastCounter: nextCounter,
+            }),
+          );
+        }
+      };
+
+      if (existingEmployeeWithId) {
+        await persistCounter();
+        continue;
       }
+
+      req.data.employeeId = generatedId;
+      await persistCounter();
       return true;
     } catch (error) {
       if (isUniqueConstraintError(error) && attempt < MAX_EMPLOYEE_ID_RETRIES - 1) {
@@ -515,9 +641,25 @@ const registerClientHandlers = (service: ClientService): void => {
       req.data.companyId = normalizeCompanyId(req.data.companyId);
     }
 
+    if (req.data.country_code !== undefined) {
+      if (typeof req.data.country_code !== 'string') {
+        req.error(400, 'Country code must be a two-letter ISO code.');
+        return;
+      }
+
+      const normalizedCountry = req.data.country_code.trim().toUpperCase();
+      if (!isValidCountryCode(normalizedCountry)) {
+        req.error(400, 'Country code must be a two-letter ISO code.');
+        return;
+      }
+
+      req.data.country_code = normalizedCountry;
+    }
+
     const tx = cds.transaction(req);
     const currentClientId = deriveRequestEntityId(req);
     let targetCompanyId = req.data.companyId;
+    let existingClient: ClientEntity | undefined;
 
     if (req.event === 'UPDATE') {
       if (!currentClientId) {
@@ -525,7 +667,7 @@ const registerClientHandlers = (service: ClientService): void => {
         return;
       }
 
-      const existingClient = (await tx.run(
+      existingClient = (await tx.run(
         SELECT.one.from('clientmgmt.Clients').columns('ID', 'companyId').where({ ID: currentClientId }),
       )) as ClientEntity | undefined;
 
@@ -541,6 +683,21 @@ const registerClientHandlers = (service: ClientService): void => {
 
     if (targetCompanyId && !ensureUserAuthorizedForCompany(req, targetCompanyId)) {
       return;
+    }
+
+    if (req.data.country_code === undefined) {
+      const companyChanged =
+        req.event === 'CREATE' ||
+        (req.event === 'UPDATE' &&
+          req.data.companyId !== undefined &&
+          (!existingClient || req.data.companyId !== existingClient.companyId));
+
+      if (companyChanged) {
+        const derivedCode = deriveCountryCodeFromCompanyId(targetCompanyId);
+        if (derivedCode) {
+          req.data.country_code = derivedCode;
+        }
+      }
     }
 
     if (req.data.companyId) {
@@ -598,6 +755,132 @@ const registerEmployeeHandlers = (service: ClientService): void => {
       handler: (req: EmployeeRequest, next: () => Promise<unknown>) => Promise<unknown> | void,
     ) => unknown;
   };
+
+  service.before(['CREATE', 'UPDATE'], 'Employees', async (req: EmployeeRequest) => {
+    const tx = cds.transaction(req);
+
+    let existingEmployee: Partial<EmployeeEntity> | undefined;
+    if (req.event === 'UPDATE') {
+      const employeeKey = deriveRequestEntityId(req);
+      if (!employeeKey) {
+        req.error(400, 'Employee identifier is required.');
+        return;
+      }
+
+      existingEmployee = (await tx.run(
+        SELECT.one
+          .from('clientmgmt.Employees')
+          .columns('ID', 'client_ID', 'entryDate', 'exitDate', 'status', 'costCenter_ID', 'manager_ID')
+          .where({ ID: employeeKey }),
+      )) as Partial<EmployeeEntity> | undefined;
+
+      if (!existingEmployee) {
+        req.error(404, `Employee ${employeeKey} not found.`);
+        return;
+      }
+    }
+
+    const entryCandidate =
+      req.data.entryDate !== undefined ? req.data.entryDate : existingEmployee?.entryDate;
+    const entryDate = toDateValue(entryCandidate);
+
+    if (!entryDate) {
+      req.error(400, 'Entry date is required.');
+      return;
+    }
+
+    const exitCandidate =
+      req.data.exitDate !== undefined ? req.data.exitDate : existingEmployee?.exitDate;
+    const exitDate = toDateValue(exitCandidate);
+
+    const statusCandidate =
+      req.data.status !== undefined ? req.data.status : existingEmployee?.status ?? 'active';
+    const inactive = isInactiveStatus(statusCandidate);
+
+    if (exitDate && entryDate && exitDate.getTime() < entryDate.getTime()) {
+      req.error(400, 'Exit date must be on or after entry date.');
+      return;
+    }
+
+    if (inactive && !exitDate) {
+      req.error(400, 'Inactive employees must have an exit date.');
+      return;
+    }
+
+    if (exitDate && !inactive) {
+      req.error(400, 'Employees with an exit date must have status set to inactive.');
+      return;
+    }
+
+    const existingCostCenterId = normalizeIdentifier(existingEmployee?.costCenter_ID);
+    const requestedCostCenterId =
+      req.data.costCenter_ID === null ? undefined : normalizeIdentifier(req.data.costCenter_ID);
+    const finalCostCenterId = requestedCostCenterId ?? existingCostCenterId;
+
+    const managerExplicit = req.data.manager_ID !== undefined;
+    const requestedManagerId =
+      managerExplicit && req.data.manager_ID !== null
+        ? normalizeIdentifier(req.data.manager_ID)
+        : undefined;
+    const existingManagerId = normalizeIdentifier(existingEmployee?.manager_ID);
+    let finalManagerId = managerExplicit ? requestedManagerId : existingManagerId;
+
+    const finalClientId =
+      (req.data.client_ID ?? existingEmployee?.client_ID) !== null
+        ? (req.data.client_ID ?? existingEmployee?.client_ID)
+        : undefined;
+
+    if (finalCostCenterId) {
+      const costCenter = (await tx.run(
+        SELECT.one
+          .from('clientmgmt.CostCenters')
+          .columns('ID', 'client_ID', 'responsible_ID')
+          .where({ ID: finalCostCenterId }),
+      )) as Partial<CostCenterEntity> | undefined;
+
+      if (!costCenter) {
+        req.error(404, `Cost center ${finalCostCenterId} not found.`);
+        return;
+      }
+
+      if (finalClientId && costCenter.client_ID && costCenter.client_ID !== finalClientId) {
+        req.error(400, 'Cost center must belong to the same client.');
+        return;
+      }
+
+      const responsibleId = costCenter.responsible_ID;
+      const costCenterExplicit = req.data.costCenter_ID !== undefined;
+      const costCenterChanged =
+        req.event === 'CREATE' ||
+        (costCenterExplicit && !identifiersMatch(existingCostCenterId, finalCostCenterId));
+
+      if ((req.event === 'CREATE' || costCenterChanged) && !managerExplicit) {
+        req.data.manager_ID = responsibleId;
+        finalManagerId = normalizeIdentifier(responsibleId) ?? responsibleId;
+      }
+
+      const shouldValidateManager = req.event === 'CREATE' || managerExplicit || costCenterChanged;
+      const managerToValidate = managerExplicit ? requestedManagerId : finalManagerId;
+
+      if (shouldValidateManager) {
+        if (!managerToValidate) {
+          req.error(
+            400,
+            'Employees assigned to a cost center must be managed by the responsible employee.',
+          );
+          return;
+        }
+
+        if (!identifiersMatch(managerToValidate, responsibleId)) {
+          req.error(
+            400,
+            'Employees assigned to a cost center must be managed by the responsible employee.',
+          );
+          return;
+        }
+      }
+    }
+  });
 
   serviceWithOn.on('CREATE', 'Employees', async (req: EmployeeRequest, next) => {
     for (let attempt = 0; attempt < MAX_EMPLOYEE_ID_RETRIES; attempt += 1) {

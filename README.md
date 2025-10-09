@@ -88,6 +88,14 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 | `TS_NODE_TRANSPILE_ONLY` | Speeds up ts-node execution for dev/test (set by scripts). |
 | `IAS_TENANT`, `IAS_CLIENT_ID`, `IAS_CLIENT_SECRET` | Optional overrides to connect to IAS without Cloud Foundry bindings during local troubleshooting. |
 | `AMS_DCL_ROOT` | Overrides the folder in which the AMS DCL files are generated (defaults to `srv/ams`). |
+| `OUTBOX_DISPATCH_INTERVAL_MS` | Interval in milliseconds between background outbox polls (defaults to `30000`). |
+| `OUTBOX_CONCURRENCY` | Number of outbox entries processed concurrently per poll (defaults to `1`). |
+| `OUTBOX_CLAIM_TTL_MS` | Time in milliseconds after which a `PROCESSING` entry becomes claimable again (defaults to `120000`). |
+| `OUTBOX_MAX_ATTEMPTS` | Maximum retry attempts before an entry is marked as `FAILED` (defaults to `6`). |
+| `OUTBOX_BASE_BACKOFF_MS` | Base delay in milliseconds used for the exponential backoff between retries (defaults to `5000`). |
+| `OUTBOX_RETENTION_HOURS` | Number of hours delivered/failed entries are retained before cleanup (defaults to `168`). |
+| `OUTBOX_CLEANUP_INTERVAL_MS` | Interval in milliseconds for the periodic cleanup task (defaults to six hours). |
+| `OUTBOX_CLEANUP_CRON` | Optional simple cron expression (`*/N * * * *` for minutes or `0 */N * * *` for hours) that overrides the cleanup interval. |
 
 ## Notes
 

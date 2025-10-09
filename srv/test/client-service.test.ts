@@ -5,7 +5,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
 import fetch, { type RequestInit } from 'node-fetch';
 
-import { processOutbox } from '../server';
+import { cleanupOutbox, processOutbox } from '../server';
 
 const cap = cds.test(path.join(__dirname, '..'));
 const encoded = Buffer.from('dev:dev').toString('base64');
@@ -39,8 +39,10 @@ const http = cap as unknown as {
 };
 
 const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
-const { SELECT, INSERT } = cds.ql;
-const DELETE = (cds.ql as any).DELETE as typeof SELECT;
+const { SELECT } = cds.ql;
+const INSERT = (cds.ql as any).INSERT as any;
+const DELETE = (cds.ql as any).DELETE as any;
+const UPDATE = (cds.ql as any).UPDATE as any;
 
 const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
 const BETA_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
@@ -68,6 +70,14 @@ afterEach(async () => {
   mockedFetch.mockReset();
   delete process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
   delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+  delete process.env.OUTBOX_CLAIM_TTL_MS;
+  delete process.env.OUTBOX_DISPATCH_INTERVAL_MS;
+  delete process.env.OUTBOX_MAX_ATTEMPTS;
+  delete process.env.OUTBOX_BASE_BACKOFF_MS;
+  delete process.env.OUTBOX_CONCURRENCY;
+  delete process.env.OUTBOX_RETENTION_HOURS;
+  delete process.env.OUTBOX_CLEANUP_INTERVAL_MS;
+  delete process.env.OUTBOX_CLEANUP_CRON;
   if (db) {
     await db.run(DELETE.from('clientmgmt.EmployeeNotificationOutbox'));
   }
@@ -109,7 +119,7 @@ describe('ClientService (HTTP)', () => {
       authConfig,
     );
     expect(created.status).toBe(201);
-    expect(created.data.employeeId).toMatch(/^COMP-001-\d{4}$/);
+    expect(created.data.employeeId).toMatch(/^COMP001[A-F0-9][0-9]{6}$/);
 
     const second = await http.post<{ employeeId: string }>(
       '/odata/v4/clients/Employees',
@@ -123,6 +133,7 @@ describe('ClientService (HTTP)', () => {
     );
     expect(second.status).toBe(201);
     expect(second.data.employeeId).not.toBe(created.data.employeeId);
+    expect(second.data.employeeId).toMatch(/^COMP001[A-F0-9][0-9]{6}$/);
   });
 
   it('rejects cost center assignments across clients', async () => {
@@ -387,6 +398,433 @@ describe('ClientService authorization', () => {
 });
 
 
+describe('Employee business rules', () => {
+  let service: any;
+
+  const createUser = ({
+    id,
+    roles,
+    companyCodes,
+  }: {
+    id: string;
+    roles: string[];
+    companyCodes: string[];
+  }) =>
+    (cds as any).User({
+      id,
+      roles,
+      attr: { companyCodes, CompanyCode: companyCodes },
+    });
+
+  const adminContext = { id: 'rules-admin', roles: ['HRAdmin'], companyCodes: [] as string[] };
+
+  const runAsAdmin = async <T>(handler: (tx: any) => Promise<T>): Promise<T> => {
+    const user = createUser(adminContext);
+    return service.tx({ user }, handler);
+  };
+
+  const createdCostCenterCodes: string[] = [];
+  const createdEmployeeEmails: string[] = [];
+  const createdClientIds: string[] = [];
+
+  const createEmployeeRecord = async (
+    tx: any,
+    overrides: Record<string, unknown> = {},
+  ): Promise<{
+    ID: string;
+    email: string;
+    employeeId: string;
+    modifiedAt: string;
+    manager_ID?: string;
+    costCenter_ID?: string;
+  }> => {
+    const email =
+      typeof overrides.email === 'string' ? (overrides.email as string) : `validation+${randomUUID()}@example.com`;
+    const entry = {
+      firstName: 'Test',
+      lastName: 'Employee',
+      email,
+      entryDate: '2024-01-01',
+      client_ID: overrides.client_ID ?? CLIENT_ID,
+      ...overrides,
+    };
+
+    await tx.run(INSERT.into(tx.entities.Employees).entries(entry));
+    createdEmployeeEmails.push(email);
+
+    const persisted = (await tx.run(
+      SELECT.one
+        .from(tx.entities.Employees)
+        .columns('ID', 'email', 'employeeId', 'modifiedAt', 'manager_ID', 'costCenter_ID', 'client_ID')
+        .where({ email }),
+    )) as any;
+
+    return persisted;
+  };
+
+  const createCostCenterRecord = async (
+    tx: any,
+    options: { clientId?: string; responsibleId: string; code?: string; name?: string },
+  ): Promise<{ ID: string; code: string }> => {
+    const code = options.code ?? `CC-${randomUUID().slice(0, 8)}`;
+    await tx.run(
+      INSERT.into(tx.entities.CostCenters).entries({
+        code,
+        name: options.name ?? 'Validation Cost Center',
+        client_ID: options.clientId ?? CLIENT_ID,
+        responsible_ID: options.responsibleId,
+      }),
+    );
+
+    const normalizedCode = code.trim().toUpperCase();
+    createdCostCenterCodes.push(normalizedCode);
+
+    const persisted = (await tx.run(
+      SELECT.one.from(tx.entities.CostCenters).columns('ID', 'code').where({ code: normalizedCode }),
+    )) as any;
+
+    return persisted;
+  };
+
+  const createClientRecord = async (
+    tx: any,
+    options: { companyId: string; countryCode?: string; name?: string },
+  ): Promise<{ ID: string; companyId: string }> => {
+    const clientId = randomUUID();
+
+    await tx.run(
+      INSERT.into(tx.entities.Clients).entries({
+        ID: clientId,
+        companyId: options.companyId,
+        name: options.name ?? `Client ${options.companyId}`,
+        country_code: options.countryCode ?? 'DE',
+      }),
+    );
+
+    createdClientIds.push(clientId);
+
+    return { ID: clientId, companyId: options.companyId };
+  };
+
+  beforeAll(async () => {
+    service = await cds.connect.to('ClientService');
+  });
+
+  afterEach(async () => {
+    if (!service) {
+      return;
+    }
+
+    if (!createdCostCenterCodes.length && !createdEmployeeEmails.length && !createdClientIds.length) {
+      return;
+    }
+
+    if (createdCostCenterCodes.length) {
+      const costCenterCodes = createdCostCenterCodes.splice(0, createdCostCenterCodes.length);
+      await db.run(DELETE.from('clientmgmt.CostCenters').where({ code: { in: costCenterCodes } }));
+    }
+
+    if (createdEmployeeEmails.length) {
+      const emails = createdEmployeeEmails.splice(0, createdEmployeeEmails.length);
+      await db.run(DELETE.from('clientmgmt.Employees').where({ email: { in: emails } }));
+    }
+
+    if (createdClientIds.length) {
+      const clientIds = createdClientIds.splice(0, createdClientIds.length);
+      await db.run(DELETE.from('clientmgmt.EmployeeIdCounters').where({ client_ID: { in: clientIds } }));
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: { in: clientIds } }));
+    }
+  });
+
+  it('requires entry date on creation', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Missing',
+            lastName: 'Entry',
+            email: `validation+${randomUUID()}@example.com`,
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Entry date is required') });
+  });
+
+  it('requires exit dates to be on or after the entry date', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Timing',
+            lastName: 'Error',
+            email: `validation+${randomUUID()}@example.com`,
+            entryDate: '2024-02-01',
+            exitDate: '2024-01-01',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Exit date must be on or after entry date.') });
+  });
+
+  it('requires an exit date when marking an employee inactive', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Inactive',
+            lastName: 'WithoutExit',
+            email: `validation+${randomUUID()}@example.com`,
+            entryDate: '2024-01-01',
+            status: 'inactive',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Inactive employees must have an exit date.') });
+  });
+
+  it('requires inactive status when an exit date is supplied', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Active',
+            lastName: 'WithExit',
+            email: `validation+${randomUUID()}@example.com`,
+            entryDate: '2024-01-01',
+            exitDate: '2024-05-01',
+            client_ID: CLIENT_ID,
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Employees with an exit date must have status set to inactive.'),
+    });
+  });
+
+  it('validates exit dates against the persisted entry date during updates', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx);
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ exitDate: '2023-12-31', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Exit date must be on or after entry date.') });
+  });
+
+  it('requires exit dates when setting status to inactive on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx);
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ status: 'inactive', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Inactive employees must have an exit date.') });
+  });
+
+  it('requires inactive status when assigning an exit date on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx);
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ exitDate: '2024-05-01', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Employees with an exit date must have status set to inactive.'),
+    });
+  });
+
+  it('defaults the manager to the cost center responsible during creation', async () => {
+    await runAsAdmin(async (tx) => {
+      const responsible = await createEmployeeRecord(tx);
+      const costCenter = await createCostCenterRecord(tx, { responsibleId: responsible.ID });
+
+      const employee = await createEmployeeRecord(tx, { costCenter_ID: costCenter.ID });
+
+      const refreshed = (await tx.run(
+        SELECT.one.from(tx.entities.Employees).columns('manager_ID').where({ ID: employee.ID }),
+      )) as any;
+
+      expect(refreshed.manager_ID).toBe(responsible.ID);
+    });
+  });
+
+  it('rejects mismatched managers when creating employees with a cost center', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const responsible = await createEmployeeRecord(tx);
+        const alternate = await createEmployeeRecord(tx, { email: `validation+${randomUUID()}@example.com` });
+        const costCenter = await createCostCenterRecord(tx, { responsibleId: responsible.ID });
+
+        await tx.run(
+          INSERT.into(tx.entities.Employees).entries({
+            firstName: 'Mismatch',
+            lastName: 'Manager',
+            email: `validation+${randomUUID()}@example.com`,
+            entryDate: '2024-01-01',
+            client_ID: CLIENT_ID,
+            costCenter_ID: costCenter.ID,
+            manager_ID: alternate.ID,
+          }),
+        );
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Employees assigned to a cost center must be managed by the responsible employee.'),
+    });
+  });
+
+  it('rejects assigning a different manager while a cost center is linked', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const responsible = await createEmployeeRecord(tx);
+        const alternate = await createEmployeeRecord(tx, { email: `validation+${randomUUID()}@example.com` });
+        const costCenter = await createCostCenterRecord(tx, { responsibleId: responsible.ID });
+        const employee = await createEmployeeRecord(tx, { costCenter_ID: costCenter.ID });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ manager_ID: alternate.ID, modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Employees assigned to a cost center must be managed by the responsible employee.'),
+    });
+  });
+
+  it('updates the manager to match the new cost center responsible when the assignment changes', async () => {
+    await runAsAdmin(async (tx) => {
+      const responsibleA = await createEmployeeRecord(tx);
+      const costCenterA = await createCostCenterRecord(tx, { responsibleId: responsibleA.ID });
+
+      const responsibleB = await createEmployeeRecord(tx, { email: `validation+${randomUUID()}@example.com` });
+      const costCenterB = await createCostCenterRecord(tx, {
+        responsibleId: responsibleB.ID,
+        code: `CC-${randomUUID().slice(0, 8)}`,
+      });
+
+      const employee = await createEmployeeRecord(tx, { costCenter_ID: costCenterA.ID });
+
+      await tx.run(
+        UPDATE(tx.entities.Employees)
+          .set({ costCenter_ID: costCenterB.ID, modifiedAt: employee.modifiedAt })
+          .where({ ID: employee.ID }),
+      );
+
+      const refreshed = (await tx.run(
+        SELECT.one
+          .from(tx.entities.Employees)
+          .columns('manager_ID', 'costCenter_ID')
+          .where({ ID: employee.ID }),
+      )) as any;
+
+      expect(refreshed.manager_ID).toBe(responsibleB.ID);
+      expect(refreshed.costCenter_ID).toBe(costCenterB.ID);
+    });
+  });
+
+  it('rejects clearing the manager while a cost center remains assigned', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const responsible = await createEmployeeRecord(tx);
+        const costCenter = await createCostCenterRecord(tx, { responsibleId: responsible.ID });
+        const employee = await createEmployeeRecord(tx, { costCenter_ID: costCenter.ID });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ manager_ID: null, modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Employees assigned to a cost center must be managed by the responsible employee.'),
+    });
+  });
+
+  it('generates sanitized employee identifiers for company codes with symbols', async () => {
+    await runAsAdmin(async (tx) => {
+      const client = await createClientRecord(tx, { companyId: 'ac-me 123' });
+      const employee = await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      expect(employee.employeeId).toMatch(/^ACME123[A-F0-9][0-9]{6}$/);
+      expect(employee.employeeId).toHaveLength(14);
+    });
+  });
+
+  it('truncates long company identifiers when building employee IDs', async () => {
+    await runAsAdmin(async (tx) => {
+      const client = await createClientRecord(tx, { companyId: 'VeryLongCompanyCode' });
+      const employee = await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      expect(employee.employeeId).toMatch(/^VERYLONG[0-9]{6}$/);
+      expect(employee.employeeId).toHaveLength(14);
+    });
+  });
+
+  it('respects existing counter values when generating new employee IDs', async () => {
+    await runAsAdmin(async (tx) => {
+      const client = await createClientRecord(tx, { companyId: 'CounterCo' });
+
+      await db.run(INSERT.into('clientmgmt.EmployeeIdCounters').entries({ client_ID: client.ID, lastCounter: 5 }));
+
+      const employee = await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      expect(employee.employeeId.endsWith('000006')).toBe(true);
+    });
+  });
+
+  it('skips existing employee identifiers to preserve uniqueness', async () => {
+    await runAsAdmin(async (tx) => {
+      const client = await createClientRecord(tx, { companyId: 'SkipCo' });
+
+      const first = await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      const prefix = first.employeeId.slice(0, first.employeeId.length - 6);
+
+      await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+        employeeId: `${prefix}000002`,
+      });
+
+      const third = await createEmployeeRecord(tx, {
+        client_ID: client.ID,
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      expect(third.employeeId).toBe(`${prefix}000003`);
+    });
+  });
+});
+
+
+
 describe('Employee notification outbox', () => {
   let service: any;
 
@@ -451,7 +889,7 @@ describe('Employee notification outbox', () => {
     });
   });
 
-  it('marks outbox entries as delivered when downstream succeeds', async () => {
+  it('marks outbox entries as completed when downstream succeeds', async () => {
     const entryId = randomUUID();
     await db.run(
       INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
@@ -479,7 +917,7 @@ describe('Employee notification outbox', () => {
       SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
     )) as any;
 
-    expect(updated.status).toBe('DELIVERED');
+    expect(updated.status).toBe('COMPLETED');
     expect(updated.deliveredAt).toBeTruthy();
     expect(updated.lastError).toBeNull();
     expect(mockedFetch).toHaveBeenCalledWith(
@@ -594,5 +1032,49 @@ describe('Employee notification outbox', () => {
 
     jest.useRealTimers();
     expect(mockedFetch).toHaveBeenCalledTimes(6);
+  });
+
+  it('removes completed and failed entries that exceed the retention window', async () => {
+    const completedId = randomUUID();
+    const failedId = randomUUID();
+
+    await db.run(
+      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries([
+        {
+          ID: completedId,
+          eventType: 'EMPLOYEE_CREATED',
+          endpoint: 'https://example.org/cleanup',
+          payload: JSON.stringify({ ok: true }),
+          status: 'COMPLETED',
+          attempts: 1,
+          nextAttemptAt: null,
+        },
+        {
+          ID: failedId,
+          eventType: 'EMPLOYEE_CREATED',
+          endpoint: 'https://example.org/cleanup',
+          payload: JSON.stringify({ ok: false }),
+          status: 'FAILED',
+          attempts: 6,
+          nextAttemptAt: null,
+        },
+      ] as any),
+    );
+
+    const cutoff = new Date(Date.now() - 8 * 60 * 60 * 1000);
+    await db.run(
+      UPDATE('clientmgmt.EmployeeNotificationOutbox' as any)
+        .set({ modifiedAt: cutoff })
+        .where({ ID: { in: [completedId, failedId] } }),
+    );
+
+    process.env.OUTBOX_RETENTION_HOURS = '1';
+    await cleanupOutbox();
+
+    const remaining = await db.run(
+      SELECT.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: { in: [completedId, failedId] } }),
+    );
+
+    expect(Array.isArray(remaining) ? remaining : []).toHaveLength(0);
   });
 });
