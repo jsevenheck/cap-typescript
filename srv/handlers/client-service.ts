@@ -43,6 +43,8 @@ const MAX_EMPLOYEE_ID_RETRIES = 5;
 const EMPLOYEE_ID_PREFIX_LENGTH = 8;
 const EMPLOYEE_ID_TOTAL_LENGTH = 14;
 const EMPLOYEE_ID_COUNTER_LENGTH = Math.max(1, EMPLOYEE_ID_TOTAL_LENGTH - EMPLOYEE_ID_PREFIX_LENGTH);
+const ANONYMIZED_PLACEHOLDER = 'ANONYMIZED';
+const ANONYMIZED_EMAIL_DOMAIN = 'example.invalid';
 
 const normalizeCompanyId = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
@@ -404,6 +406,13 @@ const ensureOptimisticConcurrency = async (
 };
 
 const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const buildAnonymizedEmail = (employeeId?: string): string => {
+  const sanitized = typeof employeeId === 'string' ? employeeId.replace(/[^A-Za-z0-9]/g, '').toLowerCase() : '';
+  const localPartBase = sanitized ? `anonymized-${sanitized}` : 'anonymized';
+  const localPart = localPartBase.slice(0, 64);
+  return `${localPart}@${ANONYMIZED_EMAIL_DOMAIN}`;
+};
 
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
   const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
@@ -982,6 +991,83 @@ const registerEmployeeHandlers = (service: ClientService): void => {
   });
 };
 
+const registerEmployeeRetentionHandlers = (service: ClientService): void => {
+  service.on('anonymizeFormerEmployees', async (req) => {
+    const cutoffDate = toDateValue(req.data?.before);
+    if (!cutoffDate) {
+      req.error(400, 'Parameter "before" must be a valid date.');
+      return;
+    }
+
+    const cutoff = cutoffDate.toISOString().split('T')[0];
+    const tx = cds.transaction(req);
+
+    // Build WHERE clause with company code filtering for HREditor
+    const whereClause: Record<string, unknown> = {
+      exitDate: { '<': cutoff },
+      firstName: { '!=': ANONYMIZED_PLACEHOLDER },
+    };
+
+    const user = getRequestUser(req);
+    if (!user?.is?.(HR_ADMIN_ROLE)) {
+      // HREditor or HRViewer - apply company code filter
+      const allowedCompanyCodes: string[] = [];
+      const attributeSource = user?.attr;
+      const attributeNames: Array<'CompanyCode' | 'companyCodes'> = ['CompanyCode', 'companyCodes'];
+
+      for (const attributeName of attributeNames) {
+        let rawValues: unknown;
+        if (typeof attributeSource === 'function') {
+          rawValues = attributeSource.call(user, attributeName);
+        } else if (attributeSource && typeof attributeSource === 'object') {
+          rawValues = (attributeSource as Record<string, unknown>)[attributeName];
+        }
+        const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
+        for (const value of values) {
+          if (typeof value === 'string') {
+            const normalized = normalizeCompanyId(value);
+            if (normalized) allowedCompanyCodes.push(normalized);
+          }
+        }
+      }
+
+      if (allowedCompanyCodes.length === 0) {
+        return 0; // No authorized companies
+      }
+
+      // Filter employees by allowed company codes via client relationship
+      whereClause['client.companyId'] = { in: allowedCompanyCodes };
+    }
+
+    const employeesToAnonymize = (await tx.run(
+      SELECT.from('clientmgmt.Employees')
+        .columns('ID', 'employeeId')
+        .where(whereClause),
+    )) as Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>;
+
+    if (!employeesToAnonymize || employeesToAnonymize.length === 0) {
+      return 0;
+    }
+
+    for (const employee of employeesToAnonymize) {
+      await tx.run(
+        UPDATE('clientmgmt.Employees')
+          .set({
+            firstName: ANONYMIZED_PLACEHOLDER,
+            lastName: ANONYMIZED_PLACEHOLDER,
+            email: buildAnonymizedEmail(employee.employeeId),
+            location: null,
+            positionLevel: null,
+            status: 'inactive',
+          })
+          .where({ ID: employee.ID }),
+      );
+    }
+
+    return employeesToAnonymize.length;
+  });
+};
+
 const registerCostCenterHandlers = (service: ClientService): void => {
   service.before(['CREATE', 'UPDATE'], 'CostCenters', async (req: CostCenterRequest) => {
     if (req.event === 'UPDATE') {
@@ -1088,5 +1174,6 @@ const registerCostCenterHandlers = (service: ClientService): void => {
 export default cds.service.impl((service: ClientService) => {
   registerClientHandlers(service);
   registerEmployeeHandlers(service);
+  registerEmployeeRetentionHandlers(service);
   registerCostCenterHandlers(service);
 });
