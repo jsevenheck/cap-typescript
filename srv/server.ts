@@ -27,38 +27,38 @@ cds.on('served', () => {
   let running = false;
   const dispatchInterval = resolveOutboxDispatchInterval();
 
-  setInterval(async () => {
+  setInterval(() => {
     if (running) {
       return;
     }
 
     running = true;
-    try {
-      await processOutbox();
-    } catch (error) {
-      logger.error?.('Outbox processing failed:', error);
-    } finally {
-      running = false;
-    }
+    void processOutbox()
+      .catch((error) => {
+        logger.error?.('Outbox processing failed:', error);
+      })
+      .finally(() => {
+        running = false;
+      });
   }, dispatchInterval);
 
   const cleanupInterval = resolveCleanupInterval();
   if (cleanupInterval > 0) {
     let cleanupRunning = false;
 
-    setInterval(async () => {
+    setInterval(() => {
       if (cleanupRunning) {
         return;
       }
 
       cleanupRunning = true;
-      try {
-        await cleanupOutbox();
-      } catch (error) {
-        logger.error?.('Outbox cleanup failed:', error);
-      } finally {
-        cleanupRunning = false;
-      }
+      void cleanupOutbox()
+        .catch((error) => {
+          logger.error?.('Outbox cleanup failed:', error);
+        })
+        .finally(() => {
+          cleanupRunning = false;
+        });
     }, cleanupInterval);
   }
 });

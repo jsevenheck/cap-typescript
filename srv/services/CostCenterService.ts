@@ -103,7 +103,7 @@ export const prepareCostCenterUpsert = async ({
     updates.code = normalizeCostCenterCode(data.code) ?? undefined;
   }
 
-  let clientId = data.client_ID ?? existingCostCenter?.client_ID;
+  const clientId = data.client_ID ?? existingCostCenter?.client_ID;
   if (!clientId) {
     throw createServiceError(400, 'Client reference is required.');
   }
