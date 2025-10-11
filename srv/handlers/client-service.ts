@@ -1001,13 +1001,48 @@ const registerEmployeeRetentionHandlers = (service: ClientService): void => {
 
     const cutoff = cutoffDate.toISOString().split('T')[0];
     const tx = cds.transaction(req);
+
+    // Build WHERE clause with company code filtering for HREditor
+    const whereClause: Record<string, unknown> = {
+      exitDate: { '<': cutoff },
+      firstName: { '!=': ANONYMIZED_PLACEHOLDER },
+    };
+
+    const user = getRequestUser(req);
+    if (!user?.is?.(HR_ADMIN_ROLE)) {
+      // HREditor or HRViewer - apply company code filter
+      const allowedCompanyCodes: string[] = [];
+      const attributeSource = user?.attr;
+      const attributeNames: Array<'CompanyCode' | 'companyCodes'> = ['CompanyCode', 'companyCodes'];
+
+      for (const attributeName of attributeNames) {
+        let rawValues: unknown;
+        if (typeof attributeSource === 'function') {
+          rawValues = attributeSource.call(user, attributeName);
+        } else if (attributeSource && typeof attributeSource === 'object') {
+          rawValues = (attributeSource as Record<string, unknown>)[attributeName];
+        }
+        const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
+        for (const value of values) {
+          if (typeof value === 'string') {
+            const normalized = normalizeCompanyId(value);
+            if (normalized) allowedCompanyCodes.push(normalized);
+          }
+        }
+      }
+
+      if (allowedCompanyCodes.length === 0) {
+        return 0; // No authorized companies
+      }
+
+      // Filter employees by allowed company codes via client relationship
+      whereClause['client.companyId'] = { in: allowedCompanyCodes };
+    }
+
     const employeesToAnonymize = (await tx.run(
       SELECT.from('clientmgmt.Employees')
         .columns('ID', 'employeeId')
-        .where({
-          exitDate: { '<': cutoff },
-          firstName: { '!=': ANONYMIZED_PLACEHOLDER },
-        }),
+        .where(whereClause),
     )) as Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>;
 
     if (!employeesToAnonymize || employeesToAnonymize.length === 0) {
