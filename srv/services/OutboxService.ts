@@ -240,6 +240,18 @@ export interface EmployeeCreatedNotification {
   payload: Record<string, unknown>;
 }
 
+const safeStringify = (value: unknown): string => {
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    throw new Error(
+      `Failed to serialize notification payload: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+};
+
 export const enqueueEmployeeCreatedNotification = async (
   tx: Transaction,
   notification: EmployeeCreatedNotification,
@@ -248,7 +260,7 @@ export const enqueueEmployeeCreatedNotification = async (
     INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
       eventType: 'EMPLOYEE_CREATED',
       endpoint: notification.endpoint,
-      payload: JSON.stringify(notification.payload),
+      payload: safeStringify(notification.payload),
       status: 'PENDING',
       attempts: 0,
       nextAttemptAt: new Date(),
