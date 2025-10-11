@@ -12,8 +12,6 @@ const ql = cds.ql as typeof cds.ql & {
   INSERT: typeof cds.ql.INSERT;
 };
 
-const { SELECT, UPDATE, DELETE, INSERT } = ql;
-
 const DEFAULT_OUTBOX_TIMEOUT_MS = 15000;
 const DEFAULT_OUTBOX_DISPATCH_INTERVAL_MS = 30000;
 const DEFAULT_OUTBOX_CLAIM_TTL_MS = 120000;
@@ -89,7 +87,7 @@ export const processOutbox = async (): Promise<void> => {
   const concurrency = resolveOutboxConcurrency();
   const candidateLimit = Math.max(concurrency * 4, concurrency);
 
-  const selectCandidates = (SELECT as any)
+  const selectCandidates = (ql.SELECT as any)
     .from('clientmgmt.EmployeeNotificationOutbox')
     .columns('ID', 'endpoint', 'payload', 'status', 'attempts', 'nextAttemptAt')
     .where({ status: { in: ['PENDING', 'PROCESSING'] } })
@@ -142,7 +140,7 @@ export const processOutbox = async (): Promise<void> => {
     }
 
     const claimResult = await db.run(
-      UPDATE('clientmgmt.EmployeeNotificationOutbox')
+      ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
         .set({ status: 'PROCESSING', nextAttemptAt: now })
         .where(where),
     );
@@ -186,7 +184,7 @@ export const processOutbox = async (): Promise<void> => {
         });
 
         await db.run(
-          UPDATE('clientmgmt.EmployeeNotificationOutbox')
+          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
             .set({
               status: 'COMPLETED',
               deliveredAt: new Date(),
@@ -201,7 +199,7 @@ export const processOutbox = async (): Promise<void> => {
         const nextAttemptAt = attempts >= maxAttempts ? null : new Date(Date.now() + backoff);
 
         await db.run(
-          UPDATE('clientmgmt.EmployeeNotificationOutbox')
+          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
             .set({
               attempts,
               lastError: String(error?.message ?? error ?? 'Unknown error'),
@@ -231,7 +229,7 @@ export const cleanupOutbox = async (): Promise<void> => {
   const cutoff = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
 
   await db.run(
-    DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({
+    (ql.DELETE as any).from('clientmgmt.EmployeeNotificationOutbox').where({
       status: { in: STATUSES_FOR_CLEANUP },
       modifiedAt: { '<': cutoff },
     }),
@@ -248,7 +246,7 @@ export const enqueueEmployeeCreatedNotification = async (
   notification: EmployeeCreatedNotification,
 ): Promise<void> => {
   await tx.run(
-    INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+    ql.INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
       eventType: 'EMPLOYEE_CREATED',
       endpoint: notification.endpoint,
       payload: JSON.stringify(notification.payload),
