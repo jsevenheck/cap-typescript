@@ -17,19 +17,22 @@
     "start:runtime": "npm run start --workspace srv"
   },
   "devDependencies": {
+    "@sap/ams": "^3",
     "@playwright/test": "^1.49.1",
     "concurrently": "^9.0.1",
-    "typescript": "^5.6.3",
-    "@cap-js/sqlite": "^2.0.3",
-    "@cap-js/cds-test": "^0.4.0"
+    "typescript": "^5.6.3"
   },
   "cds": {
     "features": {
       "typescript": true
     },
     "security": {
-      "identity": { "enabled": true },
-      "xsuaa": { "enabled": false }
+      "identity": {
+        "enabled": true
+      },
+      "xsuaa": {
+        "enabled": false
+      }
     },
     "requires": {
       "db": {
@@ -50,8 +53,14 @@
                 "HRAdmin"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001", "COMP-002"],
-                "CompanyCode": ["COMP-001", "COMP-002"]
+                "companyCodes": [
+                  "COMP-001",
+                  "COMP-002"
+                ],
+                "CompanyCode": [
+                  "COMP-001",
+                  "COMP-002"
+                ]
               }
             },
             "hrviewer": {
@@ -60,8 +69,12 @@
                 "HRViewer"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"],
-                "CompanyCode": ["COMP-001"]
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
               }
             },
             "hreditor": {
@@ -70,8 +83,12 @@
                 "HREditor"
               ],
               "attributes": {
-                "companyCodes": ["COMP-001"],
-                "CompanyCode": ["COMP-001"]
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
               }
             }
           }
@@ -85,8 +102,14 @@
               "HRAdmin"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001", "COMP-002"],
-              "CompanyCode": ["COMP-001", "COMP-002"]
+              "companyCodes": [
+                "COMP-001",
+                "COMP-002"
+              ],
+              "CompanyCode": [
+                "COMP-001",
+                "COMP-002"
+              ]
             }
           },
           "hrviewer": {
@@ -95,8 +118,12 @@
               "HRViewer"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"],
-              "CompanyCode": ["COMP-001"]
+              "companyCodes": [
+                "COMP-001"
+              ],
+              "CompanyCode": [
+                "COMP-001"
+              ]
             }
           },
           "hreditor": {
@@ -105,8 +132,12 @@
               "HREditor"
             ],
             "attributes": {
-              "companyCodes": ["COMP-001"],
-              "CompanyCode": ["COMP-001"]
+              "companyCodes": [
+                "COMP-001"
+              ],
+              "CompanyCode": [
+                "COMP-001"
+              ]
             }
           }
         }
@@ -165,8 +196,14 @@
                   "HRAdmin"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001", "COMP-002"],
-                  "CompanyCode": ["COMP-001", "COMP-002"]
+                  "companyCodes": [
+                    "COMP-001",
+                    "COMP-002"
+                  ],
+                  "CompanyCode": [
+                    "COMP-001",
+                    "COMP-002"
+                  ]
                 }
               },
               "hrviewer": {
@@ -175,8 +212,12 @@
                   "HRViewer"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001"],
-                  "CompanyCode": ["COMP-001"]
+                  "companyCodes": [
+                    "COMP-001"
+                  ],
+                  "CompanyCode": [
+                    "COMP-001"
+                  ]
                 }
               },
               "hreditor": {
@@ -185,8 +226,12 @@
                   "HREditor"
                 ],
                 "attributes": {
-                  "companyCodes": ["COMP-001"],
-                  "CompanyCode": ["COMP-001"]
+                  "companyCodes": [
+                    "COMP-001"
+                  ],
+                  "CompanyCode": [
+                    "COMP-001"
+                  ]
                 }
               }
             }
