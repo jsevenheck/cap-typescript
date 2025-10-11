@@ -173,7 +173,7 @@ export const ensureOptimisticConcurrency = async ({
     return;
   }
 
-  if (!hasHttpHeaders && !headerValue) {
+  if (!hasHttpHeaders && !headerValue && payloadValue === undefined) {
     return;
   }
 

@@ -107,220 +107,247 @@ const ensureEmployeeContext = async (req: Request, user: UserContext): Promise<E
   return enriched;
 };
 
-const registerClientHandlers = (service: Service): void => {
-  service.before(['CREATE', 'UPDATE'], 'Clients', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const concurrency = buildConcurrencyContext(req, 'clientmgmt.Clients');
-    const { updates } = await prepareClientUpsert({
-      event: req.event as 'CREATE' | 'UPDATE',
-      data: req.data as Partial<ClientEntity>,
-      targetId: deriveEntityId({
-        data: req.data as { ID?: string },
-        params: extractRequestParams(req),
-        query: (req as any).query,
-      }),
-      user,
-      tx: cds.transaction(req),
-      concurrency,
-    });
-    Object.assign(req.data, updates);
-  });
+const logger = cds.log('client-service');
 
-  service.before('DELETE', 'Clients', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const targetId = deriveEntityId({
+const handleClientUpsert = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const concurrency = buildConcurrencyContext(req, 'clientmgmt.Clients');
+  const { updates } = await prepareClientUpsert({
+    event: req.event as 'CREATE' | 'UPDATE',
+    data: req.data as Partial<ClientEntity>,
+    targetId: deriveEntityId({
       data: req.data as { ID?: string },
       params: extractRequestParams(req),
       query: (req as any).query,
-    });
-    if (!targetId) {
-      throw createServiceError(400, 'Client identifier is required.');
-    }
-    await validateClientDeletion({
-      targetId,
-      user,
-      tx: cds.transaction(req),
-      concurrency: buildConcurrencyContext(req, 'clientmgmt.Clients'),
-    });
+    }),
+    user,
+    tx: cds.transaction(req),
+    concurrency,
+  });
+  Object.assign(req.data, updates);
+};
+
+export const beforeClientCreate = handleClientUpsert;
+export const beforeClientUpdate = handleClientUpsert;
+
+export const beforeClientDelete = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const targetId = deriveEntityId({
+    data: req.data as { ID?: string },
+    params: extractRequestParams(req),
+    query: (req as any).query,
+  });
+  if (!targetId) {
+    throw createServiceError(400, 'Client identifier is required.');
+  }
+  await validateClientDeletion({
+    targetId,
+    user,
+    tx: cds.transaction(req),
+    concurrency: buildConcurrencyContext(req, 'clientmgmt.Clients'),
   });
 };
 
-const registerEmployeeHandlers = (service: Service): void => {
-  const serviceWithOn = service as ServiceWithOn;
-
-  service.before(['CREATE', 'UPDATE'], 'Employees', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const context = await prepareEmployeeWrite({
-      event: req.event as 'CREATE' | 'UPDATE',
-      data: req.data as Partial<EmployeeEntity>,
-      targetId: deriveEntityId({
-        data: req.data as { ID?: string },
-        params: extractRequestParams(req),
-        query: (req as any).query,
-      }),
-      tx: cds.transaction(req),
-      user,
-      concurrency: buildConcurrencyContext(req, 'clientmgmt.Employees'),
-    });
-    Object.assign(req.data, context.updates);
-    storeEmployeeContext(req, { client: context.client, existingEmployee: context.existingEmployee });
-
-    if (req.event === 'UPDATE' && req.data.employeeId) {
-      await ensureEmployeeIdentifier(cds.transaction(req), req.data as Partial<EmployeeEntity>, context.client, context.existingEmployee?.ID);
-    }
+const handleEmployeeUpsert = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const context = await prepareEmployeeWrite({
+    event: req.event as 'CREATE' | 'UPDATE',
+    data: req.data as Partial<EmployeeEntity>,
+    targetId: deriveEntityId({
+      data: req.data as { ID?: string },
+      params: extractRequestParams(req),
+      query: (req as any).query,
+    }),
+    tx: cds.transaction(req),
+    user,
+    concurrency: buildConcurrencyContext(req, 'clientmgmt.Employees'),
   });
+  Object.assign(req.data, context.updates);
+  storeEmployeeContext(req, { client: context.client, existingEmployee: context.existingEmployee });
 
-  serviceWithOn.on('CREATE', 'Employees', async (req: Request, next) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const tx = cds.transaction(req);
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt < EMPLOYEE_ID_RETRIES; attempt += 1) {
-      let generatedEmployeeId = false;
-      try {
-    const context = await ensureEmployeeContext(req, user);
-    generatedEmployeeId = await ensureEmployeeIdentifier(
-      tx,
+  if (req.event === 'UPDATE' && req.data.employeeId) {
+    await ensureEmployeeIdentifier(
+      cds.transaction(req),
       req.data as Partial<EmployeeEntity>,
       context.client,
       context.existingEmployee?.ID,
-        );
+    );
+  }
+};
 
-        const result = await next();
+export const beforeEmployeeCreate = handleEmployeeUpsert;
+export const beforeEmployeeUpdate = handleEmployeeUpsert;
 
-        const createdEmployee = (Array.isArray(result) ? result[0] : result) as Record<string, unknown> | undefined;
-        const endpoint = process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
-        if (endpoint && createdEmployee && context.client.companyId) {
-          const clientCompanyId = normalizeCompanyId(context.client.companyId) ?? context.client.companyId;
-          const requestData = req.data as Partial<EmployeeEntity>;
-          const payload: EmployeeCreatedNotification['payload'] = {
-            event: 'EMPLOYEE_CREATED',
-            employeeId: (createdEmployee as Partial<EmployeeEntity>).employeeId ?? requestData.employeeId,
-            employeeUUID: (createdEmployee as Partial<EmployeeEntity>).ID ?? requestData.ID,
-            clientCompanyId,
-            client_ID:
-              (createdEmployee as Partial<EmployeeEntity>).client_ID ?? requestData.client_ID ?? context.client.ID,
-            firstName: (createdEmployee as Partial<EmployeeEntity>).firstName ?? requestData.firstName,
-            lastName: (createdEmployee as Partial<EmployeeEntity>).lastName ?? requestData.lastName,
-            email: (createdEmployee as Partial<EmployeeEntity>).email ?? requestData.email,
-          };
+export const onEmployeeCreate = async (
+  req: Request,
+  next: () => Promise<unknown>,
+): Promise<unknown> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const tx = cds.transaction(req);
+  let lastError: unknown;
 
-          await enqueueEmployeeCreatedNotification(tx, { endpoint, payload });
-        }
+  for (let attempt = 0; attempt < EMPLOYEE_ID_RETRIES; attempt += 1) {
+    let generatedEmployeeId = false;
+    try {
+      const context = await ensureEmployeeContext(req, user);
+      generatedEmployeeId = await ensureEmployeeIdentifier(
+        tx,
+        req.data as Partial<EmployeeEntity>,
+        context.client,
+        context.existingEmployee?.ID,
+      );
 
-        return result;
-      } catch (error) {
-        lastError = error;
-        if (
-          generatedEmployeeId &&
-          isEmployeeIdUniqueConstraintError(error) &&
-          attempt < EMPLOYEE_ID_RETRIES - 1
-        ) {
-          delete (req.data as Partial<EmployeeEntity>).employeeId;
-          continue;
-        }
-        throw error;
+      const result = await next();
+      const createdEmployee = Array.isArray(result)
+        ? ((result[0] as Record<string, unknown> | undefined) ?? undefined)
+        : (result as Record<string, unknown> | undefined);
+
+      const endpoint = process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
+      if (endpoint && createdEmployee && context.client.companyId) {
+        const clientCompanyId = normalizeCompanyId(context.client.companyId) ?? context.client.companyId;
+        const record = createdEmployee as Partial<EmployeeEntity>;
+        const requestSnapshot = (req.data ?? {}) as Partial<EmployeeEntity>;
+        const payload: EmployeeCreatedNotification['payload'] = {
+          event: 'EMPLOYEE_CREATED',
+          employeeId: record.employeeId ?? requestSnapshot.employeeId,
+          employeeUUID: record.ID ?? requestSnapshot.ID,
+          clientCompanyId,
+          client_ID: record.client_ID ?? requestSnapshot.client_ID ?? context.client.ID,
+          firstName: record.firstName ?? requestSnapshot.firstName,
+          lastName: record.lastName ?? requestSnapshot.lastName,
+          email: record.email ?? requestSnapshot.email,
+        };
+
+        await enqueueEmployeeCreatedNotification(tx, { endpoint, payload });
       }
-    }
 
-    const errorDetails = lastError as { message?: string; stack?: string } | undefined;
-    const segments = ['Failed to create employee after multiple attempts.'];
-    if (errorDetails?.message) {
-      segments.push(`Last error: ${errorDetails.message}`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (generatedEmployeeId && isEmployeeIdUniqueConstraintError(error) && attempt < EMPLOYEE_ID_RETRIES - 1) {
+        delete (req.data as Partial<EmployeeEntity>).employeeId;
+        continue;
+      }
+      throw error;
     }
-    if (errorDetails?.stack) {
-      segments.push(`Stack: ${errorDetails.stack}`);
-    }
+  }
 
-    throw createServiceError(500, segments.join('\n'));
+  const baseMessage = 'Failed to create employee after multiple attempts.';
+  logger.error({ err: lastError }, baseMessage);
+  throw createServiceError(500, baseMessage);
+};
+
+export const beforeEmployeeDelete = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const targetId = deriveEntityId({
+    data: req.data as { ID?: string },
+    params: extractRequestParams(req),
+    query: (req as any).query,
   });
+  if (!targetId) {
+    throw createServiceError(400, 'Employee identifier is required.');
+  }
 
-  service.before('DELETE', 'Employees', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const targetId = deriveEntityId({
+  await validateEmployeeDeletion({
+    targetId,
+    tx: cds.transaction(req),
+    user,
+    concurrency: buildConcurrencyContext(req, 'clientmgmt.Employees'),
+  });
+};
+
+export const onAnonymizeFormerEmployees = async (req: Request): Promise<unknown> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const tx = cds.transaction(req);
+  const count = await anonymizeFormerEmployees(tx, user, (req.data as { before?: unknown })?.before);
+  const result = { value: count };
+  const requestWithReply = req as Request & {
+    reply?: (data: unknown) => unknown;
+    http?: { res?: { json?: (body: unknown) => void } };
+  };
+  if (requestWithReply.http?.res && typeof requestWithReply.http.res.json === 'function') {
+    requestWithReply.http.res.json(result);
+    return undefined;
+  }
+  if (typeof requestWithReply.reply === 'function') {
+    requestWithReply.reply(result);
+    return undefined;
+  }
+  return result;
+};
+
+const handleCostCenterUpsert = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const concurrency = buildConcurrencyContext(req, 'clientmgmt.CostCenters');
+  const { updates } = await prepareCostCenterUpsert({
+    event: req.event as 'CREATE' | 'UPDATE',
+    data: req.data as Partial<CostCenterEntity>,
+    targetId: deriveEntityId({
       data: req.data as { ID?: string },
       params: extractRequestParams(req),
       query: (req as any).query,
-    });
-    if (!targetId) {
-      throw createServiceError(400, 'Employee identifier is required.');
-    }
+    }),
+    tx: cds.transaction(req),
+    user,
+    concurrency,
+  });
+  Object.assign(req.data, updates);
+};
 
-    const client = await validateEmployeeDeletion({
-      targetId,
-      tx: cds.transaction(req),
-      user,
-      concurrency: buildConcurrencyContext(req, 'clientmgmt.Employees'),
-    });
+export const beforeCostCenterCreate = handleCostCenterUpsert;
+export const beforeCostCenterUpdate = handleCostCenterUpsert;
 
+export const beforeCostCenterDelete = async (req: Request): Promise<void> => {
+  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const targetId = deriveEntityId({
+    data: req.data as { ID?: string },
+    params: extractRequestParams(req),
+    query: (req as any).query,
+  });
+  if (!targetId) {
+    throw createServiceError(400, 'Cost center identifier is required.');
+  }
+
+  await validateCostCenterDeletion({
+    targetId,
+    tx: cds.transaction(req),
+    user,
+    concurrency: buildConcurrencyContext(req, 'clientmgmt.CostCenters'),
   });
 };
 
-const registerRetentionHandlers = (service: Service): void => {
-  const serviceWithOn = service as ServiceWithOn;
-  serviceWithOn.on('anonymizeFormerEmployees', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const tx = cds.transaction(req);
-    const count = await anonymizeFormerEmployees(tx, user, (req.data as { before?: unknown })?.before);
-    const result = { value: count };
-    const requestWithReply = req as Request & {
-      reply?: (data: unknown) => unknown;
-      http?: { res?: { json?: (body: unknown) => void } };
-    };
-    if (requestWithReply.http?.res && typeof requestWithReply.http.res.json === 'function') {
-      requestWithReply.http.res.json(result);
-      return;
-    }
-    if (typeof requestWithReply.reply === 'function') {
-      requestWithReply.reply(result);
-      return;
-    }
-    return result;
-  });
+export const registerClientServiceHandlers = (service: Service): void => {
+  service.before('CREATE', 'Clients', beforeClientCreate);
+  service.before('UPDATE', 'Clients', beforeClientUpdate);
+  service.before('DELETE', 'Clients', beforeClientDelete);
+
+  service.before('CREATE', 'Employees', beforeEmployeeCreate);
+  service.before('UPDATE', 'Employees', beforeEmployeeUpdate);
+  service.before('DELETE', 'Employees', beforeEmployeeDelete);
+
+  (service as ServiceWithOn).on('CREATE', 'Employees', onEmployeeCreate);
+  (service as ServiceWithOn).on('anonymizeFormerEmployees', onAnonymizeFormerEmployees);
+
+  service.before('CREATE', 'CostCenters', beforeCostCenterCreate);
+  service.before('UPDATE', 'CostCenters', beforeCostCenterUpdate);
+  service.before('DELETE', 'CostCenters', beforeCostCenterDelete);
 };
 
-const registerCostCenterHandlers = (service: Service): void => {
-  service.before(['CREATE', 'UPDATE'], 'CostCenters', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const concurrency = buildConcurrencyContext(req, 'clientmgmt.CostCenters');
-    const { updates } = await prepareCostCenterUpsert({
-      event: req.event as 'CREATE' | 'UPDATE',
-      data: req.data as Partial<CostCenterEntity>,
-      targetId: deriveEntityId({
-        data: req.data as { ID?: string },
-        params: extractRequestParams(req),
-        query: (req as any).query,
-      }),
-      tx: cds.transaction(req),
-      user,
-      concurrency,
-    });
-    Object.assign(req.data, updates);
-  });
+cds.service.impl(registerClientServiceHandlers);
 
-  service.before('DELETE', 'CostCenters', async (req: Request) => {
-    const user = buildUserContext((req as Request & { user?: unknown }).user as any);
-    const targetId = deriveEntityId({
-      data: req.data as { ID?: string },
-      params: extractRequestParams(req),
-      query: (req as any).query,
-    });
-    if (!targetId) {
-      throw createServiceError(400, 'Cost center identifier is required.');
-    }
-
-    await validateCostCenterDeletion({
-      targetId,
-      tx: cds.transaction(req),
-      user,
-      concurrency: buildConcurrencyContext(req, 'clientmgmt.CostCenters'),
-    });
-  });
-};
-
-export default cds.service.impl((service: Service) => {
-  registerClientHandlers(service);
-  registerEmployeeHandlers(service);
-  registerRetentionHandlers(service);
-  registerCostCenterHandlers(service);
+module.exports = Object.assign(registerClientServiceHandlers, {
+  registerClientServiceHandlers,
+  beforeClientCreate,
+  beforeClientUpdate,
+  beforeClientDelete,
+  beforeEmployeeCreate,
+  beforeEmployeeUpdate,
+  onEmployeeCreate,
+  beforeEmployeeDelete,
+  onAnonymizeFormerEmployees,
+  beforeCostCenterCreate,
+  beforeCostCenterUpdate,
+  beforeCostCenterDelete,
 });
+
+export default registerClientServiceHandlers;
