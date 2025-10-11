@@ -7,10 +7,12 @@ import type { Transaction } from '@sap/cds';
 import { postEmployeeNotification } from '../api/ThirdPartyEmployeeClient';
 import { parseCleanupCronInterval, resolvePositiveInt } from '../utils/environment';
 
-const SELECT = (cds.ql.SELECT as any).bind(cds.ql) as typeof cds.ql.SELECT;
-const UPDATE = (cds.ql.UPDATE as any).bind(cds.ql) as typeof cds.ql.UPDATE;
-const DELETE = ((cds.ql as any).DELETE as any).bind(cds.ql);
-const INSERT = ((cds.ql as any).INSERT as any).bind(cds.ql);
+const ql = cds.ql as typeof cds.ql & {
+  DELETE: typeof cds.ql.SELECT;
+  INSERT: typeof cds.ql.INSERT;
+};
+
+const { SELECT, UPDATE, DELETE, INSERT } = ql;
 
 const DEFAULT_OUTBOX_TIMEOUT_MS = 15000;
 const DEFAULT_OUTBOX_DISPATCH_INTERVAL_MS = 30000;
