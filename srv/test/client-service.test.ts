@@ -821,6 +821,79 @@ describe('Employee business rules', () => {
       expect(third.employeeId).toBe(`${prefix}000003`);
     });
   });
+
+  it('anonymizes former employees before the provided cutoff date', async () => {
+    const creation = await http.post<Record<string, any>>(
+      '/odata/v4/clients/Employees',
+      {
+        firstName: 'Former',
+        lastName: 'Employee',
+        email: 'former.employee@example.com',
+        entryDate: '2020-01-01',
+        exitDate: '2023-01-15',
+        status: 'inactive',
+        location: 'Paris',
+        positionLevel: 'L3',
+        client_ID: CLIENT_ID,
+      },
+      authConfig,
+    );
+
+    expect(creation.status).toBe(201);
+    const employeeId = (creation.data as Record<string, any>).ID as string | undefined;
+    expect(typeof employeeId).toBe('string');
+
+    try {
+      const actionResponse = await http.post<{ value: number }>(
+        '/odata/v4/clients/anonymizeFormerEmployees',
+        { before: '2024-01-01' },
+        authConfig,
+      );
+
+      expect(actionResponse.status).toBe(200);
+      expect(actionResponse.data).toEqual({ value: 1 });
+
+      const fetched = await http.get<Record<string, any>>(
+        `/odata/v4/clients/Employees(${employeeId})`,
+        authConfig,
+      );
+
+      expect(fetched.status).toBe(200);
+      expect(fetched.data.firstName).toBe('ANONYMIZED');
+      expect(fetched.data.lastName).toBe('ANONYMIZED');
+      expect(fetched.data.email).toMatch(/^anonymized-/);
+      expect(fetched.data.location).toBeNull();
+      expect(fetched.data.positionLevel).toBeNull();
+      expect(fetched.data.status).toBe('inactive');
+    } finally {
+      if (employeeId) {
+        await db.run(DELETE.from('clientmgmt.Employees').where({ ID: employeeId }));
+      }
+    }
+  });
+
+  it('rejects anonymization requests with invalid cutoff dates', async () => {
+    const status = await captureErrorStatus(
+      http.post(
+        '/odata/v4/clients/anonymizeFormerEmployees',
+        { before: 'not-a-date' },
+        authConfig,
+      ),
+    );
+
+    expect(status).toBe(400);
+  });
+
+  it('returns zero when no employees require anonymization', async () => {
+    const response = await http.post<{ value: number }>(
+      '/odata/v4/clients/anonymizeFormerEmployees',
+      { before: '1990-01-01' },
+      authConfig,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data).toEqual({ value: 0 });
+  });
 });
 
 

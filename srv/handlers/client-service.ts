@@ -43,6 +43,8 @@ const MAX_EMPLOYEE_ID_RETRIES = 5;
 const EMPLOYEE_ID_PREFIX_LENGTH = 8;
 const EMPLOYEE_ID_TOTAL_LENGTH = 14;
 const EMPLOYEE_ID_COUNTER_LENGTH = Math.max(1, EMPLOYEE_ID_TOTAL_LENGTH - EMPLOYEE_ID_PREFIX_LENGTH);
+const ANONYMIZED_PLACEHOLDER = 'ANONYMIZED';
+const ANONYMIZED_EMAIL_DOMAIN = 'example.invalid';
 
 const normalizeCompanyId = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
@@ -404,6 +406,13 @@ const ensureOptimisticConcurrency = async (
 };
 
 const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+const buildAnonymizedEmail = (employeeId?: string): string => {
+  const sanitized = typeof employeeId === 'string' ? employeeId.replace(/[^A-Za-z0-9]/g, '').toLowerCase() : '';
+  const localPartBase = sanitized ? `anonymized-${sanitized}` : 'anonymized';
+  const localPart = localPartBase.slice(0, 64);
+  return `${localPart}@${ANONYMIZED_EMAIL_DOMAIN}`;
+};
 
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
   const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
@@ -982,6 +991,48 @@ const registerEmployeeHandlers = (service: ClientService): void => {
   });
 };
 
+const registerEmployeeRetentionHandlers = (service: ClientService): void => {
+  service.on('anonymizeFormerEmployees', async (req) => {
+    const cutoffDate = toDateValue(req.data?.before);
+    if (!cutoffDate) {
+      req.error(400, 'Parameter "before" must be a valid date.');
+      return;
+    }
+
+    const cutoff = cutoffDate.toISOString().split('T')[0];
+    const tx = cds.transaction(req);
+    const employeesToAnonymize = (await tx.run(
+      SELECT.from('clientmgmt.Employees')
+        .columns('ID', 'employeeId')
+        .where({
+          exitDate: { '<': cutoff },
+          firstName: { '!=': ANONYMIZED_PLACEHOLDER },
+        }),
+    )) as Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>;
+
+    if (!employeesToAnonymize || employeesToAnonymize.length === 0) {
+      return 0;
+    }
+
+    for (const employee of employeesToAnonymize) {
+      await tx.run(
+        UPDATE('clientmgmt.Employees')
+          .set({
+            firstName: ANONYMIZED_PLACEHOLDER,
+            lastName: ANONYMIZED_PLACEHOLDER,
+            email: buildAnonymizedEmail(employee.employeeId),
+            location: null,
+            positionLevel: null,
+            status: 'inactive',
+          })
+          .where({ ID: employee.ID }),
+      );
+    }
+
+    return employeesToAnonymize.length;
+  });
+};
+
 const registerCostCenterHandlers = (service: ClientService): void => {
   service.before(['CREATE', 'UPDATE'], 'CostCenters', async (req: CostCenterRequest) => {
     if (req.event === 'UPDATE') {
@@ -1088,5 +1139,6 @@ const registerCostCenterHandlers = (service: ClientService): void => {
 export default cds.service.impl((service: ClientService) => {
   registerClientHandlers(service);
   registerEmployeeHandlers(service);
+  registerEmployeeRetentionHandlers(service);
   registerCostCenterHandlers(service);
 });

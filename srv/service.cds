@@ -57,4 +57,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers/client-servic
     { grant: 'READ', to: 'HREditor' }
   ]
   entity Countries as projection on CommonCountries;
+
+  @requires: ['HREditor', 'HRAdmin']
+  action anonymizeFormerEmployees(before: Date) returns Integer;
 }
