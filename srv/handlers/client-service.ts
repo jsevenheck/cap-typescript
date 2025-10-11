@@ -41,6 +41,15 @@ const { SELECT, INSERT, UPDATE } = cds.ql;
 
 const MAX_EMPLOYEE_ID_RETRIES = 5;
 
+type CdsModel = {
+  definitions?: Record<string, unknown>;
+};
+
+const getCdsModel = (): CdsModel | undefined => {
+  const cdsWithModel = cds as unknown as { model?: CdsModel };
+  return cdsWithModel.model;
+};
+
 const normalizeCompanyId = (value?: string): string | undefined =>
   value?.trim().toUpperCase();
 
@@ -185,7 +194,7 @@ const normalizeConcurrencyValue = (value: unknown): string | undefined => {
 };
 
 const getEntityConcurrencyField = (entityName: string): { etag?: string; field?: string } => {
-  const definition = cds.model?.definitions?.[entityName] as
+  const definition = getCdsModel()?.definitions?.[entityName] as
     | { ['@odata.etag']?: string; elements?: Record<string, unknown> }
     | undefined;
 
