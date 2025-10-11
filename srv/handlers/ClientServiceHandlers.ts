@@ -107,7 +107,17 @@ const ensureEmployeeContext = async (req: Request, user: UserContext): Promise<E
   return enriched;
 };
 
-const logger = cds.log('client-service');
+type ServiceLogger = { error: (message?: unknown, ...optionalParams: unknown[]) => void };
+
+const getServiceLogger = (): ServiceLogger => {
+  const typedCds = cds as unknown as { log?: (component: string) => ServiceLogger };
+  if (typeof typedCds.log === 'function') {
+    return typedCds.log('client-service');
+  }
+  return console;
+};
+
+const logger = getServiceLogger();
 
 const handleClientUpsert = async (req: Request): Promise<void> => {
   const user = buildUserContext((req as Request & { user?: unknown }).user as any);
