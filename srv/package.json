@@ -12,6 +12,7 @@
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
+    "@sap/ams": "^3",
     "@sap/cds": "^9.3.1",
     "cross-env": "^7.0.3",
     "node-fetch": "^2.6.7",
