@@ -68,7 +68,11 @@ const buildConcurrencyContext = (req: Request, entityName: string) => {
   let payloadValue: unknown;
   if (field) {
     const updatePayload = (req as { query?: { UPDATE?: { data?: Record<string, unknown> } } }).query?.UPDATE?.data;
-    payloadValue = (req.data as Record<string, unknown> | undefined)?.[field] ?? updatePayload?.[field];
+    const httpBody = (req as Request & { req?: { body?: unknown } }).req?.body;
+    const bodyValue =
+      httpBody && typeof httpBody === 'object' ? (httpBody as Record<string, unknown>)[field] : undefined;
+    payloadValue =
+      (req.data as Record<string, unknown> | undefined)?.[field] ?? updatePayload?.[field] ?? bodyValue;
   }
   return { headerValue, hasHttpHeaders, payloadValue };
 };

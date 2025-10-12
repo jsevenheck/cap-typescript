@@ -210,11 +210,11 @@ export const ensureOptimisticConcurrency = async ({
 
   const providedValue = normalizeConcurrencyValue(payloadValue);
 
-  if (etag && hasHttpHeaders) {
+  if (etag && hasHttpHeaders && !headerValue && providedValue === undefined) {
     throw createServiceError(428, 'Precondition required: supply an If-Match header.');
   }
 
-  if (!providedValue) {
+  if (providedValue === undefined) {
     throw createServiceError(428, `Precondition required: include ${field} in the request payload.`);
   }
 

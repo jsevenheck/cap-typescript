@@ -36,7 +36,7 @@ The command above starts `cds watch` (with TypeScript support) and the UI5 dev s
 * **Runtime:** `@sap/cds` 9 with TypeScript handlers loaded through `ts-node`.
 * **Database:** Local development uses SQLite (`sqlite.db`). Tests run entirely in-memory.
 * **Security:** Authentication relies on SAP Cloud Identity Services (IAS) and authorization decisions are delegated to the Authorization Management Service (AMS). Local development still uses mocked users so existing tests continue to run unchanged.
-* **Business logic:** Custom handlers in `srv/handlers/client-service.ts` perform validation, enforce cross-entity consistency, and generate sequential employee identifiers.
+* **Business logic:** Custom handlers in `srv/handlers/ClientServiceHandlers.ts` perform validation, enforce cross-entity consistency, and generate sequential employee identifiers. The service enforces optimistic concurrency on writes and accepts either `If-Match` headers or a `modifiedAt` timestamp in the payload when the UI cannot send headers (e.g. during background jobs).
 * **Health endpoint:** `/health` responds with `{ status: 'ok' }` for platform readiness probes.
 
 ### Frontend specifics
@@ -74,7 +74,7 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 | Former Java artifact | TypeScript replacement |
 | --- | --- |
 | `srv/src/main/java/com/acme/hr/Application.java` | `srv/server.ts` (exports `cds.server` with health check) |
-| Spring Boot handlers & services | `srv/handlers/client-service.ts` (CAP hooks with identical semantics) |
+| Spring Boot handlers & services | `srv/handlers/ClientServiceHandlers.ts` (CAP hooks with identical semantics) |
 | Maven build (`pom.xml`) | `package.json` workspaces + TypeScript toolchain |
 | Spring Security roles | IAS scopes `HRViewer` / `HREditor` / `HRAdmin` |
 | JUnit tests | Jest service tests + Playwright e2e tests |
