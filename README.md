@@ -96,6 +96,33 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 | `OUTBOX_RETENTION_HOURS` | Number of hours delivered/failed entries are retained before cleanup (defaults to `168`). |
 | `OUTBOX_CLEANUP_INTERVAL_MS` | Interval in milliseconds for the periodic cleanup task (defaults to six hours). |
 | `OUTBOX_CLEANUP_CRON` | Optional simple cron expression (`*/N * * * *` for minutes or `0 */N * * *` for hours) that overrides the cleanup interval. |
+| `EMPLOYEE_EXPORT_API_KEY` | API key required to call `GET /api/employees/active` without IAS authentication. |
+
+### Employee export API
+
+External systems can obtain the list of active employees through a dedicated, API-key-protected REST endpoint:
+
+```
+GET /api/employees/active
+```
+
+Set a strong API key via the `EMPLOYEE_EXPORT_API_KEY` environment variable. When running locally you can add the following snippet to your `.env` file:
+
+```
+EMPLOYEE_EXPORT_API_KEY=replace-with-a-strong-secret
+```
+
+Example requests:
+
+```bash
+# Successful call
+curl -H "x-api-key: $EMPLOYEE_EXPORT_API_KEY" https://<host>/api/employees/active
+
+# Unauthorized (missing key)
+curl https://<host>/api/employees/active
+```
+
+The endpoint returns a JSON array containing active employees (including their cost centers and managers). Invalid or missing API keys result in `401 { "error": "invalid_api_key" }`.
 
 ## Notes
 
