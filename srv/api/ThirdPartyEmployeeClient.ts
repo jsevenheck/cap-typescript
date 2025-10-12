@@ -84,7 +84,7 @@ export const postEmployeeNotification = async ({
           return JSON.stringify(redactObject(parsed));
         } catch {
           const redacted = value.replace(
-            /(\"(?:password|secret|token|authorization|auth|apiKey|apikey|accessToken|refreshToken)\"\s*:\s*)\"[^\"]*\"/gi,
+            /("(?:password|secret|token|authorization|auth|apiKey|apikey|accessToken|refreshToken)"\s*:\s*)"[^"]*"/gi,
             '$1"[redacted]"',
           );
           return redacted;
@@ -97,11 +97,16 @@ export const postEmployeeNotification = async ({
           return '[unserializable body]';
         }
       }
-      try {
+      if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
         return JSON.stringify(value);
-      } catch {
-        return String(value);
       }
+      if (typeof value === 'symbol') {
+        return value.description ? `Symbol(${value.description})` : 'Symbol()';
+      }
+      if (typeof value === 'function') {
+        return '[function]';
+      }
+      return '[unserializable body]';
     };
 
     return truncate(serialise(body));
