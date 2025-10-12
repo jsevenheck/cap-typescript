@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
 const INVALID_API_KEY_RESPONSE = { error: 'invalid_api_key' } as const;
@@ -17,11 +18,32 @@ function extractApiKey(req: Request): string | undefined {
   return matches?.groups?.key?.trim();
 }
 
+const toKeyBuffer = (key: string | undefined): Buffer | undefined => {
+  if (!key) {
+    return undefined;
+  }
+
+  return Buffer.from(key, 'utf8');
+};
+
 export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const configuredKey = process.env.EMPLOYEE_EXPORT_API_KEY?.trim();
-  const providedKey = extractApiKey(req);
+  const providedKey = extractApiKey(req)?.trim();
 
-  if (!configuredKey || !providedKey || configuredKey !== providedKey) {
+  const configuredBuffer = toKeyBuffer(configuredKey);
+  const providedBuffer = toKeyBuffer(providedKey);
+
+  if (!configuredBuffer || !providedBuffer || configuredBuffer.length !== providedBuffer.length) {
+    res.status(401).json(INVALID_API_KEY_RESPONSE);
+    return;
+  }
+
+  try {
+    if (!crypto.timingSafeEqual(configuredBuffer, providedBuffer)) {
+      res.status(401).json(INVALID_API_KEY_RESPONSE);
+      return;
+    }
+  } catch (_error) {
     res.status(401).json(INVALID_API_KEY_RESPONSE);
     return;
   }

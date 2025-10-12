@@ -10,6 +10,7 @@ describe('GET /api/employees/active', () => {
   const cdsAny = cds as any;
   const originalModel = cdsAny.model;
   const originalRun = cdsAny.run;
+  const originalTx = cdsAny.tx;
 
   const buildApp = () => {
     const app = express();
@@ -21,17 +22,20 @@ describe('GET /api/employees/active', () => {
     process.env.EMPLOYEE_EXPORT_API_KEY = 'test-key';
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
+    cdsAny.tx = originalTx;
   });
 
   afterEach(() => {
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
+    cdsAny.tx = originalTx;
   });
 
   afterAll(() => {
     process.env.EMPLOYEE_EXPORT_API_KEY = originalApiKey;
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
+    cdsAny.tx = originalTx;
   });
 
   it('responds with 401 when the API key is missing', async () => {
@@ -47,7 +51,11 @@ describe('GET /api/employees/active', () => {
     const app = buildApp();
 
     const employeesDefinition = { elements: { entryDate: {}, exitDate: {}, status: {} } };
-    cdsAny.model = { definitions: { 'clientmgmt.Employees': employeesDefinition } };
+    cdsAny.model = {
+      definitions: {
+        'ClientService.Employees': employeesDefinition,
+      },
+    };
 
     const runSpy = jest.fn().mockResolvedValue([
       {
@@ -73,7 +81,7 @@ describe('GET /api/employees/active', () => {
         },
       },
     ]);
-    cdsAny.run = runSpy;
+    cdsAny.tx = jest.fn().mockReturnValue({ run: runSpy });
 
     await request(app)
       .get('/api/employees/active')
@@ -102,7 +110,7 @@ describe('GET /api/employees/active', () => {
           },
         },
       ]);
-
     expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(cdsAny.tx).toHaveBeenCalledTimes(1);
   });
 });

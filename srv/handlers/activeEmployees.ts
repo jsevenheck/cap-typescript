@@ -1,5 +1,5 @@
 import cds from '@sap/cds';
-import type { RequestHandler } from 'express';
+import type { NextFunction, Request, Response, RequestHandler } from 'express';
 
 type EmployeeEntityDefinition = {
   elements?: Record<string, unknown>;
@@ -149,33 +149,43 @@ const shapeEmployee = (row: EmployeeRow, selectFields?: Set<string>): ActiveEmpl
   return shaped;
 };
 
-const EMPLOYEES_ENTITY_NAME = 'clientmgmt.Employees';
+const EMPLOYEE_ENTITY_CANDIDATES = ['ClientService.Employees', 'clientmgmt.Employees'] as const;
 
-const resolveEmployeeDefinition = (): EmployeeEntityDefinition | undefined => {
-  const cdsAny = cds as any;
-  const namespaceEntities = typeof cdsAny.entities === 'function' ? cdsAny.entities('clientmgmt') : undefined;
-  const employeesFromNamespace = namespaceEntities?.Employees as EmployeeEntityDefinition | undefined;
-
-  if (employeesFromNamespace) {
-    return employeesFromNamespace;
-  }
-
-  const model = cdsAny.model as { definitions?: Record<string, EmployeeEntityDefinition> } | undefined;
-  return model?.definitions?.[EMPLOYEES_ENTITY_NAME];
+type EmployeeEntityInfo = {
+  name: string;
+  definition: EmployeeEntityDefinition;
 };
 
-export const activeEmployeesHandler: RequestHandler = async (req, res) => {
-  try {
-    const employeeDefinition = resolveEmployeeDefinition();
-    if (!employeeDefinition) {
-      throw new Error('Employees entity definition not found.');
+const resolveEmployeeEntity = (): EmployeeEntityInfo | undefined => {
+  const cdsAny = cds as any;
+  const model = cdsAny.model as { definitions?: Record<string, EmployeeEntityDefinition> } | undefined;
+
+  if (!model?.definitions) {
+    return undefined;
+  }
+
+  for (const candidate of EMPLOYEE_ENTITY_CANDIDATES) {
+    const definition = model.definitions[candidate];
+    if (definition) {
+      return { name: candidate, definition };
     }
+  }
 
-    const selectFields = parseSelect(req.query.$select);
-    const top = parseNonNegativeInteger(req.query.$top);
-    const skip = parseNonNegativeInteger(req.query.$skip);
+  return undefined;
+};
 
-    const query = cds.ql.SELECT.from(EMPLOYEES_ENTITY_NAME).columns(
+const executeActiveEmployeesQuery = async (
+  req: Request,
+  selectFields: Set<string> | undefined,
+  top: number | undefined,
+  skip: number | undefined
+): Promise<ActiveEmployee[]> => {
+  const entityInfo = resolveEmployeeEntity();
+  if (!entityInfo) {
+    throw new Error('Employees entity definition not found.');
+  }
+
+  const query = cds.ql.SELECT.from(entityInfo.name).columns(
       'ID',
       'employeeId',
       'firstName',
@@ -188,48 +198,66 @@ export const activeEmployeesHandler: RequestHandler = async (req, res) => {
       'status'
     );
 
-    const elements = employeeDefinition.elements ?? {};
-    if ('isActive' in elements) {
-      (query as any).where({ isActive: true });
-    } else {
-      const today = new Date().toISOString().slice(0, 10);
-      const parts = [
-        `entryDate <= '${today}'`,
-        `(exitDate IS NULL OR exitDate >= '${today}')`,
-      ];
+  const elements = entityInfo.definition.elements ?? {};
+  if ('isActive' in elements) {
+    (query as any).where({ isActive: true });
+  } else {
+    const today = new Date().toISOString().slice(0, 10);
 
-      if ('status' in elements) {
-        parts.push("(status = 'active' OR status IS NULL)");
-      }
+    (query as any).where({ entryDate: { '<=': today } });
+    (query as any).where({ or: [{ exitDate: null }, { exitDate: { '>=': today } }] });
 
-      (query as any).where(parts.join(' AND '));
+    if ('status' in elements) {
+      (query as any).where({ or: [{ status: { '=': 'active' } }, { status: null }] });
     }
-
-    if (top !== undefined || skip !== undefined) {
-      const limit = top ?? Number.MAX_SAFE_INTEGER;
-      (query as any).limit(limit, skip ?? 0);
-    }
-
-    const rows = (await (cds as any).run(query)) as EmployeeRow[];
-    const fieldsToApply = selectFields ?? new Set(DEFAULT_SELECT_FIELDS);
-
-    const employees = rows.map((row) => shapeEmployee(row, fieldsToApply));
-
-    if (!selectFields) {
-      res.json(employees);
-      return;
-    }
-
-    res.json(
-      employees.map((employee) => {
-        const filteredEntries = Object.entries(employee).filter(([key]) => selectFields.has(key));
-        return Object.fromEntries(filteredEntries);
-      })
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected error';
-    res.status(500).json({ error: 'internal_error', message });
   }
+
+  if (top !== undefined || skip !== undefined) {
+    const limit = top ?? Number.MAX_SAFE_INTEGER;
+    (query as any).limit(limit, skip ?? 0);
+  }
+
+  const transaction = (cds as any).tx(req);
+  if (!transaction || typeof transaction.run !== 'function') {
+    throw new Error('Failed to acquire transaction for request.');
+  }
+
+  const rows = (await transaction.run(query)) as EmployeeRow[];
+  const fieldsToApply = selectFields ?? new Set(DEFAULT_SELECT_FIELDS);
+  return rows.map((row) => shapeEmployee(row, fieldsToApply));
+};
+
+const handleActiveEmployees = async (req: Request, res: Response): Promise<void> => {
+  const selectFields = parseSelect(req.query.$select);
+  const top = parseNonNegativeInteger(req.query.$top);
+  const skip = parseNonNegativeInteger(req.query.$skip);
+
+  const employees = await executeActiveEmployeesQuery(req, selectFields, top, skip);
+
+  if (!selectFields) {
+    res.json(employees);
+    return;
+  }
+
+  res.json(
+    employees.map((employee) => {
+      const filteredEntries = Object.entries(employee).filter(([key]) => selectFields.has(key));
+      return Object.fromEntries(filteredEntries);
+    })
+  );
+};
+
+export const activeEmployeesHandler: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {
+  handleActiveEmployees(req, res).catch((error) => {
+    if (!res.headersSent) {
+      const message = error instanceof Error ? error.message : 'Unexpected error';
+      res.status(500).json({ error: 'internal_error', message });
+    }
+
+    if (typeof next === 'function') {
+      next(error);
+    }
+  });
 };
 
 export default activeEmployeesHandler;
