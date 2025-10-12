@@ -1,5 +1,5 @@
 import cds from '@sap/cds';
-import type { Application } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
 
 import {
   cleanupOutbox,
@@ -8,11 +8,24 @@ import {
   resolveOutboxDispatchInterval,
 } from './services/OutboxService';
 import { resolveAuthProviderName } from './utils/authProvider';
+import { listActiveEmployeesForThirdParty } from './services/ThirdPartyEmployeeService';
 
 cds.on('bootstrap', (app: Application) => {
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+
+  app.get(
+    '/api/external/active-employees',
+    async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const employees = await listActiveEmployeesForThirdParty();
+        res.status(200).json({ value: employees });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 });
 
 cds.on('served', () => {
