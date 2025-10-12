@@ -212,8 +212,8 @@ export const onEmployeeCreate = async (
         ? ((result[0] as Record<string, unknown> | undefined) ?? undefined)
         : (result as Record<string, unknown> | undefined);
 
-      const endpoint = process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
-      if (endpoint && createdEmployee && context.client.companyId) {
+      const destinationName = process.env.THIRD_PARTY_EMPLOYEE_DESTINATION;
+      if (destinationName && createdEmployee && context.client.companyId) {
         const clientCompanyId = normalizeCompanyId(context.client.companyId) ?? context.client.companyId;
         const record = createdEmployee as Partial<EmployeeEntity>;
         const requestSnapshot = (req.data ?? {}) as Partial<EmployeeEntity>;
@@ -228,7 +228,7 @@ export const onEmployeeCreate = async (
           email: record.email ?? requestSnapshot.email,
         };
 
-        await enqueueEmployeeCreatedNotification(tx, { endpoint, payload });
+        await enqueueEmployeeCreatedNotification(tx, { destinationName, payload });
       }
 
       return result;

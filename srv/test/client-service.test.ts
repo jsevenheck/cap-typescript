@@ -1,9 +1,11 @@
-jest.mock('node-fetch', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('@sap-cloud-sdk/connectivity', () => ({ __esModule: true, getDestination: jest.fn() }));
+jest.mock('@sap-cloud-sdk/http-client', () => ({ __esModule: true, executeHttpRequest: jest.fn() }));
 
 import path from 'node:path';
 import { createHmac, randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
-import fetch, { type RequestInit } from 'node-fetch';
+import { getDestination } from '@sap-cloud-sdk/connectivity';
+import { executeHttpRequest } from '@sap-cloud-sdk/http-client';
 
 import { cleanupOutbox, processOutbox } from '../server';
 
@@ -38,7 +40,8 @@ const http = cap as unknown as {
   ) => Promise<{ status: number; data: T; headers: Record<string, string> }>;
 };
 
-const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
+const mockedGetDestination = getDestination as jest.MockedFunction<typeof getDestination>;
+const mockedExecuteHttpRequest = executeHttpRequest as jest.MockedFunction<typeof executeHttpRequest>;
 const { SELECT } = cds.ql;
 const INSERT = (cds.ql as any).INSERT as any;
 const DELETE = (cds.ql as any).DELETE as any;
@@ -67,8 +70,9 @@ const captureErrorStatus = async (promise: Promise<unknown>): Promise<number> =>
 };
 
 afterEach(async () => {
-  mockedFetch.mockReset();
-  delete process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT;
+  mockedGetDestination.mockReset();
+  mockedExecuteHttpRequest.mockReset();
+  delete process.env.THIRD_PARTY_EMPLOYEE_DESTINATION;
   delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
   delete process.env.OUTBOX_CLAIM_TTL_MS;
   delete process.env.OUTBOX_DISPATCH_INTERVAL_MS;
@@ -928,8 +932,8 @@ describe('Employee notification outbox', () => {
     service = await cds.connect.to('ClientService');
   });
 
-  it('writes an outbox entry after employee creation when endpoint configured', async () => {
-    process.env.THIRD_PARTY_EMPLOYEE_ENDPOINT = 'https://example.org/employees';
+  it('writes an outbox entry after employee creation when destination configured', async () => {
+    process.env.THIRD_PARTY_EMPLOYEE_DESTINATION = 'EmployeesAPI';
 
     await runAs(
       { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
@@ -948,7 +952,7 @@ describe('Employee notification outbox', () => {
     const entry = (await db.run(
       SELECT.one
         .from('clientmgmt.EmployeeNotificationOutbox')
-        .where({ endpoint: 'https://example.org/employees' }),
+        .where({ destinationName: 'EmployeesAPI' }),
     )) as any;
 
     expect(entry).toBeDefined();
@@ -968,7 +972,7 @@ describe('Employee notification outbox', () => {
       INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
         ID: entryId,
         eventType: 'EMPLOYEE_CREATED',
-        endpoint: 'https://example.org/success',
+        destinationName: 'employees-success',
         payload: JSON.stringify({ ok: true }),
         status: 'PENDING',
         attempts: 0,
@@ -977,12 +981,9 @@ describe('Employee notification outbox', () => {
     );
 
     process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'super-secret';
-
-    mockedFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: async () => '',
-    } as any);
+    const destination = { name: 'employees-success', url: 'https://example.org/success' } as any;
+    mockedGetDestination.mockResolvedValueOnce(destination);
+    mockedExecuteHttpRequest.mockResolvedValueOnce({ status: 200, data: '', headers: {} } as any);
 
     await processOutbox();
 
@@ -993,10 +994,11 @@ describe('Employee notification outbox', () => {
     expect(updated.status).toBe('COMPLETED');
     expect(updated.deliveredAt).toBeTruthy();
     expect(updated.lastError).toBeNull();
-    expect(mockedFetch).toHaveBeenCalledWith(
-      'https://example.org/success',
+    expect(mockedExecuteHttpRequest).toHaveBeenCalledWith(
+      destination,
       expect.objectContaining({
-        method: 'POST',
+        method: 'post',
+        data: JSON.stringify({ ok: true }),
         headers: expect.objectContaining({
           'content-type': 'application/json',
           'x-signature-sha256': createHmac('sha256', 'super-secret').update(JSON.stringify({ ok: true })).digest('hex'),
@@ -1016,7 +1018,7 @@ describe('Employee notification outbox', () => {
       INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
         ID: entryId,
         eventType: 'EMPLOYEE_CREATED',
-        endpoint: 'https://example.org/hang',
+        destinationName: 'employees-hang',
         payload: JSON.stringify({ ok: true }),
         status: 'PENDING',
         attempts: 0,
@@ -1024,13 +1026,13 @@ describe('Employee notification outbox', () => {
       }),
     );
 
-    mockedFetch.mockImplementationOnce((_url, init?: RequestInit) =>
-      new Promise((_resolve, reject) => {
-        const signal = init?.signal as AbortSignal | undefined;
-        signal?.addEventListener('abort', () => {
-          reject(new Error('aborted'));
-        });
-      }),
+    const destination = { name: 'employees-hang', url: 'https://example.org/hang' } as any;
+    mockedGetDestination.mockResolvedValue(destination);
+    mockedExecuteHttpRequest.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          setTimeout(() => reject(new Error('timeout exceeded')), 20);
+        }),
     );
 
     process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS = '10';
@@ -1051,10 +1053,12 @@ describe('Employee notification outbox', () => {
     expect(updated.status).toBe('PENDING');
     expect(updated.attempts).toBe(1);
     expect(new Date(updated.nextAttemptAt).getTime()).toBeGreaterThan(baseTime);
-    expect(String(updated.lastError)).toContain('aborted');
+    expect(String(updated.lastError)).toContain('timeout');
 
-    const fetchOptions = mockedFetch.mock.calls[0]?.[1] as RequestInit | undefined;
-    expect(fetchOptions?.signal).toBeDefined();
+    expect(mockedExecuteHttpRequest).toHaveBeenCalledWith(
+      destination,
+      expect.objectContaining({ timeout: 10 }),
+    );
 
     delete process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS;
     jest.useRealTimers();
@@ -1070,7 +1074,7 @@ describe('Employee notification outbox', () => {
       INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
         ID: entryId,
         eventType: 'EMPLOYEE_CREATED',
-        endpoint: 'https://example.org/fail',
+        destinationName: 'employees-fail',
         payload: JSON.stringify({ ok: false }),
         status: 'PENDING',
         attempts: 0,
@@ -1078,7 +1082,9 @@ describe('Employee notification outbox', () => {
       }),
     );
 
-    mockedFetch.mockRejectedValue(new Error('network down'));
+    const destination = { name: 'employees-fail', url: 'https://example.org/fail' } as any;
+    mockedGetDestination.mockResolvedValue(destination);
+    mockedExecuteHttpRequest.mockRejectedValue(new Error('network down'));
 
     let currentTime = baseTime;
     for (let attempt = 1; attempt <= 6; attempt += 1) {
@@ -1104,7 +1110,7 @@ describe('Employee notification outbox', () => {
     }
 
     jest.useRealTimers();
-    expect(mockedFetch).toHaveBeenCalledTimes(6);
+    expect(mockedExecuteHttpRequest).toHaveBeenCalledTimes(6);
   });
 
   it('removes completed and failed entries that exceed the retention window', async () => {
@@ -1116,7 +1122,7 @@ describe('Employee notification outbox', () => {
         {
           ID: completedId,
           eventType: 'EMPLOYEE_CREATED',
-          endpoint: 'https://example.org/cleanup',
+          destinationName: 'employees-cleanup',
           payload: JSON.stringify({ ok: true }),
           status: 'COMPLETED',
           attempts: 1,
@@ -1125,7 +1131,7 @@ describe('Employee notification outbox', () => {
         {
           ID: failedId,
           eventType: 'EMPLOYEE_CREATED',
-          endpoint: 'https://example.org/cleanup',
+          destinationName: 'employees-cleanup',
           payload: JSON.stringify({ ok: false }),
           status: 'FAILED',
           attempts: 6,

@@ -60,9 +60,12 @@ entity CostCenters : managed, cuid {
   employees    : Association to many Employees on employees.costCenter = $self;
 }
 
+@cds.persistence.indices: [
+  { name: 'Outbox_status_nextAttempt_idx', elements: ['status', 'nextAttemptAt'] }
+]
 entity EmployeeNotificationOutbox : managed, cuid {
   eventType     : String(60)  not null;
-  endpoint      : String(500) not null;
+  destinationName: String(120) not null;
   payload       : LargeString not null;
   status        : String(20)  default 'PENDING';
   attempts      : Integer     default 0;

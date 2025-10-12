@@ -4,6 +4,8 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
+import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
+
 import { postEmployeeNotification } from '../api/ThirdPartyEmployeeClient';
 import { parseCleanupCronInterval, resolvePositiveInt } from '../utils/environment';
 
@@ -67,7 +69,7 @@ export const resolveCleanupInterval = (): number => {
 
 interface OutboxEntry {
   ID: string;
-  endpoint: string;
+  destinationName: string;
   payload: string;
   status?: string;
   attempts?: number;
@@ -89,7 +91,7 @@ export const processOutbox = async (): Promise<void> => {
 
   const selectCandidates = (ql.SELECT as any)
     .from('clientmgmt.EmployeeNotificationOutbox')
-    .columns('ID', 'endpoint', 'payload', 'status', 'attempts', 'nextAttemptAt')
+    .columns('ID', 'destinationName', 'payload', 'status', 'attempts', 'nextAttemptAt')
     .where({ status: { in: ['PENDING', 'PROCESSING'] } })
     .orderBy('nextAttemptAt')
     .limit(candidateLimit);
@@ -176,8 +178,19 @@ export const processOutbox = async (): Promise<void> => {
   await Promise.all(
     claimed.map(async (entry) => {
       try {
+        const destination = await getDestination({ destinationName: entry.destinationName });
+        if (!destination) {
+          throw new Error(`Destination ${entry.destinationName} not found`);
+        }
+
+        if ((destination as HttpDestination).url === undefined) {
+          throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
+        }
+
+        const httpDestination = destination as HttpDestination;
+
         await postEmployeeNotification({
-          endpoint: entry.endpoint,
+          destination: httpDestination,
           payload: entry.payload,
           secret: secret ?? undefined,
           timeoutMs,
@@ -237,7 +250,7 @@ export const cleanupOutbox = async (): Promise<void> => {
 };
 
 export interface EmployeeCreatedNotification {
-  endpoint: string;
+  destinationName: string;
   payload: Record<string, unknown>;
 }
 
@@ -248,7 +261,7 @@ export const enqueueEmployeeCreatedNotification = async (
   await tx.run(
     ql.INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
       eventType: 'EMPLOYEE_CREATED',
-      endpoint: notification.endpoint,
+      destinationName: notification.destinationName,
       payload: JSON.stringify(notification.payload),
       status: 'PENDING',
       attempts: 0,

@@ -2,10 +2,11 @@
  * Lightweight HTTP client for delivering employee notifications to downstream systems.
  */
 import { createHmac } from 'node:crypto';
-import fetch, { type RequestInit } from 'node-fetch';
+import type { HttpDestination } from '@sap-cloud-sdk/connectivity';
+import { executeHttpRequest, type HttpRequestConfig } from '@sap-cloud-sdk/http-client';
 
 export interface NotificationRequest {
-  endpoint: string;
+  destination: HttpDestination;
   payload: string;
   secret?: string;
   timeoutMs: number;
@@ -21,29 +22,23 @@ const buildHeaders = (payload: string, secret?: string): Record<string, string> 
 };
 
 export const postEmployeeNotification = async ({
-  endpoint,
+  destination,
   payload,
   secret,
   timeoutMs,
 }: NotificationRequest): Promise<void> => {
   const headers = buildHeaders(payload, secret);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const request: HttpRequestConfig = {
+    method: 'post',
+    data: payload,
+    headers,
+    timeout: timeoutMs,
+  };
 
   try {
-    const request: RequestInit = {
-      method: 'POST',
-      headers,
-      body: payload,
-      signal: controller.signal,
-    };
-    const response = await fetch(endpoint, request);
-
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(`HTTP ${response.status} ${message}`.trim());
-    }
-  } finally {
-    clearTimeout(timeout);
+    await executeHttpRequest(destination, request);
+  } catch (error: any) {
+    const message = error?.message ?? 'Unknown error';
+    throw new Error(String(message));
   }
 };
