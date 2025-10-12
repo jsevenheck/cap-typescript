@@ -227,6 +227,44 @@ describe('ClientService (HTTP)', () => {
 
     expect(conflictStatus).toBe(412);
   });
+
+  it('accepts modifiedAt payload fallback when If-Match header is absent', async () => {
+    const createResponse = await http.post<Record<string, any>>(
+      '/odata/v4/clients/Employees',
+      {
+        firstName: 'Payload',
+        lastName: 'Concurrency',
+        email: 'payload.concurrency@example.com',
+        entryDate: '2024-07-01',
+        client_ID: CLIENT_ID,
+      },
+      authConfig,
+    );
+    expect(createResponse.status).toBe(201);
+
+    const employeeId = (createResponse.data as Record<string, any>).ID as string;
+    expect(typeof employeeId).toBe('string');
+
+    const fetched = await http.get<Record<string, any>>(
+      `/odata/v4/clients/Employees(${employeeId})`,
+      authConfig,
+    );
+    expect(fetched.status).toBe(200);
+
+    const initialModifiedAt = (fetched.data as Record<string, any>).modifiedAt as string | undefined;
+    expect(typeof initialModifiedAt).toBe('string');
+
+    const updateResponse = await http.patch<Record<string, any>>(
+      `/odata/v4/clients/Employees(${employeeId})`,
+      { location: 'Paris', modifiedAt: initialModifiedAt },
+      authConfig,
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedModifiedAt = (updateResponse.data as Record<string, any>).modifiedAt as string | undefined;
+    expect(typeof updatedModifiedAt).toBe('string');
+    expect(updatedModifiedAt).not.toBe(initialModifiedAt);
+  });
 });
 
 
