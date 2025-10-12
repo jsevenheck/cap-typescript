@@ -12,10 +12,11 @@
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
+    "@sap-cloud-sdk/connectivity": "^3.23.0",
+    "@sap-cloud-sdk/http-client": "^3.23.0",
     "@sap/ams": "^3",
     "@sap/cds": "^9.3.1",
     "cross-env": "^7.0.3",
-    "node-fetch": "^2.6.7",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
@@ -26,7 +27,6 @@
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.1",
-    "@types/node-fetch": "^2.6.11",
     "@types/supertest": "^6.0.3",
     "@eslint/eslintrc": "^3.1.0",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
