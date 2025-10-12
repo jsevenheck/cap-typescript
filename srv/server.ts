@@ -1,6 +1,9 @@
 import cds from '@sap/cds';
 import type { Application } from 'express';
 
+import apiKeyMiddleware from './middleware/apiKey';
+import activeEmployeesHandler from './handlers/activeEmployees';
+
 import {
   cleanupOutbox,
   processOutbox,
@@ -13,6 +16,8 @@ cds.on('bootstrap', (app: Application) => {
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+
+  app.get('/api/employees/active', apiKeyMiddleware, activeEmployeesHandler);
 });
 
 cds.on('served', () => {
