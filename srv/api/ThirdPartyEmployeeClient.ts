@@ -45,6 +45,68 @@ export const postEmployeeNotification = async ({
     timeout: timeoutMs,
   };
 
+  const sanitizeBodyForDiagnostics = (body: unknown): string => {
+    const truncate = (value: string, maxLength = 500): string =>
+      value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+
+    const sensitiveKeyPattern = /password|secret|token|authorization|auth|apiKey|apikey|accessToken|refreshToken/i;
+
+    const redactObject = (value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.map(redactObject);
+      }
+      if (value && typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>(
+          (acc, [key, val]) => {
+            if (sensitiveKeyPattern.test(key)) {
+              acc[key] = '[redacted]';
+            } else {
+              acc[key] = redactObject(val);
+            }
+            return acc;
+          },
+          {},
+        );
+      }
+      if (typeof value === 'string' && sensitiveKeyPattern.test(value)) {
+        return '[redacted]';
+      }
+      return value;
+    };
+
+    const serialise = (value: unknown): string => {
+      if (value === undefined || value === null) {
+        return '';
+      }
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return JSON.stringify(redactObject(parsed));
+        } catch {
+          const redacted = value.replace(
+            /(\"(?:password|secret|token|authorization|auth|apiKey|apikey|accessToken|refreshToken)\"\s*:\s*)\"[^\"]*\"/gi,
+            '$1"[redacted]"',
+          );
+          return redacted;
+        }
+      }
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(redactObject(value));
+        } catch {
+          return '[unserializable body]';
+        }
+      }
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    return truncate(serialise(body));
+  };
+
   try {
     await executeHttpRequest(destination, request);
   } catch (error: unknown) {
@@ -60,18 +122,7 @@ export const postEmployeeNotification = async ({
       }
 
       if (body !== undefined) {
-        const serialized = (() => {
-          if (typeof body === 'string') {
-            return body;
-          }
-          try {
-            return JSON.stringify(body);
-          } catch (serializationError) {
-            return `[unserializable body: ${serializationError instanceof Error ? serializationError.message : 'unknown'}]`;
-          }
-        })();
-
-        context.push(`body ${serialized}`);
+        context.push('body [redacted]');
       }
 
       const contextSuffix = context.length ? ` (${context.join(', ')})` : '';
@@ -84,7 +135,7 @@ export const postEmployeeNotification = async ({
 
       Object.assign(enrichedError, {
         status,
-        responseBody: body,
+        responseBodySnippet: body !== undefined ? sanitizeBodyForDiagnostics(body) : undefined,
       });
 
       throw enrichedError;
