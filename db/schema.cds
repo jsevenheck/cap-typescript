@@ -65,7 +65,7 @@ entity CostCenters : managed, cuid {
 ]
 entity EmployeeNotificationOutbox : managed, cuid {
   eventType     : String(60)  not null;
-  destinationName: String(120) not null;
+  destinationName: String(500) not null;
   payload       : LargeString not null;
   status        : String(20)  default 'PENDING';
   attempts      : Integer     default 0;
