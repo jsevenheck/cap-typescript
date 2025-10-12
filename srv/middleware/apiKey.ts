@@ -43,7 +43,7 @@ export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction
       res.status(401).json(INVALID_API_KEY_RESPONSE);
       return;
     }
-  } catch (_error) {
+  } catch {
     res.status(401).json(INVALID_API_KEY_RESPONSE);
     return;
   }
