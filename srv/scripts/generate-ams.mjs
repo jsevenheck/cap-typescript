@@ -24,7 +24,7 @@ if (!cdsBin) {
 }
 
 const child = spawn(process.execPath, [cdsBin, 'build', '--for', 'ams'], {
-  cwd: repoRoot,
+  cwd: projectRoot,
   stdio: 'inherit',
   env: {
     ...process.env,
