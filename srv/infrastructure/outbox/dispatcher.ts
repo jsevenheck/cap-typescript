@@ -1,0 +1,199 @@
+import cds from '@sap/cds';
+import type { Transaction } from '@sap/cds';
+
+import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
+
+import { postEmployeeNotification } from '../api/third-party/employee.client';
+import {
+  resolveOutboxBaseBackoff,
+  resolveOutboxClaimTtl,
+  resolveOutboxConcurrency,
+  resolveOutboxMaxAttempts,
+  resolveOutboxTimeout,
+} from './config';
+
+const ql = cds.ql as typeof cds.ql & {
+  DELETE: typeof cds.ql.SELECT;
+  INSERT: typeof cds.ql.INSERT;
+};
+
+interface OutboxEntry {
+  ID: string;
+  destinationName: string;
+  payload: string;
+  status?: string;
+  attempts?: number;
+  nextAttemptAt?: Date | null;
+}
+
+export const processOutbox = async (): Promise<void> => {
+  const db = (cds as any).db ?? (await cds.connect.to('db'));
+  if (!db) {
+    return;
+  }
+
+  const now = new Date();
+  const nowTime = now.getTime();
+  const claimTtlMs = resolveOutboxClaimTtl();
+  const claimExpiryTime = nowTime - claimTtlMs;
+  const concurrency = resolveOutboxConcurrency();
+  const candidateLimit = Math.max(concurrency * 4, concurrency);
+
+  const selectCandidates = (ql.SELECT as any)
+    .from('clientmgmt.EmployeeNotificationOutbox')
+    .columns('ID', 'destinationName', 'payload', 'status', 'attempts', 'nextAttemptAt')
+    .where({ status: { in: ['PENDING', 'PROCESSING'] } })
+    .orderBy('nextAttemptAt')
+    .limit(candidateLimit);
+
+  const rawEntries = (await db.run(selectCandidates)) as OutboxEntry[];
+
+  const claimable = rawEntries.filter((entry) => {
+    const status = entry.status ?? 'PENDING';
+    const nextAttemptAt = entry.nextAttemptAt
+      ? new Date(entry.nextAttemptAt as unknown as string).getTime()
+      : undefined;
+
+    if (status === 'PENDING') {
+      return !nextAttemptAt || nextAttemptAt <= nowTime;
+    }
+
+    if (status === 'PROCESSING') {
+      return nextAttemptAt !== undefined && nextAttemptAt <= claimExpiryTime;
+    }
+
+    return false;
+  });
+
+  if (!claimable.length) {
+    return;
+  }
+
+  const claimed: OutboxEntry[] = [];
+
+  for (const entry of claimable) {
+    if (claimed.length >= concurrency) {
+      break;
+    }
+
+    const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
+    const originalNextAttemptAt =
+      entry.nextAttemptAt === null || entry.nextAttemptAt === undefined ? null : entry.nextAttemptAt;
+
+    const where: Record<string, unknown> = {
+      ID: entry.ID,
+      status: expectedStatus,
+    };
+
+    if (originalNextAttemptAt === null) {
+      where.nextAttemptAt = null;
+    } else {
+      where.nextAttemptAt = originalNextAttemptAt;
+    }
+
+    const claimResult = await db.run(
+      ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+        .set({ status: 'PROCESSING', nextAttemptAt: now })
+        .where(where),
+    );
+
+    const claimedCount =
+      typeof claimResult === 'number'
+        ? claimResult
+        : Array.isArray(claimResult)
+        ? claimResult[0]
+        : 0;
+
+    if (!claimedCount) {
+      continue;
+    }
+
+    claimed.push({
+      ...entry,
+      status: 'PROCESSING',
+      attempts: entry.attempts ?? 0,
+      nextAttemptAt: now,
+    });
+  }
+
+  if (!claimed.length) {
+    return;
+  }
+
+  const timeoutMs = resolveOutboxTimeout();
+  const maxAttempts = resolveOutboxMaxAttempts();
+  const baseBackoff = resolveOutboxBaseBackoff();
+  const secret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+
+  await Promise.all(
+    claimed.map(async (entry) => {
+      try {
+        const destination = await getDestination({ destinationName: entry.destinationName });
+        if (!destination) {
+          throw new Error(`Destination ${entry.destinationName} not found`);
+        }
+
+        if ((destination as HttpDestination).url === undefined) {
+          throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
+        }
+
+        const httpDestination = destination as HttpDestination;
+
+        await postEmployeeNotification({
+          destination: httpDestination,
+          payload: entry.payload,
+          secret: secret ?? undefined,
+          timeoutMs,
+        });
+
+        await db.run(
+          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+            .set({
+              status: 'COMPLETED',
+              deliveredAt: new Date(),
+              lastError: null,
+              nextAttemptAt: null,
+            })
+            .where({ ID: entry.ID }),
+        );
+      } catch (error: any) {
+        const attempts = (entry.attempts ?? 0) + 1;
+        const backoff = Math.pow(2, attempts - 1) * baseBackoff;
+        const nextAttemptAt = attempts >= maxAttempts ? null : new Date(Date.now() + backoff);
+
+        await db.run(
+          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+            .set({
+              attempts,
+              lastError: String(error?.message ?? error ?? 'Unknown error'),
+              status: attempts >= maxAttempts ? 'FAILED' : 'PENDING',
+              nextAttemptAt,
+            })
+            .where({ ID: entry.ID }),
+        );
+      }
+    }),
+  );
+};
+
+export interface EmployeeCreatedNotification {
+  destinationName: string;
+  payload: Record<string, unknown>;
+}
+
+export const enqueueEmployeeCreatedNotification = async (
+  tx: Transaction,
+  notification: EmployeeCreatedNotification,
+): Promise<void> => {
+  await tx.run(
+    ql.INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: notification.destinationName,
+      payload: JSON.stringify(notification.payload),
+      status: 'PENDING',
+      attempts: 0,
+      nextAttemptAt: new Date(),
+    }),
+  );
+};
+

@@ -2,15 +2,39 @@ import cds from '@sap/cds';
 import type { Application } from 'express';
 
 import apiKeyMiddleware from './middleware/apiKey';
-import activeEmployeesHandler from './handlers/activeEmployees';
+import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
-import {
-  cleanupOutbox,
-  processOutbox,
-  resolveCleanupInterval,
-  resolveOutboxDispatchInterval,
-} from './services/OutboxService';
-import { resolveAuthProviderName } from './utils/authProvider';
+import { processOutbox } from './infrastructure/outbox/dispatcher';
+import { cleanupOutbox } from './infrastructure/outbox/cleanup';
+import { scheduleOutboxCleanup, scheduleOutboxProcessing } from './infrastructure/outbox/scheduler';
+import { resolveAuthProviderName } from './shared/utils/authProvider';
+
+const outboxTimers: NodeJS.Timeout[] = [];
+
+const registerTimer = (timer?: NodeJS.Timeout): void => {
+  if (timer) {
+    outboxTimers.push(timer);
+  }
+};
+
+const clearOutboxTimers = (): void => {
+  while (outboxTimers.length) {
+    const timer = outboxTimers.pop();
+    if (timer) {
+      clearInterval(timer);
+    }
+  }
+};
+
+let shutdownHooksRegistered = false;
+const ensureShutdownHooks = (): void => {
+  if (shutdownHooksRegistered) {
+    return;
+  }
+  shutdownHooksRegistered = true;
+  cds.on('shutdown', clearOutboxTimers);
+  process.on('exit', clearOutboxTimers);
+};
 
 cds.on('bootstrap', (app: Application) => {
   app.get('/health', (_req, res) => {
@@ -29,43 +53,9 @@ cds.on('served', () => {
   }
 
   const logger = (cds as any).log?.('outbox') ?? console;
-  let running = false;
-  const dispatchInterval = resolveOutboxDispatchInterval();
-
-  setInterval(() => {
-    if (running) {
-      return;
-    }
-
-    running = true;
-    void processOutbox()
-      .catch((error) => {
-        logger.error?.('Outbox processing failed:', error);
-      })
-      .finally(() => {
-        running = false;
-      });
-  }, dispatchInterval);
-
-  const cleanupInterval = resolveCleanupInterval();
-  if (cleanupInterval > 0) {
-    let cleanupRunning = false;
-
-    setInterval(() => {
-      if (cleanupRunning) {
-        return;
-      }
-
-      cleanupRunning = true;
-      void cleanupOutbox()
-        .catch((error) => {
-          logger.error?.('Outbox cleanup failed:', error);
-        })
-        .finally(() => {
-          cleanupRunning = false;
-        });
-    }, cleanupInterval);
-  }
+  registerTimer(scheduleOutboxProcessing(processOutbox, logger));
+  registerTimer(scheduleOutboxCleanup(cleanupOutbox, logger));
+  ensureShutdownHooks();
 });
 
 export { processOutbox, cleanupOutbox };

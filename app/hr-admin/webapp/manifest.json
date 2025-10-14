@@ -23,13 +23,17 @@
     "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
   },
   "sap.ui5": {
-    "rootView": { "viewName": "hr.admin.view.Main", "type": "XML", "async": true },
+    "rootView": { "viewName": "hr.admin.view.app.Main", "type": "XML", "async": true },
     "dependencies": {
       "minUI5Version": "1.120.0",
       "libs": {
         "sap.ui.core": {},
         "sap.m": {}
       }
+    },
+    "resourceRoots": {
+      "ui": "./controller",
+      "views": "./view"
     },
     "contentDensities": { "compact": true, "cozy": true },
     "models": {

@@ -2,7 +2,7 @@
 using { clientmgmt as db } from '../db/schema';
 using { sap.common.Countries as CommonCountries } from '@sap/cds/common';
 
-service ClientService @(path:'/odata/v4/clients', impl:'./handlers/ClientServiceHandlers.ts') {
+service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer',  where: '(companyId in $user.CompanyCode or companyId in $user.companyCodes)' },
