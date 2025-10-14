@@ -3,6 +3,28 @@ import type { Transaction } from '@sap/cds';
 
 import type { CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object';
+
+const selectColumns = <T>(requested: (keyof T)[], required: (keyof T)[]): (keyof T)[] =>
+  Array.from(new Set<keyof T>([...requested, ...required]));
+
+const hasRequiredFields = <T>(record: Record<string, unknown>, required: (keyof T)[]): boolean =>
+  required.every((field) => {
+    const value = record[field as string];
+    return value !== undefined && value !== null;
+  });
+
+const projectEntity = <T>(record: Record<string, unknown>, columns: (keyof T)[]): T => {
+  const projection: Record<string, unknown> = {};
+  for (const column of columns) {
+    if (column in record) {
+      projection[column as string] = record[column as string];
+    }
+  }
+  return projection as T;
+};
+
 const ql = cds.ql as typeof cds.ql & {
   UPDATE: typeof cds.ql.UPDATE;
   INSERT: typeof cds.ql.INSERT;
@@ -12,13 +34,22 @@ export const findEmployeeById = async (
   tx: Transaction,
   employeeId: string,
   columns: (keyof EmployeeEntity)[] = ['ID', 'client_ID'],
-): Promise<EmployeeEntity | undefined> =>
-  (await tx.run(
+): Promise<EmployeeEntity | undefined> => {
+  const required: Array<keyof EmployeeEntity> = ['ID', 'client_ID'];
+  const selection = selectColumns<EmployeeEntity>(columns, required);
+  const row = await tx.run(
     ql.SELECT.one
       .from('clientmgmt.Employees')
-      .columns(...(columns as string[]))
+      .columns(...(selection as string[]))
       .where({ ID: employeeId }),
-  )) as EmployeeEntity | undefined;
+  );
+
+  if (!isRecord(row) || !hasRequiredFields<EmployeeEntity>(row, required)) {
+    return undefined;
+  }
+
+  return projectEntity<EmployeeEntity>(row, selection);
+};
 
 export const findEmployeeByEmployeeId = async (
   tx: Transaction,
