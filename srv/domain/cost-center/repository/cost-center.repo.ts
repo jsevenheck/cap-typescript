@@ -5,15 +5,15 @@ import type { ClientEntity, CostCenterEntity, EmployeeEntity } from '../dto/cost
 
 const ql = cds.ql as typeof cds.ql;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object';
 
-const selectColumns = <T>(
+export const selectColumns = <T>(
   requested: (keyof T)[],
   required: (keyof T)[],
 ): (keyof T)[] => Array.from(new Set<keyof T>([...requested, ...required]));
 
-const projectEntity = <T>(
+export const projectEntity = <T>(
   record: Record<string, unknown>,
   columns: (keyof T)[],
 ): T => {
@@ -26,7 +26,7 @@ const projectEntity = <T>(
   return projection as T;
 };
 
-const hasRequiredFields = <T>(
+export const hasRequiredFields = <T>(
   record: Record<string, unknown>,
   required: (keyof T)[],
 ): boolean =>

@@ -2,28 +2,12 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import type { CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object';
-
-const selectColumns = <T>(requested: (keyof T)[], required: (keyof T)[]): (keyof T)[] =>
-  Array.from(new Set<keyof T>([...requested, ...required]));
-
-const hasRequiredFields = <T>(record: Record<string, unknown>, required: (keyof T)[]): boolean =>
-  required.every((field) => {
-    const value = record[field as string];
-    return value !== undefined && value !== null;
-  });
-
-const projectEntity = <T>(record: Record<string, unknown>, columns: (keyof T)[]): T => {
-  const projection: Record<string, unknown> = {};
-  for (const column of columns) {
-    if (column in record) {
-      projection[column as string] = record[column as string];
-    }
-  }
-  return projection as T;
-};
+import {
+  hasRequiredFields,
+  isRecord,
+  projectEntity,
+  selectColumns,
+} from '../../cost-center/repository/cost-center.repo';
 
 const ql = cds.ql as typeof cds.ql & {
   UPDATE: typeof cds.ql.UPDATE;
@@ -106,17 +90,32 @@ export const insertEmployeeIdCounter = async (
   );
 };
 
-export const findCostCenterById = async (
+type CostCenterRequiredFields = Extract<keyof CostCenterEntity, 'ID' | 'client_ID'>;
+
+export const findCostCenterById = async <K extends keyof CostCenterEntity = 'responsible_ID'>(
   tx: Transaction,
   costCenterId: string,
-  columns: (keyof CostCenterEntity)[] = ['ID', 'client_ID', 'responsible_ID'],
-): Promise<Partial<CostCenterEntity> | undefined> =>
-  (await tx.run(
+  columns?: K[],
+): Promise<Pick<CostCenterEntity, K | CostCenterRequiredFields> | undefined> => {
+  const required: CostCenterRequiredFields[] = ['ID', 'client_ID'];
+  const requested = columns ?? (['responsible_ID'] as K[]);
+  const selection = selectColumns<CostCenterEntity>(requested, required) as Array<
+    K | CostCenterRequiredFields
+  >;
+
+  const row = await tx.run(
     ql.SELECT.one
       .from('clientmgmt.CostCenters')
-      .columns(...(columns as string[]))
+      .columns(...(selection as string[]))
       .where({ ID: costCenterId }),
-  )) as Partial<CostCenterEntity> | undefined;
+  );
+
+  if (!isRecord(row) || !hasRequiredFields<CostCenterEntity>(row, required)) {
+    return undefined;
+  }
+
+  return projectEntity<Pick<CostCenterEntity, K | CostCenterRequiredFields>>(row, selection);
+};
 
 export const withForUpdate = <T extends object>(query: T): T => {
   const forUpdate = (query as T & { forUpdate?: () => T }).forUpdate;
