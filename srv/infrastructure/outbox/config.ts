@@ -10,7 +10,7 @@ const DEFAULT_OUTBOX_RETENTION_HOURS = 168;
 const DEFAULT_OUTBOX_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export const resolveOutboxTimeout = (): number =>
-  resolvePositiveInt(process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS, DEFAULT_OUTBOX_TIMEOUT_MS);
+  resolvePositiveInt(process.env.OUTBOX_TIMEOUT_MS, DEFAULT_OUTBOX_TIMEOUT_MS);
 
 export const resolveOutboxDispatchInterval = (): number =>
   resolvePositiveInt(process.env.OUTBOX_DISPATCH_INTERVAL_MS, DEFAULT_OUTBOX_DISPATCH_INTERVAL_MS);

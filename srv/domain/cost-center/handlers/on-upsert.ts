@@ -4,10 +4,10 @@ import type { Request } from '@sap/cds';
 import type { CostCenterEntity } from '../dto/cost-center.dto';
 import { prepareCostCenterUpsert } from '../services/service';
 import { buildUserContext } from '../../../shared/utils/auth';
-import { buildConcurrencyContext, deriveTargetId } from '../../shared/request-context';
+import { buildConcurrencyContext, deriveTargetId, requireRequestUser } from '../../shared/request-context';
 
 export const onUpsert = async (req: Request): Promise<void> => {
-  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const user = buildUserContext(requireRequestUser(req));
   const concurrency = buildConcurrencyContext(req, 'clientmgmt.CostCenters');
   const { updates } = await prepareCostCenterUpsert({
     event: req.event as 'CREATE' | 'UPDATE',

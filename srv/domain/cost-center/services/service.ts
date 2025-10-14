@@ -8,7 +8,7 @@ import { createServiceError } from '../../../shared/utils/errors';
 import { normalizeCostCenterCode } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
-import type { ClientEntity, CostCenterEntity, EmployeeEntity } from '../dto/cost-center.dto';
+import type { ClientEntity, CostCenterEntity } from '../dto/cost-center.dto';
 import { findClientById, findCostCenterById, findEmployeeById } from '../repository/cost-center.repo';
 
 export interface CostCenterUpsertContext {

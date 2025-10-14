@@ -8,7 +8,6 @@ import {
   resolveOutboxBaseBackoff,
   resolveOutboxClaimTtl,
   resolveOutboxConcurrency,
-  resolveOutboxDispatchInterval,
   resolveOutboxMaxAttempts,
   resolveOutboxTimeout,
 } from './config';

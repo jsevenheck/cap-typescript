@@ -14,6 +14,7 @@ import {
 } from '../../../infrastructure/outbox/dispatcher';
 import type { EmployeeEntity } from '../dto/employee.dto';
 import { createServiceError } from '../../../shared/utils/errors';
+import { requireRequestUser } from '../../shared/request-context';
 import { getEmployeeContext, prepareEmployeeContext } from './context';
 
 const getServiceLogger = () => {
@@ -30,7 +31,7 @@ export const onCreateEvent = async (
   req: Request,
   next: () => Promise<unknown>,
 ): Promise<unknown> => {
-  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const user = buildUserContext(requireRequestUser(req));
   const tx = cds.transaction(req);
   let lastError: unknown;
 
@@ -42,7 +43,7 @@ export const onCreateEvent = async (
         tx,
         req.data as Partial<EmployeeEntity>,
         result.client,
-        result.existingEmployee?.ID,
+        result.existingEmployee?.employeeId ?? undefined,
       );
 
       const response = await next();

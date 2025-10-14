@@ -79,6 +79,7 @@ afterEach(async () => {
   delete process.env.OUTBOX_MAX_ATTEMPTS;
   delete process.env.OUTBOX_BASE_BACKOFF_MS;
   delete process.env.OUTBOX_CONCURRENCY;
+  delete process.env.OUTBOX_TIMEOUT_MS;
   delete process.env.OUTBOX_RETENTION_HOURS;
   delete process.env.OUTBOX_CLEANUP_INTERVAL_MS;
   delete process.env.OUTBOX_CLEANUP_CRON;
@@ -1073,7 +1074,7 @@ describe('Employee notification outbox', () => {
         }),
     );
 
-    process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS = '10';
+    process.env.OUTBOX_TIMEOUT_MS = '10';
     const processing = processOutbox();
 
     if (typeof (jest as any).advanceTimersByTimeAsync === 'function') {
@@ -1098,7 +1099,7 @@ describe('Employee notification outbox', () => {
       expect.objectContaining({ timeout: 10 }),
     );
 
-    delete process.env.THIRD_PARTY_EMPLOYEE_TIMEOUT_MS;
+    delete process.env.OUTBOX_TIMEOUT_MS;
     jest.useRealTimers();
   });
 

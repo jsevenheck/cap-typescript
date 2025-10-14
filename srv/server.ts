@@ -9,6 +9,33 @@ import { cleanupOutbox } from './infrastructure/outbox/cleanup';
 import { scheduleOutboxCleanup, scheduleOutboxProcessing } from './infrastructure/outbox/scheduler';
 import { resolveAuthProviderName } from './shared/utils/authProvider';
 
+const outboxTimers: NodeJS.Timeout[] = [];
+
+const registerTimer = (timer?: NodeJS.Timeout): void => {
+  if (timer) {
+    outboxTimers.push(timer);
+  }
+};
+
+const clearOutboxTimers = (): void => {
+  while (outboxTimers.length) {
+    const timer = outboxTimers.pop();
+    if (timer) {
+      clearInterval(timer);
+    }
+  }
+};
+
+let shutdownHooksRegistered = false;
+const ensureShutdownHooks = (): void => {
+  if (shutdownHooksRegistered) {
+    return;
+  }
+  shutdownHooksRegistered = true;
+  cds.on('shutdown', clearOutboxTimers);
+  process.on('exit', clearOutboxTimers);
+};
+
 cds.on('bootstrap', (app: Application) => {
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
@@ -26,8 +53,9 @@ cds.on('served', () => {
   }
 
   const logger = (cds as any).log?.('outbox') ?? console;
-  scheduleOutboxProcessing(processOutbox, logger);
-  scheduleOutboxCleanup(cleanupOutbox, logger);
+  registerTimer(scheduleOutboxProcessing(processOutbox, logger));
+  registerTimer(scheduleOutboxCleanup(cleanupOutbox, logger));
+  ensureShutdownHooks();
 });
 
 export { processOutbox, cleanupOutbox };

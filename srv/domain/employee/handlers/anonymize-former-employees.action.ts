@@ -3,9 +3,10 @@ import type { Request } from '@sap/cds';
 
 import { anonymizeFormerEmployees } from '../services/retention.service';
 import { buildUserContext } from '../../../shared/utils/auth';
+import { requireRequestUser } from '../../shared/request-context';
 
 export const onAnonymizeFormerEmployees = async (req: Request): Promise<unknown> => {
-  const user = buildUserContext((req as Request & { user?: unknown }).user as any);
+  const user = buildUserContext(requireRequestUser(req));
   const tx = cds.transaction(req);
   const count = await anonymizeFormerEmployees(tx, user, (req.data as { before?: unknown })?.before);
   const result = { value: count };

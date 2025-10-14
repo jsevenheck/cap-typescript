@@ -6,11 +6,50 @@ import {
   getEntityConcurrencyField,
   type HeaderMap,
 } from '../../shared/utils/concurrency';
+import { createServiceError } from '../../shared/utils/errors';
+import type { CapUserLike } from '../../shared/utils/auth';
 
 export const getHeaders = (req: Request): HeaderMap => (req as Request & { headers?: HeaderMap }).headers;
 
 export const extractRequestParams = (req: Request): Array<Record<string, unknown>> | undefined =>
   (req as Request & { params?: Array<Record<string, unknown>> }).params;
+
+const isCapUserLike = (user: unknown): user is CapUserLike => {
+  if (!user || typeof user !== 'object') {
+    return false;
+  }
+
+  const candidate = user as CapUserLike & Record<string, unknown>;
+  if ('is' in candidate && candidate.is !== undefined && typeof candidate.is !== 'function') {
+    return false;
+  }
+
+  if ('attr' in candidate && candidate.attr !== undefined) {
+    const attr = candidate.attr;
+    if (typeof attr !== 'function' && (typeof attr !== 'object' || attr === null)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+interface RequestWithUser extends Request {
+  user?: unknown;
+}
+
+export const requireRequestUser = (req: Request): CapUserLike => {
+  const candidate = (req as RequestWithUser).user;
+  if (!candidate) {
+    throw createServiceError(401, 'User context is required.');
+  }
+
+  if (!isCapUserLike(candidate)) {
+    throw createServiceError(401, 'Invalid user context received.');
+  }
+
+  return candidate;
+};
 
 export const buildConcurrencyContext = (req: Request, entityName: string) => {
   const headers = getHeaders(req);

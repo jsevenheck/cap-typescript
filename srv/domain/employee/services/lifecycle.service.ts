@@ -17,7 +17,7 @@ import {
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
-import type { ClientEntity, CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
+import type { ClientEntity, EmployeeEntity } from '../dto/employee.dto';
 import {
   findCostCenterById,
   findEmployeeByEmployeeId,
@@ -281,7 +281,7 @@ const ensureUniqueEmployeeId = async (
   tx: Transaction,
   data: Partial<EmployeeEntity>,
   client: ClientEntity,
-  currentEmployeeId?: string,
+  currentEmployeeIdentifier?: string,
 ): Promise<boolean> => {
   const { client_ID: clientId } = data;
   if (!clientId) {
@@ -290,8 +290,14 @@ const ensureUniqueEmployeeId = async (
 
   if (data.employeeId) {
     data.employeeId = data.employeeId.trim().toUpperCase();
+    if (
+      currentEmployeeIdentifier &&
+      data.employeeId === currentEmployeeIdentifier.trim().toUpperCase()
+    ) {
+      return false;
+    }
     const existing = await findEmployeeByEmployeeId(tx, clientId, data.employeeId);
-    if (existing && existing.ID !== currentEmployeeId) {
+    if (existing) {
       throw createServiceError(409, `Employee ID ${data.employeeId} already exists.`);
     }
     return false;
@@ -384,8 +390,8 @@ export const ensureEmployeeIdentifier = async (
   tx: Transaction,
   data: Partial<EmployeeEntity>,
   client: ClientEntity,
-  existingEmployeeId?: string,
-): Promise<boolean> => ensureUniqueEmployeeId(tx, data, client, existingEmployeeId);
+  existingEmployeeIdentifier?: string,
+): Promise<boolean> => ensureUniqueEmployeeId(tx, data, client, existingEmployeeIdentifier);
 
 export interface EmployeeDeletionContext {
   targetId: string;

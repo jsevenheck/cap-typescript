@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
-import type { ClientEntity, CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
+import type { CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
 
 const ql = cds.ql as typeof cds.ql & {
   UPDATE: typeof cds.ql.UPDATE;
@@ -24,13 +24,13 @@ export const findEmployeeByEmployeeId = async (
   tx: Transaction,
   clientId: string,
   employeeIdentifier: string,
-): Promise<EmployeeEntity | undefined> =>
+): Promise<Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined> =>
   (await tx.run(
     ql.SELECT.one
       .from('clientmgmt.Employees')
-      .columns('ID')
+      .columns('ID', 'employeeId')
       .where({ employeeId: employeeIdentifier, client_ID: clientId }),
-  )) as EmployeeEntity | undefined;
+  )) as Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined;
 
 export const findEmployeeIdCounter = async (
   tx: Transaction,
