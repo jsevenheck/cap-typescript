@@ -9,7 +9,11 @@ import {
   EmploymentTypeKey,
   ViewState,
 } from "../types/DialogTypes";
-import { EMPLOYMENT_TYPE_OPTIONS, STATUS_OPTIONS } from "../constants/selectOptions";
+import {
+  COUNTRY_OPTIONS,
+  EMPLOYMENT_TYPE_OPTIONS,
+  STATUS_OPTIONS,
+} from "../constants/selectOptions";
 
 const DEFAULT_STATUS: EmployeeStatusKey = "active";
 const DEFAULT_EMPLOYMENT_TYPE: EmploymentTypeKey = "internal";
@@ -72,4 +76,5 @@ export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(createInitialViewState()), "view");
   view.setModel(new JSONModel(STATUS_OPTIONS), "statusOptions");
   view.setModel(new JSONModel(EMPLOYMENT_TYPE_OPTIONS), "employmentTypeOptions");
+  view.setModel(new JSONModel(COUNTRY_OPTIONS), "countryOptions");
 }

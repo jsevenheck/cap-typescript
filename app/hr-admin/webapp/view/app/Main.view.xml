@@ -189,14 +189,13 @@
                 <Label text="Country" labelFor="clientCountrySelect"/>
                 <Select
                         id="clientCountrySelect"
-                        items="{path: '/Countries'}"
+                        items="{ path: 'countryOptions>/', templateShareable: false }"
                         selectedKey="{dialog>/client/country_code}"
                         forceSelection="false"
-                        required="true"
-                        templateShareable="false">
+                        required="true">
                     <core:Item
-                            key="{code}"
-                            text="{= ${name} ? ${name} + ' (' + ${code} + ')' : ${code}}"/>
+                            key="{countryOptions>key}"
+                            text="{= ${countryOptions>text} + ' (' + ${countryOptions>key} + ')' }"/>
                 </Select>
             </VBox>
         </content>
@@ -258,21 +257,19 @@
                 <Label text="Status" required="true" labelFor="employeeStatus"/>
                 <Select
                         id="employeeStatus"
-                        items="{statusOptions>/}"
+                        items="{ path: 'statusOptions>/', templateShareable: false }"
                         selectedKey="{employeeDialog>/employee/status}"
                         forceSelection="true"
-                        required="true"
-                        templateShareable="false">
+                        required="true">
                     <core:Item key="{statusOptions>key}" text="{statusOptions>text}"/>
                 </Select>
                 <Label text="Employment Type" required="true" labelFor="employeeEmploymentType"/>
                 <Select
                         id="employeeEmploymentType"
-                        items="{employmentTypeOptions>/}"
+                        items="{ path: 'employmentTypeOptions>/', templateShareable: false }"
                         selectedKey="{employeeDialog>/employee/employmentType}"
                         forceSelection="true"
-                        required="true"
-                        templateShareable="false">
+                        required="true">
                     <core:Item key="{employmentTypeOptions>key}" text="{employmentTypeOptions>text}"/>
                 </Select>
             </VBox>
