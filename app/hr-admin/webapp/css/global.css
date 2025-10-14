@@ -1,0 +1,248 @@
+:root {
+  --hr-admin-background: var(--sapBackgroundColor, #f9fafb);
+  --hr-admin-surface: var(--sapTile_Background, #ffffff);
+  --hr-admin-border: var(--sapTile_BorderColor, #d0d7de);
+  --hr-admin-accent: var(--sapHighlightColor, #0a6ed1);
+  --hr-admin-accent-strong: var(
+    --sapButton_Emphasized_Hover_Background,
+    var(--sapButton_Emphasized_Background, #0854a0)
+  );
+  --hr-admin-text-primary: var(--sapTextColor, #1a1a1a);
+  --hr-admin-text-secondary: var(--sapContent_LabelColor, #4a4a4a);
+  --hr-admin-focus-color: var(--sapContent_FocusColor, rgba(10, 110, 209, 0.15));
+  --hr-admin-shadow: var(--sapContent_Shadow1, 0 6px 18px rgba(0, 0, 0, 0.08));
+}
+
+html,
+body {
+  height: 100%;
+  background-color: var(--hr-admin-background);
+  color: var(--hr-admin-text-primary);
+}
+
+body {
+  font-family: "72", "72full", "72-Light", "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#content,
+.sapUiBody,
+.sapMApp {
+  background-color: var(--hr-admin-background);
+}
+
+.sapMPage {
+  background: transparent;
+}
+
+.sapMPage>.sapMPageScroll {
+  padding: 2rem;
+}
+
+.sapMTitle,
+.sapUiFormTitle,
+.sapUiLabel {
+  color: var(--hr-admin-text-primary);
+}
+
+.sapMText,
+.sapMLabel,
+.sapMListHdrTBar>.sapMTitle {
+  color: var(--hr-admin-text-secondary);
+}
+
+.sapMBtn[type="Emphasized"],
+.sapMBtnInner.sapMBtnEmphasized {
+  background-color: var(--sapButton_Emphasized_Background, var(--hr-admin-accent));
+  border-color: var(--sapButton_Emphasized_BorderColor, var(--hr-admin-accent));
+  color: var(--sapButton_Emphasized_TextColor, #ffffff);
+}
+
+.sapMBtnInner.sapMBtnEmphasized:hover,
+.sapMBtnInner.sapMBtnEmphasized:focus {
+  background-color: var(--hr-admin-accent-strong);
+  border-color: var(--sapButton_Emphasized_BorderColor, var(--hr-admin-accent-strong));
+}
+
+.sapMBtnInner.sapMBtnTransparent {
+  color: var(--sapLinkColor, var(--hr-admin-accent));
+}
+
+.sapMList {
+  background-color: transparent;
+}
+
+.sapMList>.sapMLIB,
+.sapMListInset>.sapMLIB,
+.sapMListInset>.sapMLIB.sapMLIBSelected,
+.sapMDialogScrollCont>.sapMLIB {
+  background-color: var(--hr-admin-surface);
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--hr-admin-shadow);
+  border: 1px solid var(--hr-admin-border);
+}
+
+.sapMDialog {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: var(--sapContent_Shadow2, 0 12px 32px rgba(0, 0, 0, 0.18));
+}
+
+.sapMDialog .sapMDialogTitle {
+  font-weight: 600;
+}
+
+.sapMDialog .sapMDialogScrollCont {
+  background-color: var(--hr-admin-background);
+}
+
+.sapMVBox.sapUiContentPadding,
+.sapMVBox.sapUiSmallMargin {
+  background-color: var(--hr-admin-surface);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: var(--hr-admin-shadow);
+  border: 1px solid var(--hr-admin-border);
+}
+
+.sapMToolbar {
+  border-radius: 0.5rem;
+  background-color: var(--hr-admin-surface);
+  border: 1px solid var(--hr-admin-border);
+  margin-bottom: 0.75rem;
+}
+
+.sapMToolbar>.sapMTitle {
+  font-weight: 600;
+  color: var(--hr-admin-text-primary);
+}
+
+.sapMInputBaseInner,
+.sapMTextAreaInner,
+.sapMSelectListItemBase,
+.sapMSelectList {
+  border-radius: 0.5rem;
+}
+
+.sapMInputBaseInner:focus,
+.sapMTextAreaInner:focus,
+.sapMComboBoxBasePicker-CTX .sapMSelectListItemBase.sapMSelectListItemBaseSelected {
+  border-color: var(--sapField_Focus_BorderColor, var(--hr-admin-accent));
+  box-shadow: 0 0 0 0.125rem var(--hr-admin-focus-color);
+}
+
+.sapMInputBaseReadonly .sapMInputBaseInner,
+.sapMInputBaseReadonly .sapMInputBaseContentWrapper {
+  background-color: var(--sapField_ReadOnly_Background, #f5f6f7);
+  color: var(--sapContent_LabelColor, #5b7383);
+  cursor: default;
+  border-color: var(--sapField_ReadOnly_BorderColor, var(--hr-admin-border));
+}
+
+.sapMInputBaseReadonly .sapMInputBaseInner::placeholder {
+  color: var(--sapContent_LabelColor, #5b7383);
+  opacity: 0.85;
+}
+
+.sapMInputBaseReadonly .sapMInputBaseInner {
+  border-color: var(--sapField_ReadOnly_BorderColor, var(--hr-admin-border));
+}
+
+.sapMInputBase.hrAdminDatePicker .sapMInputBaseContentWrapper {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: border-color 120ms ease;
+}
+
+.sapMInputBase.hrAdminDatePicker
+  .sapMInputBaseContentWrapper:not(.sapMInputBaseContentWrapperError):not(
+    .sapMInputBaseContentWrapperWarning
+  ):not(.sapMInputBaseContentWrapperSuccess):not(
+    .sapMInputBaseContentWrapperInformation
+  ) {
+  border: 1px solid var(--sapField_BorderColor, var(--hr-admin-border));
+  background-color: var(--sapField_Background, #ffffff);
+}
+
+.sapMInputBase.hrAdminDatePicker
+  .sapMInputBaseContentWrapper:not(.sapMInputBaseContentWrapperError):not(
+    .sapMInputBaseContentWrapperWarning
+  ):not(.sapMInputBaseContentWrapperSuccess):not(
+    .sapMInputBaseContentWrapperInformation
+  ):focus-within {
+  border-color: var(--sapField_Focus_BorderColor, var(--hr-admin-accent));
+  box-shadow: 0 0 0 0.125rem var(--hr-admin-focus-color);
+}
+
+.sapMInputBase.hrAdminDatePicker .sapMInputBaseInner {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sapMInputBase.hrAdminDatePicker .sapMInputBaseIconContainer {
+  background-color: transparent;
+}
+
+.sapMInputBase.hrAdminDatePicker
+  .sapMInputBaseContentWrapper:not(.sapMInputBaseContentWrapperError):not(
+    .sapMInputBaseContentWrapperWarning
+  ):not(.sapMInputBaseContentWrapperSuccess):not(
+    .sapMInputBaseContentWrapperInformation
+  )
+  .sapMInputBaseIconContainer {
+  border-left: 1px solid var(--sapField_BorderColor, var(--hr-admin-border));
+  background-color: var(--sapField_Background, #ffffff);
+}
+
+.sapMInputBase.hrAdminDatePicker .sapUiIcon {
+  color: var(--sapContent_IconColor, var(--hr-admin-text-secondary));
+}
+
+.sapUiResponsiveContentPadding>.sapUiRespGrid {
+  gap: 1.5rem;
+}
+
+.sapUiNoMarginTop {
+  margin-top: 0 !important;
+}
+
+.sapUiNoMarginBottom {
+  margin-bottom: 0 !important;
+}
+
+.sapUiContentPadding .sapMLabel {
+  font-weight: 600;
+}
+
+.sapUiContentPadding .sapMInputBaseInner,
+.sapUiContentPadding .sapMComboBoxBaseInner,
+.sapUiContentPadding .sapMSelectListItemBase {
+  background-color: var(--sapField_Background, #ffffff);
+}
+
+.sapUiContentPadding .sapMDatePickerDisplay {
+  width: 100%;
+}
+
+.sapUiContentPadding .sapMSelectListItemBase.sapMSelectListItemBaseSelected {
+  background-color: var(
+    --sapList_SelectionBackgroundColor,
+    rgba(10, 110, 209, 0.08)
+  );
+}
+
+@media (max-width: 960px) {
+  .sapMPage>.sapMPageScroll {
+    padding: 1rem;
+  }
+
+  .sapMVBox.sapUiContentPadding,
+  .sapMVBox.sapUiSmallMargin {
+    padding: 1rem;
+  }
+}
+
