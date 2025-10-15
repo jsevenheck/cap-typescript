@@ -211,10 +211,12 @@ const validateManagerAndCostCenter = async (
   const updates: Partial<EmployeeEntity> = {};
   const tx = context.tx;
 
-  const existingCostCenterId = normalizeIdentifier(existing?.costCenter_ID);
+  const costCenterExplicit = context.data.costCenter_ID !== undefined;
+  const removingCostCenter = costCenterExplicit && context.data.costCenter_ID === null;
   const requestedCostCenterId =
-    context.data.costCenter_ID === null ? undefined : normalizeIdentifier(context.data.costCenter_ID);
-  const finalCostCenterId = requestedCostCenterId ?? existingCostCenterId;
+    costCenterExplicit && !removingCostCenter ? normalizeIdentifier(context.data.costCenter_ID) : undefined;
+  const existingCostCenterId = normalizeIdentifier(existing?.costCenter_ID);
+  const finalCostCenterId = removingCostCenter ? undefined : requestedCostCenterId ?? existingCostCenterId;
 
   const managerExplicit = context.data.manager_ID !== undefined;
   const requestedManagerId =
@@ -234,14 +236,11 @@ const validateManagerAndCostCenter = async (
     }
 
     const responsibleId = costCenter.responsible_ID;
-    const costCenterExplicit = context.data.costCenter_ID !== undefined;
-    const costCenterChanged =
-      context.event === 'CREATE' ||
-      (costCenterExplicit && !identifiersMatch(existingCostCenterId, finalCostCenterId));
+    const costCenterChanged = costCenterExplicit && !identifiersMatch(existingCostCenterId, finalCostCenterId);
 
     if ((context.event === 'CREATE' || costCenterChanged) && !managerExplicit) {
-      updates.manager_ID = responsibleId ?? undefined;
-      finalManagerId = normalizeIdentifier(responsibleId) ?? responsibleId ?? undefined;
+      finalManagerId = normalizeIdentifier(responsibleId);
+      updates.manager_ID = finalManagerId ?? undefined;
     }
 
     const shouldValidateManager = context.event === 'CREATE' || managerExplicit || costCenterChanged;
@@ -265,13 +264,15 @@ const validateManagerAndCostCenter = async (
   }
 
   if (context.data.manager_ID !== undefined) {
-    updates.manager_ID = context.data.manager_ID ?? undefined;
+    // Preserve explicit null to clear the relation
+    updates.manager_ID = context.data.manager_ID;
   } else if (updates.manager_ID === undefined && finalManagerId !== existingManagerId) {
     updates.manager_ID = finalManagerId ?? undefined;
   }
 
   if (context.data.costCenter_ID !== undefined) {
-    updates.costCenter_ID = context.data.costCenter_ID ?? undefined;
+    // Preserve explicit null to clear the relation
+    updates.costCenter_ID = context.data.costCenter_ID;
   }
 
   return updates;

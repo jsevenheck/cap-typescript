@@ -229,7 +229,7 @@
                 <Label text="Cost Center" labelFor="employeeCostCenter"/>
                 <Select
                         id="employeeCostCenter"
-                        items="{path: 'costCenters'}"
+                        items="{ path: 'costCenters', parameters: { $select: ['ID','code','name','responsible_ID'], $expand: { responsible: { $select: ['firstName','lastName'] } } } }"
                         change=".onEmployeeCostCenterChange"
                         selectedKey="{employeeDialog>/employee/costCenter_ID}">
                     <core:Item key="{ID}" text="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"/>
