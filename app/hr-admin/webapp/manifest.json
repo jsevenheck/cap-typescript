@@ -35,6 +35,13 @@
       "ui": "./controller",
       "views": "./view"
     },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/global.css"
+        }
+      ]
+    },
     "contentDensities": { "compact": true, "cozy": true },
     "models": {
       "": {
