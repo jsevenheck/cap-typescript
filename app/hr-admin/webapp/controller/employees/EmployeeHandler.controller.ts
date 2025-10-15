@@ -17,7 +17,7 @@ import { formatPersonName } from "../../core/utils/Formatters";
 import { getEventParameter } from "../../core/utils/EventParam";
 
 type ODataContext = NonNullable<Context>;
-type CreationContext = {
+type CreationContext = ODataContext & {
   created(): Promise<void> | undefined;
   delete(groupId?: string): Promise<void>;
 };
@@ -236,8 +236,7 @@ export default class EmployeeHandler {
               : "Failed to initialize employee creation context.";
           MessageBox.error(errorMessage);
         },
-        (context) => {
-          const readyContext = context as CreationContext;
+        (readyContext) => {
           const creationPromise = readyContext.created?.();
 
           if (!creationPromise) {
@@ -247,6 +246,7 @@ export default class EmployeeHandler {
             return;
           }
 
+          const model = readyContext.getModel() as ODataModel;
           creationPromise
             .then(() => {
               dialog.setBusy(false);
@@ -256,8 +256,10 @@ export default class EmployeeHandler {
             .catch((error: Error) => {
               dialog.setBusy(false);
               MessageBox.error(error.message ?? "Failed to create employee");
-              readyContext.delete("$auto");
+              void readyContext.delete("$auto");
             });
+
+          void model.submitBatch("$auto");
         }
       );
     } else if (data.mode === "edit") {

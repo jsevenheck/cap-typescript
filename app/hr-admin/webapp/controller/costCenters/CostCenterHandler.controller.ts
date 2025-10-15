@@ -14,7 +14,7 @@ import { getOptionalListBinding } from "../../core/services/odata";
 import { getEventParameter } from "../../core/utils/EventParam";
 
 type ODataContext = NonNullable<Context>;
-type CreationContext = {
+type CreationContext = ODataContext & {
   created(): Promise<void> | undefined;
   delete(groupId?: string): Promise<void>;
 };
@@ -173,8 +173,7 @@ export default class CostCenterHandler {
               : "Failed to initialize cost center creation context.";
           MessageBox.error(errorMessage);
         },
-        (context) => {
-          const readyContext = context as CreationContext;
+        (readyContext) => {
           const creationPromise = readyContext.created?.();
 
           if (!creationPromise) {
@@ -184,6 +183,7 @@ export default class CostCenterHandler {
             return;
           }
 
+          const model = readyContext.getModel() as ODataModel;
           creationPromise
             .then(() => {
               dialog.setBusy(false);
@@ -193,8 +193,10 @@ export default class CostCenterHandler {
             .catch((error: Error) => {
               dialog.setBusy(false);
               MessageBox.error(error.message ?? "Failed to create cost center");
-              readyContext.delete();
+              void readyContext.delete();
             });
+
+          void model.submitBatch("$auto");
         }
       );
     } else if (data.mode === "edit") {
