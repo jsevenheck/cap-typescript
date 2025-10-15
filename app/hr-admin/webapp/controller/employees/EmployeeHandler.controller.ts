@@ -270,7 +270,9 @@ export default class EmployeeHandler {
       }
 
       const model = context.getModel() as ODataModel;
-      context.setProperty("employeeId", employeeIdValue);
+      if (employeeIdValue !== undefined) {
+        context.setProperty("employeeId", employeeIdValue);
+      }
       context.setProperty("firstName", payload.firstName);
       context.setProperty("lastName", payload.lastName);
       context.setProperty("email", payload.email);
@@ -337,7 +339,7 @@ export default class EmployeeHandler {
       const managerFirstName = bindingContext.getProperty("responsible/firstName") as string | undefined;
       const managerLastName = bindingContext.getProperty("responsible/lastName") as string | undefined;
 
-      if (responsibleId || managerFirstName || managerLastName) {
+      if (responsibleId) {
         applyResponsible({
           responsibleId,
           firstName: managerFirstName,
