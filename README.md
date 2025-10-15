@@ -67,7 +67,7 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 
 * `mta.yaml` now provisions `cap-ts-ias` and `cap-ts-ams` service instances alongside the existing database, destination, connectivity, HTML5 repo, and logging services.
 * Static UI build artefacts are served by the CAP service and the approuter via the `srv-api` destination.
-* The approuter configuration forwards `/odata/*` to the CAP service, enforces IAS authentication on all routes, and exposes the UI as the welcome route.
+* The approuter configuration forwards `/odata/v4/*` to the CAP service, enforces IAS authentication on all routes, and exposes the UI as the welcome route.
 
 ## Java → TypeScript mapping
 
