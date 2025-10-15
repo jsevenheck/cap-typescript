@@ -130,7 +130,7 @@ export default class SelectionState {
 
     this.clearingSelections.add(listId);
     try {
-      list.removeSelections(true, true);
+      list.removeSelections(true, false);
     } finally {
       this.clearingSelections.delete(listId);
     }
