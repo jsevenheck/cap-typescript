@@ -203,6 +203,10 @@ export default class ClientHandler {
   }
 
   public handleSelectionChange(event: Event): void {
+    if (this.selection.isClearingListSelection("clientsList")) {
+      return;
+    }
+
     const listItem = getEventParameter<ListItemBase | null>(event, "listItem") ?? null;
     const context = listItem ? (listItem.getBindingContext() as Context) : undefined;
     this.selection.setClient(context || undefined);
