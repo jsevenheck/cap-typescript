@@ -118,6 +118,10 @@ export default class SelectionState {
     return true;
   }
 
+  public isClearingListSelection(listId: string): boolean {
+    return this.clearingSelections.has(listId);
+  }
+
   private clearListSelection(listId: string): void {
     const list = this.controller.byId(listId) as List | undefined;
     if (!list) {
