@@ -165,9 +165,13 @@ export default class CostCenterHandler {
       const creationContext = listBinding.create(payload) as Context | undefined;
       this.runWithCreationContext(
         creationContext,
-        () => {
+        (error?: unknown) => {
           dialog.setBusy(false);
-          MessageBox.error("Failed to initialize cost center creation context.");
+          const errorMessage =
+            error instanceof Error && error.message
+              ? error.message
+              : "Failed to initialize cost center creation context.";
+          MessageBox.error(errorMessage);
         },
         (context) => {
           const readyContext = context as CreationContext;
@@ -256,8 +260,8 @@ export default class CostCenterHandler {
   }
 
   private runWithCreationContext(
-    context: Context | undefined,
-    onMissing: () => void,
+    context: Context | PromiseLike<Context> | undefined,
+    onMissing: (error?: unknown) => void,
     onReady: (context: CreationContext) => void
   ): void {
     if (!context) {
@@ -265,6 +269,29 @@ export default class CostCenterHandler {
       return;
     }
 
-    onReady(context as CreationContext);
+    const candidate = context as Context;
+    if (typeof candidate.getModel === "function") {
+      onReady(candidate as CreationContext);
+      return;
+    }
+
+    const maybePromise = context as PromiseLike<Context>;
+    if (typeof maybePromise.then === "function") {
+      maybePromise
+        .then((resolvedContext) => {
+          if (!resolvedContext) {
+            onMissing();
+            return;
+          }
+
+          onReady(resolvedContext as CreationContext);
+        })
+        .catch((error: unknown) => {
+          onMissing(error);
+        });
+      return;
+    }
+
+    onMissing();
   }
 }
