@@ -166,13 +166,12 @@ export default class EmployeeHandler {
     const clientId = this.selection.getSelectedClientId();
     const costCenterId = data.employee.costCenter_ID || undefined;
     const managerId = data.employee.manager_ID || undefined;
-    const employeeIdValue = data.employee.employeeId?.trim() ?? "";
+    const employeeIdValue = data.employee.employeeId?.trim();
 
     const entryDateValue = data.employee.entryDate?.trim() ?? "";
     const exitDateValue = data.employee.exitDate?.trim() ?? "";
 
     const payload: Record<string, unknown> = {
-      employeeId: employeeIdValue,
       firstName: data.employee.firstName?.trim() ?? "",
       lastName: data.employee.lastName?.trim() ?? "",
       email: data.employee.email?.trim() ?? "",
@@ -190,8 +189,12 @@ export default class EmployeeHandler {
       payload.client_ID = clientId;
     }
 
-    if (!payload.employeeId) {
-      MessageBox.error("Employee ID is required.");
+    if (employeeIdValue) {
+      payload.employeeId = employeeIdValue;
+    }
+
+    if (data.mode === "edit" && !employeeIdValue) {
+      MessageBox.error("Employee ID is required to update an employee.");
       return;
     }
 
@@ -244,6 +247,7 @@ export default class EmployeeHandler {
             dialog.setBusy(false);
             dialog.close();
             MessageToast.show("Employee created");
+            listBinding.refresh();
             return;
           }
 
@@ -252,6 +256,7 @@ export default class EmployeeHandler {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Employee created");
+              listBinding.refresh();
             })
             .catch((error: Error) => {
               dialog.setBusy(false);
@@ -269,7 +274,7 @@ export default class EmployeeHandler {
       }
 
       const model = context.getModel() as ODataModel;
-      context.setProperty("employeeId", payload.employeeId);
+      context.setProperty("employeeId", employeeIdValue);
       context.setProperty("firstName", payload.firstName);
       context.setProperty("lastName", payload.lastName);
       context.setProperty("email", payload.email);
@@ -319,17 +324,62 @@ export default class EmployeeHandler {
     const costCenterId = select.getSelectedKey() || undefined;
     dialogModel.setProperty("/employee/costCenter_ID", costCenterId);
 
+    const applyResponsible = (options?: {
+      responsibleId?: string;
+      firstName?: string;
+      lastName?: string;
+    }): void => {
+      dialogModel.setProperty("/employee/manager_ID", options?.responsibleId ?? undefined);
+      dialogModel.setProperty(
+        "/employee/managerName",
+        formatPersonName(options?.firstName, options?.lastName)
+      );
+    };
+
     if (bindingContext) {
       const responsibleId = bindingContext.getProperty("responsible_ID") as string | undefined;
-      const managerName = formatPersonName(
-        bindingContext.getProperty("responsible/firstName") as string | undefined,
-        bindingContext.getProperty("responsible/lastName") as string | undefined
-      );
-      dialogModel.setProperty("/employee/manager_ID", responsibleId);
-      dialogModel.setProperty("/employee/managerName", managerName);
+      const managerFirstName = bindingContext.getProperty("responsible/firstName") as string | undefined;
+      const managerLastName = bindingContext.getProperty("responsible/lastName") as string | undefined;
+
+      if (responsibleId || managerFirstName || managerLastName) {
+        applyResponsible({
+          responsibleId,
+          firstName: managerFirstName,
+          lastName: managerLastName,
+        });
+        return;
+      }
+
+      const selectedKey = select.getSelectedKey();
+      applyResponsible();
+      void bindingContext
+        .requestObject()
+        .then((costCenter: unknown) => {
+          if (select.getSelectedKey() !== selectedKey) {
+            return;
+          }
+
+          const data = costCenter as
+            | {
+                responsible_ID?: string;
+                responsible?: { firstName?: string; lastName?: string };
+              }
+            | null
+            | undefined;
+
+          applyResponsible({
+            responsibleId: data?.responsible_ID,
+            firstName: data?.responsible?.firstName,
+            lastName: data?.responsible?.lastName,
+          });
+        })
+        .catch(() => {
+          if (select.getSelectedKey() === selectedKey) {
+            applyResponsible();
+          }
+        });
     } else {
-      dialogModel.setProperty("/employee/manager_ID", undefined);
-      dialogModel.setProperty("/employee/managerName", "");
+      applyResponsible();
     }
   }
 
