@@ -9,6 +9,7 @@ export default class SelectionState {
   private clientContext?: Context;
   private employeeContext?: Context;
   private costCenterContext?: Context;
+  private readonly clearingSelections = new Set<string>();
 
   constructor(
     private readonly controller: Controller,
@@ -117,8 +118,25 @@ export default class SelectionState {
     return true;
   }
 
+  public isClearingListSelection(listId: string): boolean {
+    return this.clearingSelections.has(listId);
+  }
+
   private clearListSelection(listId: string): void {
     const list = this.controller.byId(listId) as List | undefined;
-    list?.removeSelections(true);
+    if (!list) {
+      return;
+    }
+
+    if (this.clearingSelections.has(listId)) {
+      return;
+    }
+
+    this.clearingSelections.add(listId);
+    try {
+      list.removeSelections(true, false);
+    } finally {
+      this.clearingSelections.delete(listId);
+    }
   }
 }

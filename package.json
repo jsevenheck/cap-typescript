@@ -22,6 +22,9 @@
     "concurrently": "^9.0.1",
     "typescript": "^5.6.3"
   },
+  "dependencies": {
+    "@ui5/cli": "^4.0.30"
+  },
   "cds": {
     "features": {
       "typescript": true
@@ -38,61 +41,11 @@
       "db": {
         "kind": "sqlite",
         "credentials": {
-          "database": "sqlite.db"
+          "filename": "sqlite.db"
         }
       },
       "auth": {
         "kind": "mocked",
-        "credentials": {
-          "users": {
-            "dev": {
-              "password": "dev",
-              "roles": [
-                "HRViewer",
-                "HREditor",
-                "HRAdmin"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001",
-                  "COMP-002"
-                ],
-                "CompanyCode": [
-                  "COMP-001",
-                  "COMP-002"
-                ]
-              }
-            },
-            "hrviewer": {
-              "password": "hrviewer",
-              "roles": [
-                "HRViewer"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001"
-                ],
-                "CompanyCode": [
-                  "COMP-001"
-                ]
-              }
-            },
-            "hreditor": {
-              "password": "hreditor",
-              "roles": [
-                "HREditor"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001"
-                ],
-                "CompanyCode": [
-                  "COMP-001"
-                ]
-              }
-            }
-          }
-        },
         "users": {
           "dev": {
             "password": "dev",
@@ -181,81 +134,10 @@
         "db": {
           "kind": "sqlite",
           "credentials": {
-            "database": ":memory:"
-          }
-        },
-        "auth": {
-          "kind": "mocked",
-          "credentials": {
-            "users": {
-              "dev": {
-                "password": "dev",
-                "roles": [
-                  "HRViewer",
-                  "HREditor",
-                  "HRAdmin"
-                ],
-                "attributes": {
-                  "companyCodes": [
-                    "COMP-001",
-                    "COMP-002"
-                  ],
-                  "CompanyCode": [
-                    "COMP-001",
-                    "COMP-002"
-                  ]
-                }
-              },
-              "hrviewer": {
-                "password": "hrviewer",
-                "roles": [
-                  "HRViewer"
-                ],
-                "attributes": {
-                  "companyCodes": [
-                    "COMP-001"
-                  ],
-                  "CompanyCode": [
-                    "COMP-001"
-                  ]
-                }
-              },
-              "hreditor": {
-                "password": "hreditor",
-                "roles": [
-                  "HREditor"
-                ],
-                "attributes": {
-                  "companyCodes": [
-                    "COMP-001"
-                  ],
-                  "CompanyCode": [
-                    "COMP-001"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "ams": {
-          "kind": "authorization",
-          "vcap": {
-            "label": "authorization",
-            "service": "authorization",
-            "plan": "application"
-          },
-          "credentials": {
-            "dclRoot": "srv/ams",
-            "dcnRoot": "srv/gen/ams/dcn",
-            "dclGenerationPackage": "cap",
-            "generateDcl": true,
-            "generatePoliciesDeployer": false
+            "filename": ":memory:"
           }
         }
       }
     }
-  },
-  "dependencies": {
-    "@ui5/cli": "^4.0.30"
   }
 }

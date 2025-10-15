@@ -163,6 +163,10 @@ export default class CostCenterHandler {
       }
 
       const creationContext = listBinding.create(payload) as Context | undefined;
+      const model = listBinding.getModel() as ODataModel;
+      void model
+        .submitBatch("$auto")
+        .catch(() => undefined);
       this.runWithCreationContext(
         creationContext,
         () => {

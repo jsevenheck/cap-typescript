@@ -22,16 +22,16 @@
   "devDependencies": {
     "@cap-js/cds-test": "^0.4.0",
     "@cap-js/sqlite": "^2.0.3",
+    "@eslint/eslintrc": "^3.1.0",
     "@sap/ams-dev": "^2",
     "@sap/cds-dk": "^9.3.1",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.1",
     "@types/supertest": "^6.0.3",
-    "concurrently": "^9.2.1",
-    "@eslint/eslintrc": "^3.1.0",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
     "@typescript-eslint/parser": "^8.13.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.13.0",
     "eslint-config-prettier": "^9.1.0",
     "jest": "^29.7.0",
@@ -47,56 +47,6 @@
     "requires": {
       "auth": {
         "kind": "mocked",
-        "credentials": {
-          "users": {
-            "dev": {
-              "password": "dev",
-              "roles": [
-                "HRViewer",
-                "HREditor",
-                "HRAdmin"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001",
-                  "COMP-002"
-                ],
-                "CompanyCode": [
-                  "COMP-001",
-                  "COMP-002"
-                ]
-              }
-            },
-            "hrviewer": {
-              "password": "hrviewer",
-              "roles": [
-                "HRViewer"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001"
-                ],
-                "CompanyCode": [
-                  "COMP-001"
-                ]
-              }
-            },
-            "hreditor": {
-              "password": "hreditor",
-              "roles": [
-                "HREditor"
-              ],
-              "attributes": {
-                "companyCodes": [
-                  "COMP-001"
-                ],
-                "CompanyCode": [
-                  "COMP-001"
-                ]
-              }
-            }
-          }
-        },
         "users": {
           "dev": {
             "password": "dev",
@@ -144,8 +94,16 @@
               ]
             }
           }
+        }
+      },
+      "ams": {
+        "kind": "authorization",
+        "vcap": {
+          "label": "authorization",
+          "service": "authorization",
+          "plan": "application"
         },
-        "ams": {
+        "credentials": {
           "dclRoot": "ams",
           "dcnRoot": "gen/ams/dcn",
           "dclGenerationPackage": "cap",

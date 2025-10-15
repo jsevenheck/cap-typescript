@@ -57,6 +57,32 @@ modules:
       - name: cap-ts-db
 
   # ===================================
+  # AMS DCL Deployer
+  # ===================================
+  - name: cap-ts-ams-deployer
+    type: javascript.nodejs
+    path: srv/ams
+    parameters:
+      buildpack: nodejs_buildpack
+      no-route: true
+      no-start: true
+      tasks:
+        - name: deploy-dcl
+          command: npm start
+          memory: 256M
+    build-parameters:
+      builder: custom
+      commands:
+        - npm ci --production
+    requires:
+      - name: cap-ts-ias
+        parameters:
+          config:
+            credential-type: X509_GENERATED
+            app-identifier: policy-deployer
+      - name: cap-ts-ams
+
+  # ===================================
   # Frontend App (UI5/Fiori)
   # ===================================
   - name: cap-ts-app-hr-admin
@@ -77,6 +103,24 @@ modules:
           name: srv-api
           url: ~{srv-url}
           forwardAuthToken: true
+
+  # ===================================
+  # HTML5 Application Repository (Upload)
+  # ===================================
+  - name: cap-ts-app-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: cap-ts-html5-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: cap-ts-app-hr-admin
+          artifacts:
+            - dist/*.zip
+          target-path: resources/
 
   # ===================================
   # App Router (Central Entry Point)
@@ -106,47 +150,6 @@ modules:
       - name: app-api
         properties:
           app-url: ${default-url}
-
-  - name: cap-ts-ams-deployer
-    type: javascript.nodejs
-    path: srv/ams
-    parameters:
-      buildpack: nodejs_buildpack
-      no-route: true
-      no-start: true
-      tasks:
-        - name: deploy-dcl
-          command: npm start
-          memory: 256M
-    build-parameters:
-      builder: custom
-      commands:
-        - npm ci --production
-    requires:
-      - name: cap-ts-ias
-        parameters:
-          config:
-            credential-type: X509_GENERATED
-            app-identifier: policy-deployer
-      - name: cap-ts-ams
-
-  # ===================================
-  # HTML5 Application Repository (Upload)
-  # ===================================
-  - name: cap-ts-app-deployer
-    type: com.sap.application.content
-    path: .
-    requires:
-      - name: cap-ts-html5-repo-host
-        parameters:
-          content-target: true
-    build-parameters:
-      build-result: resources
-      requires:
-        - name: cap-ts-app-hr-admin
-          artifacts:
-            - dist/*.zip
-          target-path: resources/
 
 # ===================================
 # Resources (Services)

@@ -129,7 +129,12 @@ export default class ClientHandler {
     dialog.setBusy(true);
 
     if (data.mode === "create") {
-      const creationContext = this.getClientsBinding().create(payload) as Context | undefined;
+      const listBinding = this.getClientsBinding();
+      const creationContext = listBinding.create(payload) as Context | undefined;
+      const model = listBinding.getModel() as ODataModel;
+      void model
+        .submitBatch("$auto")
+        .catch(() => undefined);
       this.runWithCreationContext(
         creationContext,
         () => {
@@ -198,6 +203,10 @@ export default class ClientHandler {
   }
 
   public handleSelectionChange(event: Event): void {
+    if (this.selection.isClearingListSelection("clientsList")) {
+      return;
+    }
+
     const listItem = getEventParameter<ListItemBase | null>(event, "listItem") ?? null;
     const context = listItem ? (listItem.getBindingContext() as Context) : undefined;
     this.selection.setClient(context || undefined);
