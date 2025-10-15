@@ -174,29 +174,22 @@ export default class CostCenterHandler {
           MessageBox.error(errorMessage);
         },
         (readyContext) => {
-          const creationPromise = readyContext.created?.();
-
-          if (!creationPromise) {
-            dialog.setBusy(false);
-            dialog.close();
-            MessageToast.show("Cost center created");
-            return;
-          }
-
+          const creationPromise = readyContext.created?.() ?? Promise.resolve();
           const model = readyContext.getModel() as ODataModel;
-          creationPromise
+          const batchPromise = model.submitBatch("$auto");
+
+          Promise.all([creationPromise, batchPromise])
             .then(() => {
-              dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Cost center created");
             })
             .catch((error: Error) => {
-              dialog.setBusy(false);
               MessageBox.error(error.message ?? "Failed to create cost center");
-              void readyContext.delete();
+              void readyContext.delete().catch(() => undefined);
+            })
+            .finally(() => {
+              dialog.setBusy(false);
             });
-
-          void model.submitBatch("$auto");
         }
       );
     } else if (data.mode === "edit") {
