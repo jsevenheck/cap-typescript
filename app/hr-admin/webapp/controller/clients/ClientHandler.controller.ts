@@ -57,12 +57,15 @@ export default class ClientHandler {
     const dialogModel = this.models.getClientModel();
     const currentData = context?.getObject() as (ClientDialogModelData["client"] & {
       country_code?: string | null;
+      country?: { code?: string | null } | null;
     }) | undefined;
 
     if (!currentData) {
       MessageBox.error("Unable to load the selected client.");
       return;
     }
+
+    const countryCode = currentData.country_code ?? currentData.country?.code ?? null;
 
     dialogModel.setData({
       mode: "edit",
@@ -71,7 +74,7 @@ export default class ClientHandler {
         ID: currentData.ID,
         companyId: currentData.companyId,
         name: currentData.name,
-        country_code: currentData.country_code ?? null,
+        country_code: countryCode ?? null,
       },
     });
     this.openDialog();

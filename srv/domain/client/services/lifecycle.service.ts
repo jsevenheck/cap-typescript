@@ -134,6 +134,10 @@ export const prepareClientUpsert = async ({
     }
   }
 
+  if (event === 'CREATE' && !updates.country_code) {
+    throw createServiceError(400, 'Country code is required.');
+  }
+
   if (updates.companyId) {
     const existing = await findClientByCompanyId(tx, updates.companyId, event === 'UPDATE' ? targetId : undefined);
 

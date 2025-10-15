@@ -42,12 +42,8 @@ const ensureClientExists = async (tx: Transaction, clientId?: string | null): Pr
 const ensureResponsibleEmployee = async (
   tx: Transaction,
   clientId: string,
-  responsibleId?: string | null,
+  responsibleId: string,
 ): Promise<void> => {
-  if (!responsibleId) {
-    return;
-  }
-
   const responsible = await findEmployeeById(tx, responsibleId, ['client_ID']);
 
   if (!responsible) {
@@ -84,7 +80,7 @@ export const prepareCostCenterUpsert = async ({
       payloadValue: concurrency?.payloadValue,
     });
 
-    existingCostCenter = await findCostCenterById(tx, targetId, ['ID', 'client_ID']);
+    existingCostCenter = await findCostCenterById(tx, targetId, ['ID', 'client_ID', 'responsible_ID']);
 
     if (!existingCostCenter) {
       throw createServiceError(404, `Cost center ${targetId} not found.`);
@@ -103,10 +99,29 @@ export const prepareCostCenterUpsert = async ({
   const client = await ensureClientExists(tx, clientId);
   ensureUserAuthorizedForCompany(user, client.companyId);
 
-  await ensureResponsibleEmployee(tx, client.ID, data.responsible_ID);
-
+  let normalizedResponsibleId: string | undefined;
   if (data.responsible_ID !== undefined) {
-    updates.responsible_ID = data.responsible_ID;
+    if (data.responsible_ID === null || typeof data.responsible_ID !== 'string') {
+      throw createServiceError(400, 'Responsible employee is required.');
+    }
+
+    normalizedResponsibleId = data.responsible_ID.trim();
+    if (!normalizedResponsibleId) {
+      throw createServiceError(400, 'Responsible employee is required.');
+    }
+  }
+
+  const effectiveResponsibleId =
+    normalizedResponsibleId ?? existingCostCenter?.responsible_ID ?? undefined;
+
+  if (!effectiveResponsibleId) {
+    throw createServiceError(400, 'Responsible employee is required.');
+  }
+
+  await ensureResponsibleEmployee(tx, client.ID, effectiveResponsibleId);
+
+  if (normalizedResponsibleId !== undefined) {
+    updates.responsible_ID = normalizedResponsibleId;
   }
 
   updates.client_ID = client.ID;
