@@ -270,7 +270,7 @@ export default class EmployeeHandler {
       }
 
       const model = context.getModel() as ODataModel;
-      if (employeeIdValue !== undefined) {
+      if (employeeIdValue !== undefined && employeeIdValue !== "") {
         context.setProperty("employeeId", employeeIdValue);
       }
       context.setProperty("firstName", payload.firstName);
