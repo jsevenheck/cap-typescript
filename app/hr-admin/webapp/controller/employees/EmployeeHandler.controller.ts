@@ -192,11 +192,7 @@ export default class EmployeeHandler {
     if (employeeIdValue) {
       payload.employeeId = employeeIdValue;
     }
-
-    if (data.mode === "edit" && !employeeIdValue) {
-      MessageBox.error("Employee ID is required to update an employee.");
-      return;
-    }
+    // Allow edits even if employeeId is not yet assigned; backend keeps existing value
 
     if (
       !payload.firstName ||
@@ -247,7 +243,6 @@ export default class EmployeeHandler {
             dialog.setBusy(false);
             dialog.close();
             MessageToast.show("Employee created");
-            listBinding.refresh();
             return;
           }
 
@@ -256,6 +251,7 @@ export default class EmployeeHandler {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Employee created");
+              // Refresh once after creation resolves
               listBinding.refresh();
             })
             .catch((error: Error) => {
