@@ -225,7 +225,18 @@ export default class EmployeeHandler {
         return;
       }
 
-      const creationContext = listBinding.create(payload) as Context | undefined;
+      let creationContext: Context | undefined;
+      try {
+        creationContext = listBinding.create(payload) as Context | undefined;
+      } catch (error) {
+        dialog.setBusy(false);
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to initialize employee creation context.";
+        MessageBox.error(errorMessage);
+        return;
+      }
       this.runWithCreationContext(
         creationContext,
         (error?: unknown) => {

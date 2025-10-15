@@ -162,7 +162,18 @@ export default class CostCenterHandler {
         return;
       }
 
-      const creationContext = listBinding.create(payload) as Context | undefined;
+      let creationContext: Context | undefined;
+      try {
+        creationContext = listBinding.create(payload) as Context | undefined;
+      } catch (error) {
+        dialog.setBusy(false);
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to initialize cost center creation context.";
+        MessageBox.error(errorMessage);
+        return;
+      }
       this.runWithCreationContext(
         creationContext,
         (error?: unknown) => {
@@ -185,7 +196,7 @@ export default class CostCenterHandler {
             })
             .catch((error: Error) => {
               MessageBox.error(error.message ?? "Failed to create cost center");
-              void readyContext.delete().catch(() => undefined);
+              void readyContext.delete("$auto").catch(() => undefined);
             })
             .finally(() => {
               dialog.setBusy(false);

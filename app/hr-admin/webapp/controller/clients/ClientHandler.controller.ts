@@ -129,7 +129,18 @@ export default class ClientHandler {
     dialog.setBusy(true);
 
     if (data.mode === "create") {
-      const creationContext = this.getClientsBinding().create(payload) as Context | undefined;
+      let creationContext: Context | undefined;
+      try {
+        creationContext = this.getClientsBinding().create(payload) as Context | undefined;
+      } catch (error) {
+        dialog.setBusy(false);
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to initialize client creation context.";
+        MessageBox.error(errorMessage);
+        return;
+      }
       this.runWithCreationContext(
         creationContext,
         (error?: unknown) => {
