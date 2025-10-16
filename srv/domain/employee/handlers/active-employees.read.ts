@@ -220,9 +220,8 @@ const executeActiveEmployeesQuery = async (
     (query as any).where({ and: predicates });
   }
 
-  if (top !== undefined || skip !== undefined) {
-    const limit = top ?? Number.MAX_SAFE_INTEGER;
-    (query as any).limit(limit, skip ?? 0);
+  if (top !== undefined) {
+    (query as any).limit(top, skip ?? 0);
   }
 
   const transaction = (cds as any).tx(req);
@@ -239,6 +238,11 @@ const handleActiveEmployees = async (req: Request, res: Response): Promise<void>
   const selectFields = parseSelect(req.query.$select);
   const top = parseNonNegativeInteger(req.query.$top);
   const skip = parseNonNegativeInteger(req.query.$skip);
+
+  if (skip !== undefined && top === undefined) {
+    res.status(400).json({ error: '$top parameter is required when using $skip' });
+    return;
+  }
 
   const employees = await executeActiveEmployeesQuery(req, selectFields, top, skip);
 
