@@ -64,10 +64,10 @@
                     navButtonPress=".onBackToClients">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title level="H2" text="{= ${view>/selectedClientName} ? 'Employees of ' + ${view>/selectedClientName} : 'Employees'}"/>
+                        <Title level="H2" text="{= ${name} ? 'Employees of ' + ${name} : 'Employees'}"/>
                         <Text
-                                visible="{= !!${view>/selectedClientCompanyId}}"
-                                text="{= ${view>/selectedClientCompanyId} ? 'Company ID: ' + ${view>/selectedClientCompanyId} : ''}"/>
+                                visible="{= !!${companyId}}"
+                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
                         <Text
                                 text="Manage employees assigned to the selected client."/>
                         <List
@@ -125,10 +125,10 @@
                     navButtonPress=".onBackToEmployees">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title level="H2" text="{= ${view>/selectedClientName} ? 'Cost Centers of ' + ${view>/selectedClientName} : 'Cost Centers'}"/>
+                        <Title level="H2" text="{= ${name} ? 'Cost Centers of ' + ${name} : 'Cost Centers'}"/>
                         <Text
-                                visible="{= !!${view>/selectedClientCompanyId}}"
-                                text="{= ${view>/selectedClientCompanyId} ? 'Company ID: ' + ${view>/selectedClientCompanyId} : ''}"/>
+                                visible="{= !!${companyId}}"
+                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
                         <Text text="Manage cost centers for the selected client."/>
                         <List
                                 id="costCentersList"
