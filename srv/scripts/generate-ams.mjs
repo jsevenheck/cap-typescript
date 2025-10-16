@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(projectRoot, '..');
+const cdsRoot = path.resolve(projectRoot, cds?.env?.root ?? '.');
 
 const candidateBins = [
   path.resolve(repoRoot, 'node_modules/@sap/cds-dk/bin/cds.js'),
@@ -50,14 +51,13 @@ const runCommand = (command, args, options, errorMessage) =>
     });
   });
 
-const resolveConfiguredPath = (value) => (value ? path.resolve(repoRoot, value) : undefined);
-const resolveWithFallback = (configured, fallback) => configured ?? path.resolve(repoRoot, fallback);
+const resolveConfiguredPath = (value) => (value ? path.resolve(cdsRoot, value) : undefined);
 
 const compilePoliciesToDcn = async () => {
   const amsConfig = cds?.env?.requires?.ams ?? {};
   const credentials = amsConfig.credentials ?? {};
   const configuredDclRoot = resolveConfiguredPath(credentials.dclRoot);
-  const fallbackDclRoot = path.resolve(repoRoot, 'srv', 'ams');
+  const fallbackDclRoot = path.resolve(projectRoot, 'ams');
   const potentialRoots = [
     configuredDclRoot ? path.join(configuredDclRoot, 'dcl') : undefined,
     configuredDclRoot,
@@ -66,7 +66,8 @@ const compilePoliciesToDcn = async () => {
   ].filter((root, index, array) => root !== undefined && array.indexOf(root) === index);
   const dclRoot = potentialRoots.find((root) => existsSync(path.join(root, 'schema.dcl')))
     ?? fallbackDclRoot;
-  const dcnRoot = resolveWithFallback(resolveConfiguredPath(credentials.dcnRoot), path.join('srv', 'gen', 'ams', 'dcn'));
+  const configuredDcnRoot = resolveConfiguredPath(credentials.dcnRoot);
+  const dcnRoot = configuredDcnRoot ?? path.resolve(projectRoot, 'gen', 'ams', 'dcn');
 
   if (!existsSync(dclRoot)) {
     console.warn(`Skipping DCL compilation because the configured dclRoot "${dclRoot}" does not exist.`);
