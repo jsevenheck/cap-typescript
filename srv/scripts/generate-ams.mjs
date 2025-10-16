@@ -66,7 +66,7 @@ const compilePoliciesToDcn = async () => {
   const amsConfig = cds?.env?.requires?.ams ?? {};
   const credentials = amsConfig.credentials ?? {};
   const configuredDclRoot = resolveConfiguredPath(credentials.dclRoot);
-  const fallbackDclRoot = path.resolve(projectRoot, 'ams');
+  const fallbackDclRoot = path.resolve(cdsRoot, 'ams');
   const potentialRoots = [
     configuredDclRoot ? path.join(configuredDclRoot, 'dcl') : undefined,
     configuredDclRoot,
@@ -75,7 +75,7 @@ const compilePoliciesToDcn = async () => {
   ].filter((root, index, array) => root !== undefined && array.indexOf(root) === index);
   const dclRoot = potentialRoots.find((root) => existsSync(path.join(root, 'schema.dcl')));
   const configuredDcnRoot = resolveConfiguredPath(credentials.dcnRoot);
-  const dcnRoot = configuredDcnRoot ?? path.resolve(projectRoot, 'gen', 'ams', 'dcn');
+  const dcnRoot = configuredDcnRoot ?? path.resolve(cdsRoot, 'gen', 'ams', 'dcn');
 
   if (!dclRoot) {
     console.warn(
