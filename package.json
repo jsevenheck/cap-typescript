@@ -16,6 +16,9 @@
     "start": "npm run build && npm run start:runtime",
     "start:runtime": "npm run start --workspace srv"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@sap/ams": "^3",
