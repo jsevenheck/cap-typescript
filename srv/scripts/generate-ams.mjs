@@ -75,11 +75,6 @@ const compilePoliciesToDcn = async () => {
     return;
   }
 
-  if (!existsSync(dclRoot)) {
-    console.warn(`Skipping DCL compilation because the configured dclRoot "${dclRoot}" does not exist.`);
-    return;
-  }
-
   if (!existsSync(dcnRoot)) {
     mkdirSync(dcnRoot, { recursive: true });
   }
@@ -102,7 +97,7 @@ const compilePoliciesToDcn = async () => {
     command,
     args,
     {
-      cwd: repoRoot,
+      cwd: projectRoot,
       stdio: 'inherit',
       env: {
         ...process.env,
