@@ -206,7 +206,7 @@ const executeActiveEmployeesQuery = async (
 
     const predicates: any[] = [
       { entryDate: { '<=': today } },
-      { or: [{ exitDate: null }, { exitDate: { '>': today } }] },
+      { or: [{ exitDate: null }, { exitDate: { '>=': today } }] },
     ];
 
     const statusElement = 'status_code' in elements ? 'status_code' : 'status' in elements ? 'status' : undefined;
