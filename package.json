@@ -16,10 +16,15 @@
     "start": "npm run build && npm run start:runtime",
     "start:runtime": "npm run start --workspace srv"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@sap/ams": "^3",
     "concurrently": "^9.0.1",
+    "cross-env": "^10.1.0",
+    "rimraf": "^6.0.1",
     "typescript": "^5.6.3"
   },
   "dependencies": {

@@ -14,6 +14,10 @@ This repository contains a full SAP Cloud Application Programming Model (CAP) st
 
 ## Getting started
 
+### Prerequisites
+
+- Node.js 20 LTS or newer (the workspace scripts depend on tooling that requires Node 20+)
+
 ```bash
 npm install
 npm run dev
