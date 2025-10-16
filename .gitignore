@@ -48,6 +48,8 @@ out/
 app/**/*.tsbuildinfo
 /srv/node_modules/
 /npm-debug.log*
+/ams/
+/gen/
 
 # --- Env/Secrets
 .env
