@@ -1,9 +1,11 @@
 import Dialog from "sap/m/Dialog";
 import MessageBox from "sap/m/MessageBox";
 import MessageToast from "sap/m/MessageToast";
+import DatePicker from "sap/m/DatePicker";
 import Select from "sap/m/Select";
 import Event from "sap/ui/base/Event";
 import Controller from "sap/ui/core/mvc/Controller";
+import { ValueState } from "sap/ui/core/library";
 import ListItemBase from "sap/m/ListItemBase";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
@@ -208,9 +210,33 @@ export default class EmployeeHandler {
 
     const entryDate = payload.entryDate as string;
     const exitDate = (payload.exitDate as string | null) ?? null;
+    const statusValue = (payload.status as string | undefined) ?? "";
+
+    const exitDatePicker = this.byId("employeeExitDate") as DatePicker | undefined;
+    const statusSelect = this.byId("employeeStatus") as Select | undefined;
+    exitDatePicker?.setValueState(ValueState.None);
+    exitDatePicker?.setValueStateText("");
+    statusSelect?.setValueState(ValueState.None);
+    statusSelect?.setValueStateText("");
 
     if (exitDate && exitDate < entryDate) {
+      exitDatePicker?.setValueState(ValueState.Error);
+      exitDatePicker?.setValueStateText("Exit date cannot be before entry date.");
       MessageBox.error("Exit date cannot be before entry date.");
+      return;
+    }
+
+    if (statusValue === "inactive" && !exitDate) {
+      exitDatePicker?.setValueState(ValueState.Error);
+      exitDatePicker?.setValueStateText("Inactive employees must have an exit date.");
+      MessageBox.error("Inactive employees must have an exit date.");
+      return;
+    }
+
+    if (statusValue !== "inactive" && exitDate) {
+      statusSelect?.setValueState(ValueState.Error);
+      statusSelect?.setValueStateText("Employees with an exit date must have inactive status.");
+      MessageBox.error("Employees with an exit date must have inactive status.");
       return;
     }
 

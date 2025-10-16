@@ -25,8 +25,6 @@ export default class SelectionState {
     this.clientContext = context;
     const viewModel = this.models.getViewStateModel();
     viewModel.setProperty("/selectedClientId", context.getProperty("ID"));
-    viewModel.setProperty("/selectedClientName", context.getProperty("name"));
-    viewModel.setProperty("/selectedClientCompanyId", context.getProperty("companyId"));
     this.clearEmployee();
     this.clearCostCenter();
   }
@@ -36,8 +34,6 @@ export default class SelectionState {
     this.clearListSelection("clientsList");
     const viewModel = this.models.getViewStateModel();
     viewModel.setProperty("/selectedClientId", undefined);
-    viewModel.setProperty("/selectedClientName", undefined);
-    viewModel.setProperty("/selectedClientCompanyId", undefined);
     this.clearEmployee();
     this.clearCostCenter();
   }

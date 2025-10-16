@@ -61,8 +61,6 @@ export interface CostCenterDialogModelData {
 
 export interface ViewState {
   selectedClientId?: string;
-  selectedClientName?: string;
-  selectedClientCompanyId?: string;
   selectedEmployeeId?: string;
   selectedCostCenterId?: string;
 }

@@ -204,12 +204,20 @@ const executeActiveEmployeesQuery = async (
   } else {
     const today = new Date().toISOString().slice(0, 10);
 
-    (query as any).where({ entryDate: { '<=': today } });
-    (query as any).where({ or: [{ exitDate: null }, { exitDate: { '>=': today } }] });
+    const predicates: any[] = [
+      { entryDate: { '<=': today } },
+      { or: [{ exitDate: null }, { exitDate: { '>=': today } }] },
+    ];
 
-    if ('status' in elements) {
-      (query as any).where({ or: [{ status: { '=': 'active' } }, { status: null }] });
+    const statusElement = 'status_code' in elements ? 'status_code' : 'status' in elements ? 'status' : undefined;
+
+    if (statusElement) {
+      const statusFilter: Record<string, unknown> = {};
+      statusFilter[statusElement] = { '=': 'active' };
+      predicates.push(statusFilter);
     }
+
+    (query as any).where({ and: predicates });
   }
 
   if (top !== undefined || skip !== undefined) {
