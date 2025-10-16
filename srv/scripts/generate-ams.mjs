@@ -4,8 +4,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const cdsModule = await import('@sap/cds');
-const cds = cdsModule.default ?? cdsModule;
+let cds;
+try {
+  const cdsModule = await import('@sap/cds');
+  cds = cdsModule.default ?? cdsModule;
+} catch (error) {
+  console.error('Failed to load @sap/cds. Ensure it is installed in the workspace (srv) or at the repo root.');
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,7 +30,9 @@ const compileCandidates = [
   path.resolve(repoRoot, 'node_modules/.bin/compile-dcl'),
   path.resolve(projectRoot, 'node_modules/.bin/compile-dcl'),
   path.resolve(repoRoot, 'node_modules/@sap/ams-dev/src/bin/compileDcl.js'),
+  path.resolve(projectRoot, 'node_modules/@sap/ams-dev/src/bin/compileDcl.js'),
   path.resolve(repoRoot, 'node_modules/@sap/ams/bin/compile-dcl'),
+  path.resolve(projectRoot, 'node_modules/@sap/ams/bin/compile-dcl'),
 ];
 
 const cdsBin = candidateBins.find((candidate) => existsSync(candidate));
@@ -38,12 +46,13 @@ const runCommand = (command, args, options, errorMessage) =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, options);
 
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       if (code === 0) {
         resolve();
         return;
       }
-      reject(new Error(`${errorMessage} (exit code ${code ?? 'unknown'})`));
+      const reason = code != null ? `exit code ${code}` : signal ? `signal ${signal}` : 'unknown exit';
+      reject(new Error(`${errorMessage} (${reason})`));
     });
 
     child.on('error', (error) => {
@@ -75,11 +84,19 @@ const compilePoliciesToDcn = async () => {
     return;
   }
 
-  if (!existsSync(dcnRoot)) {
-    mkdirSync(dcnRoot, { recursive: true });
-  }
+  mkdirSync(dcnRoot, { recursive: true });
 
-  const compileBin = compileCandidates.find((candidate) => existsSync(candidate));
+  const compileBin = (() => {
+    const extensions = process.platform === 'win32' ? ['.cmd', '.ps1'] : [];
+    for (const candidate of compileCandidates) {
+      const variants = [candidate, ...extensions.map((ext) => `${candidate}${ext}`)];
+      const resolved = variants.find((variant) => existsSync(variant));
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return undefined;
+  })();
 
   if (!compileBin) {
     console.warn(
