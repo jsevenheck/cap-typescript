@@ -64,10 +64,16 @@ const compilePoliciesToDcn = async () => {
     path.join(fallbackDclRoot, 'dcl'),
     fallbackDclRoot,
   ].filter((root, index, array) => root !== undefined && array.indexOf(root) === index);
-  const dclRoot = potentialRoots.find((root) => existsSync(path.join(root, 'schema.dcl')))
-    ?? fallbackDclRoot;
+  const dclRoot = potentialRoots.find((root) => existsSync(path.join(root, 'schema.dcl')));
   const configuredDcnRoot = resolveConfiguredPath(credentials.dcnRoot);
   const dcnRoot = configuredDcnRoot ?? path.resolve(projectRoot, 'gen', 'ams', 'dcn');
+
+  if (!dclRoot) {
+    console.warn(
+      'Skipping DCL compilation because no schema.dcl was found under the configured or default DCL roots.',
+    );
+    return;
+  }
 
   if (!existsSync(dclRoot)) {
     console.warn(`Skipping DCL compilation because the configured dclRoot "${dclRoot}" does not exist.`);
