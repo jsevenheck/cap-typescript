@@ -197,7 +197,6 @@ export default class CostCenterHandler {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Cost center created");
-              listBinding.refresh();
             })
             .catch(handleError);
         }
@@ -224,7 +223,6 @@ export default class CostCenterHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges("$auto");
           MessageBox.error(error.message ?? "Failed to update cost center");
         });
     }

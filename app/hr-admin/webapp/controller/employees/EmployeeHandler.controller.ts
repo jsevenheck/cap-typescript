@@ -219,7 +219,9 @@ export default class EmployeeHandler {
     statusSelect?.setValueState(ValueState.None);
     statusSelect?.setValueStateText("");
 
-    if (exitDate && exitDate < entryDate) {
+    const entry = entryDate ? new Date(entryDate) : null;
+    const exit = exitDate ? new Date(exitDate) : null;
+    if (exit && entry && exit < entry) {
       exitDatePicker?.setValueState(ValueState.Error);
       exitDatePicker?.setValueStateText("Exit date cannot be before entry date.");
       MessageBox.error("Exit date cannot be before entry date.");
@@ -322,7 +324,6 @@ export default class EmployeeHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges("$auto");
           MessageBox.error(error.message ?? "Failed to update employee");
         });
     }
