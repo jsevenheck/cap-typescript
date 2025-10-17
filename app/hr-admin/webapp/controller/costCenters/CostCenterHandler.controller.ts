@@ -180,7 +180,9 @@ export default class CostCenterHandler {
                 ? error.message
                 : "Failed to create cost center";
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch(() => undefined);
+            void readyContext.delete("$auto").catch((err) => {
+              console.error("Failed to delete creation context:", err);
+            });
           };
 
           let creationPromise: Promise<unknown>;

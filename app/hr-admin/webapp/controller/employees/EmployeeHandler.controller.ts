@@ -219,9 +219,8 @@ export default class EmployeeHandler {
     statusSelect?.setValueState(ValueState.None);
     statusSelect?.setValueStateText("");
 
-    const entry = entryDate ? new Date(entryDate) : null;
-    const exit = exitDate ? new Date(exitDate) : null;
-    if (exit && entry && exit < entry) {
+    // Compare as strings (YYYY-MM-DD) to avoid timezone issues
+    if (exitDate && entryDate && exitDate < entryDate) {
       exitDatePicker?.setValueState(ValueState.Error);
       exitDatePicker?.setValueStateText("Exit date cannot be before entry date.");
       MessageBox.error("Exit date cannot be before entry date.");
