@@ -134,10 +134,6 @@ export default class ClientHandler {
     if (data.mode === "create") {
       const listBinding = this.getClientsBinding();
       const creationContext = listBinding.create(payload) as Context | undefined;
-      const model = listBinding.getModel() as ODataModel;
-      void model
-        .submitBatch("$auto")
-        .catch(() => undefined);
       this.runWithCreationContext(
         creationContext,
         () => {
@@ -145,27 +141,45 @@ export default class ClientHandler {
           MessageBox.error("Failed to initialize client creation context.");
         },
         (context) => {
-          const readyContext = context as CreationContext;
-          const creationPromise = readyContext.created?.();
+          const readyContext = context as CreationContext & ODataContext;
+          const model = readyContext.getModel() as ODataModel;
+          let isSettled = false;
 
-          if (!creationPromise) {
+          const handleSuccess = (): void => {
+            if (isSettled) {
+              return;
+            }
+
+            isSettled = true;
             dialog.setBusy(false);
             dialog.close();
             MessageToast.show("Client created");
-            return;
+          };
+
+          const handleError = (error: unknown): void => {
+            if (isSettled) {
+              return;
+            }
+
+            isSettled = true;
+            dialog.setBusy(false);
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : "Failed to create client";
+            MessageBox.error(message);
+            void readyContext.delete("$auto").catch(() => undefined);
+          };
+
+          const creationPromise = readyContext.created?.();
+
+          if (!creationPromise) {
+            handleSuccess();
+          } else {
+            creationPromise.then(handleSuccess).catch(handleError);
           }
 
-          creationPromise
-            .then(() => {
-              dialog.setBusy(false);
-              dialog.close();
-              MessageToast.show("Client created");
-            })
-            .catch((error: Error) => {
-              dialog.setBusy(false);
-              MessageBox.error(error.message ?? "Failed to create client");
-              readyContext.delete("$auto");
-            });
+          void model.submitBatch("$auto").catch(handleError);
         }
       );
     } else if (data.mode === "edit") {
