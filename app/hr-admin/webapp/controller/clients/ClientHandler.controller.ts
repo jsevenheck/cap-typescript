@@ -168,6 +168,7 @@ export default class ClientHandler {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
+              listBinding.refresh();
             })
             .catch(handleError);
         }
@@ -193,7 +194,7 @@ export default class ClientHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges();
+          model.resetChanges("$auto");
           MessageBox.error(error.message ?? "Failed to update client");
         });
     }

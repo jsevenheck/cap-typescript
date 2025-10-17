@@ -322,7 +322,7 @@ export default class EmployeeHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges();
+          model.resetChanges("$auto");
           MessageBox.error(error.message ?? "Failed to update employee");
         });
     }
