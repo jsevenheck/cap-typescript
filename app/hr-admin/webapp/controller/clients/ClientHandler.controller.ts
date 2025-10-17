@@ -134,10 +134,6 @@ export default class ClientHandler {
     if (data.mode === "create") {
       const listBinding = this.getClientsBinding();
       const creationContext = listBinding.create(payload) as Context | undefined;
-      const model = listBinding.getModel() as ODataModel;
-      void model
-        .submitBatch("$auto")
-        .catch(() => undefined);
       this.runWithCreationContext(
         creationContext,
         () => {
@@ -145,27 +141,35 @@ export default class ClientHandler {
           MessageBox.error("Failed to initialize client creation context.");
         },
         (context) => {
-          const readyContext = context as CreationContext;
-          const creationPromise = readyContext.created?.();
+          const readyContext = context as CreationContext & ODataContext;
+          const model = readyContext.getModel() as ODataModel;
 
-          if (!creationPromise) {
+          const handleError = (error: unknown): void => {
             dialog.setBusy(false);
-            dialog.close();
-            MessageToast.show("Client created");
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : "Failed to create client";
+            MessageBox.error(message);
+            void readyContext.delete("$auto").catch(() => undefined);
+          };
+
+          let creationPromise: Promise<unknown>;
+
+          try {
+            creationPromise = readyContext.created?.() ?? Promise.resolve();
+          } catch (error) {
+            handleError(error);
             return;
           }
 
-          creationPromise
+          Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
             })
-            .catch((error: Error) => {
-              dialog.setBusy(false);
-              MessageBox.error(error.message ?? "Failed to create client");
-              readyContext.delete("$auto");
-            });
+            .catch(handleError);
         }
       );
     } else if (data.mode === "edit") {
@@ -189,7 +193,6 @@ export default class ClientHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges();
           MessageBox.error(error.message ?? "Failed to update client");
         });
     }

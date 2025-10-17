@@ -219,7 +219,8 @@ export default class EmployeeHandler {
     statusSelect?.setValueState(ValueState.None);
     statusSelect?.setValueStateText("");
 
-    if (exitDate && exitDate < entryDate) {
+    // Compare as strings (YYYY-MM-DD) to avoid timezone issues
+    if (exitDate && entryDate && exitDate < entryDate) {
       exitDatePicker?.setValueState(ValueState.Error);
       exitDatePicker?.setValueStateText("Exit date cannot be before entry date.");
       MessageBox.error("Exit date cannot be before entry date.");
@@ -251,10 +252,6 @@ export default class EmployeeHandler {
       }
 
       const creationContext = listBinding.create(payload) as Context | undefined;
-      const model = listBinding.getModel() as ODataModel;
-      void model
-        .submitBatch("$auto")
-        .catch(() => undefined);
       this.runWithCreationContext(
         creationContext,
         () => {
@@ -262,29 +259,36 @@ export default class EmployeeHandler {
           MessageBox.error("Failed to initialize employee creation context.");
         },
         (context) => {
-          const readyContext = context as CreationContext;
-          const creationPromise = readyContext.created?.();
+          const readyContext = context as CreationContext & ODataContext;
+          const model = readyContext.getModel() as ODataModel;
 
-          if (!creationPromise) {
+          const handleError = (error: unknown): void => {
             dialog.setBusy(false);
-            dialog.close();
-            MessageToast.show("Employee created");
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : "Failed to create employee";
+            MessageBox.error(message);
+            void readyContext.delete("$auto").catch(() => undefined);
+          };
+
+          let creationPromise: Promise<unknown>;
+
+          try {
+            creationPromise = readyContext.created?.() ?? Promise.resolve();
+          } catch (error) {
+            handleError(error);
             return;
           }
 
-          creationPromise
+          Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Employee created");
-              // Refresh once after creation resolves
               listBinding.refresh();
             })
-            .catch((error: Error) => {
-              dialog.setBusy(false);
-              MessageBox.error(error.message ?? "Failed to create employee");
-              readyContext.delete("$auto");
-            });
+            .catch(handleError);
         }
       );
     } else if (data.mode === "edit") {
@@ -319,7 +323,6 @@ export default class EmployeeHandler {
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          model.resetChanges();
           MessageBox.error(error.message ?? "Failed to update employee");
         });
     }
