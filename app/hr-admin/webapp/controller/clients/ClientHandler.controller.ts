@@ -143,25 +143,8 @@ export default class ClientHandler {
         (context) => {
           const readyContext = context as CreationContext & ODataContext;
           const model = readyContext.getModel() as ODataModel;
-          let isSettled = false;
-
-          const handleSuccess = (): void => {
-            if (isSettled) {
-              return;
-            }
-
-            isSettled = true;
-            dialog.setBusy(false);
-            dialog.close();
-            MessageToast.show("Client created");
-          };
 
           const handleError = (error: unknown): void => {
-            if (isSettled) {
-              return;
-            }
-
-            isSettled = true;
             dialog.setBusy(false);
             const message =
               error instanceof Error && error.message
@@ -171,15 +154,22 @@ export default class ClientHandler {
             void readyContext.delete("$auto").catch(() => undefined);
           };
 
-          const creationPromise = readyContext.created?.();
+          let creationPromise: Promise<unknown>;
 
-          if (!creationPromise) {
-            handleSuccess();
-          } else {
-            creationPromise.then(handleSuccess).catch(handleError);
+          try {
+            creationPromise = readyContext.created?.() ?? Promise.resolve();
+          } catch (error) {
+            handleError(error);
+            return;
           }
 
-          void model.submitBatch("$auto").catch(handleError);
+          Promise.all([creationPromise, model.submitBatch("$auto")])
+            .then(() => {
+              dialog.setBusy(false);
+              dialog.close();
+              MessageToast.show("Client created");
+            })
+            .catch(handleError);
         }
       );
     } else if (data.mode === "edit") {
