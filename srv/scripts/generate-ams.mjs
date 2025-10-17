@@ -87,12 +87,13 @@ const compilePoliciesToDcn = async () => {
   mkdirSync(dcnRoot, { recursive: true });
 
   const compileBin = (() => {
-    const extensions = process.platform === 'win32' ? ['.cmd', '.ps1'] : [];
+    const extensions = process.platform === 'win32' ? ['.cmd', '.ps1', ''] : [''];
     for (const candidate of compileCandidates) {
-      const variants = [candidate, ...extensions.map((ext) => `${candidate}${ext}`)];
-      const resolved = variants.find((variant) => existsSync(variant));
-      if (resolved) {
-        return resolved;
+      for (const ext of extensions) {
+        const variant = `${candidate}${ext}`;
+        if (existsSync(variant)) {
+          return variant;
+        }
       }
     }
     return undefined;
@@ -105,10 +106,23 @@ const compilePoliciesToDcn = async () => {
     return;
   }
 
-  const command = compileBin.endsWith('.js') ? process.execPath : compileBin;
-  const args = command === process.execPath
-    ? [compileBin, '--dcl', dclRoot, '--output', dcnRoot]
-    : ['--dcl', dclRoot, '--output', dcnRoot];
+  // On Windows, use cmd.exe to run .cmd files, otherwise use the file directly
+  const isCmd = compileBin.endsWith('.cmd');
+  const isJs = compileBin.endsWith('.js');
+  
+  let command;
+  let args;
+  
+  if (isJs) {
+    command = process.execPath;
+    args = [compileBin, '--dcl', dclRoot, '--output', dcnRoot];
+  } else if (isCmd) {
+    command = process.env.comspec || 'cmd.exe';
+    args = ['/d', '/s', '/c', compileBin, '--dcl', dclRoot, '--output', dcnRoot];
+  } else {
+    command = compileBin;
+    args = ['--dcl', dclRoot, '--output', dcnRoot];
+  }
 
   await runCommand(
     command,
@@ -120,6 +134,7 @@ const compilePoliciesToDcn = async () => {
         ...process.env,
         NODE_ENV: process.env.NODE_ENV ?? 'development',
       },
+      shell: isCmd,
     },
     'compile-dcl failed',
   );
@@ -146,4 +161,3 @@ try {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }
-

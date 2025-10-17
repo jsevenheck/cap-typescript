@@ -1,0 +1,10 @@
+{
+  "requires": {
+    "auth": {
+      "kind": "mocked"
+    },
+    "ams": {
+      "kind": "ams-local"
+    }
+  }
+}

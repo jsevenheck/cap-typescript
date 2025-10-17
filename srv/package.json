@@ -97,12 +97,7 @@
         }
       },
       "ams": {
-        "kind": "authorization",
-        "vcap": {
-          "label": "authorization",
-          "service": "authorization",
-          "plan": "application"
-        },
+        "kind": "ams-local",
         "credentials": {
           "dclRoot": "ams",
           "dcnRoot": "gen/ams/dcn",
@@ -116,6 +111,14 @@
       "requires": {
         "auth": {
           "kind": "ias"
+        },
+        "ams": {
+          "kind": "authorization",
+          "vcap": {
+            "label": "authorization",
+            "service": "authorization",
+            "plan": "application"
+          }
         }
       }
     }

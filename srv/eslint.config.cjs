@@ -36,15 +36,6 @@ module.exports = [
       node: true,
       es2022: true,
     },
-    overrides: [
-      {
-        files: ['test/**/*.ts', 'jest.config.ts'],
-        env: {
-          jest: true,
-          node: true,
-        },
-      },
-    ],
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -57,4 +48,30 @@ module.exports = [
       '@typescript-eslint/require-await': 'off',
     },
   }),
+  // Override for .mjs files in scripts folder - disable TypeScript-specific rules
+  {
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+    },
+    languageOptions: {
+      parserOptions: {
+        project: null,
+      },
+    },
+  },
+  // Override for test files
+  {
+    files: ['test/**/*.ts', 'jest.config.ts'],
+    languageOptions: {
+      globals: {
+        jest: true,
+      },
+    },
+  },
 ];
