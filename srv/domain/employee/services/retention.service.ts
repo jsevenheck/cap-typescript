@@ -44,7 +44,7 @@ export const anonymizeFormerEmployees = async (
       .filter((value): value is string => Boolean(value));
 
     if (allowedCompanyCodes.length === 0) {
-      return 0;
+      throw createServiceError(403, 'User is not authorized for any company.');
     }
 
     whereClause['client.companyId'] = { in: allowedCompanyCodes };
