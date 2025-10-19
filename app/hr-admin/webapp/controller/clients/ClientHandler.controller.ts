@@ -111,7 +111,6 @@ export default class ClientHandler {
     const dialog = this.byId("clientDialog") as Dialog;
     const dialogModel = this.models.getClientModel();
     const data = dialogModel.getData();
-    const isCreateMode = data.mode === "create" || !data.client.ID;
     const countryCode = data.client.country_code?.trim() ?? "";
     const payload = {
       companyId: data.client.companyId?.trim() ?? "",
@@ -124,7 +123,7 @@ export default class ClientHandler {
       return;
     }
 
-    if (isCreateMode && !payload.country_code) {
+    if (!payload.country_code) {
       MessageBox.error("Country is required.");
       return;
     }
