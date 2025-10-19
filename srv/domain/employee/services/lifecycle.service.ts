@@ -183,7 +183,7 @@ const validateTimeline = (
     throw createServiceError(400, 'Employees with an exit date must have status set to inactive.');
   }
 
-  if (!inactive && data.status && isInactiveStatus(data.status)) {
+  if (data.status && isInactiveStatus(data.status)) {
     data.status = 'inactive';
   }
 };

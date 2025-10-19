@@ -59,6 +59,7 @@ export default class EmployeeHandler {
         status: "active",
         employmentType: "internal",
       },
+      managerLookupPending: false,
     });
     this.openDialog();
   }
@@ -123,6 +124,7 @@ export default class EmployeeHandler {
           status: currentData.status ?? "active",
           employmentType: currentData.employmentType ?? "internal",
         },
+        managerLookupPending: false,
       });
       this.openDialog();
     } catch (error: unknown) {
@@ -164,6 +166,13 @@ export default class EmployeeHandler {
   public save(): void {
     const dialog = this.byId("employeeDialog") as Dialog;
     const dialogModel = this.models.getEmployeeModel();
+    const managerLookupPending = Boolean(
+      dialogModel.getProperty("/managerLookupPending")
+    );
+    if (managerLookupPending) {
+      MessageBox.warning("Please wait for the cost center manager to finish loading before saving.");
+      return;
+    }
     const data = dialogModel.getData();
     const clientId = this.selection.getSelectedClientId();
     const costCenterId = data.employee.costCenter_ID || undefined;
@@ -350,6 +359,8 @@ export default class EmployeeHandler {
     const dialogModel = this.models.getEmployeeModel();
     const costCenterId = select.getSelectedKey() || undefined;
     dialogModel.setProperty("/employee/costCenter_ID", costCenterId);
+    const previousManagerId = dialogModel.getProperty("/employee/manager_ID") as string | undefined;
+    const previousManagerName = dialogModel.getProperty("/employee/managerName") as string | undefined;
 
     const applyResponsible = (options?: {
       responsibleId?: string;
@@ -363,12 +374,23 @@ export default class EmployeeHandler {
       );
     };
 
+    const restorePreviousResponsible = (): void => {
+      dialogModel.setProperty("/employee/manager_ID", previousManagerId ?? undefined);
+      dialogModel.setProperty("/employee/managerName", previousManagerName ?? "");
+    };
+
+    const clearResponsible = (): void => {
+      dialogModel.setProperty("/employee/manager_ID", undefined);
+      dialogModel.setProperty("/employee/managerName", "");
+    };
+
     if (bindingContext) {
       const responsibleId = bindingContext.getProperty("responsible_ID") as string | undefined;
       const managerFirstName = bindingContext.getProperty("responsible/firstName") as string | undefined;
       const managerLastName = bindingContext.getProperty("responsible/lastName") as string | undefined;
 
       if (responsibleId) {
+        dialogModel.setProperty("/managerLookupPending", false);
         applyResponsible({
           responsibleId,
           firstName: managerFirstName,
@@ -378,7 +400,8 @@ export default class EmployeeHandler {
       }
 
       const selectedKey = select.getSelectedKey();
-      applyResponsible();
+      dialogModel.setProperty("/managerLookupPending", true);
+      clearResponsible();
       void bindingContext
         .requestObject()
         .then((costCenter: unknown) => {
@@ -394,19 +417,29 @@ export default class EmployeeHandler {
             | null
             | undefined;
 
-          applyResponsible({
-            responsibleId: data?.responsible_ID,
-            firstName: data?.responsible?.firstName,
-            lastName: data?.responsible?.lastName,
-          });
+          if (data?.responsible_ID) {
+            applyResponsible({
+              responsibleId: data.responsible_ID,
+              firstName: data.responsible?.firstName,
+              lastName: data.responsible?.lastName,
+            });
+          } else {
+            clearResponsible();
+          }
         })
         .catch(() => {
           if (select.getSelectedKey() === selectedKey) {
-            applyResponsible();
+            restorePreviousResponsible();
+          }
+        })
+        .finally(() => {
+          if (select.getSelectedKey() === selectedKey) {
+            dialogModel.setProperty("/managerLookupPending", false);
           }
         });
     } else {
-      applyResponsible();
+      clearResponsible();
+      dialogModel.setProperty("/managerLookupPending", false);
     }
   }
 

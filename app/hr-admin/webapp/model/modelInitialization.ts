@@ -49,6 +49,7 @@ export function createInitialEmployeeDialogData(): EmployeeDialogModelData {
       status: DEFAULT_STATUS,
       employmentType: DEFAULT_EMPLOYMENT_TYPE,
     },
+    managerLookupPending: false,
   };
 }
 

@@ -43,6 +43,7 @@ export interface EmployeeDialogModelData {
   mode: DialogMode;
   title: string;
   employee: EmployeeDialogData;
+  managerLookupPending: boolean;
 }
 
 export interface CostCenterDialogData {
