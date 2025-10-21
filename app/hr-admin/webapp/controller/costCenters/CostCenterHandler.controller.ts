@@ -199,6 +199,7 @@ export default class CostCenterHandler {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Cost center created");
+              listBinding.refresh();
             })
             .catch(handleError);
         }

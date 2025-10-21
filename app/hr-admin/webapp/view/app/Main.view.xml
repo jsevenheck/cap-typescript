@@ -275,7 +275,7 @@
             </VBox>
         </content>
         <beginButton>
-            <Button text="Save" type="Emphasized" press=".onSaveEmployee"/>
+            <Button text="Save" type="Emphasized" press=".onSaveEmployee" enabled="{= !${employeeDialog>/managerLookupPending} }"/>
         </beginButton>
         <endButton>
             <Button text="Cancel" press=".onCancelEmployee"/>
