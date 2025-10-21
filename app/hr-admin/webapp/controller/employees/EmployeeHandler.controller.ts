@@ -25,6 +25,8 @@ type CreationContext = {
 };
 
 export default class EmployeeHandler {
+  private currentManagerLookupToken: number = 0;
+
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
@@ -354,6 +356,10 @@ export default class EmployeeHandler {
   }
 
   public handleCostCenterChange(event: Event): void {
+    // Increment token to invalidate previous requests
+    this.currentManagerLookupToken++;
+    const lookupToken = this.currentManagerLookupToken;
+
     const select = event.getSource() as Select;
     const bindingContext = select.getSelectedItem()?.getBindingContext() as Context | undefined;
     const dialogModel = this.models.getEmployeeModel();
@@ -405,6 +411,11 @@ export default class EmployeeHandler {
       void bindingContext
         .requestObject()
         .then((costCenter: unknown) => {
+          // Check if this request is still valid
+          if (lookupToken !== this.currentManagerLookupToken) {
+            return;
+          }
+
           if (select.getSelectedKey() !== selectedKey) {
             return;
           }
@@ -428,11 +439,21 @@ export default class EmployeeHandler {
           }
         })
         .catch(() => {
+          // Check if this request is still valid
+          if (lookupToken !== this.currentManagerLookupToken) {
+            return;
+          }
+
           if (select.getSelectedKey() === selectedKey) {
             restorePreviousResponsible();
           }
         })
         .finally(() => {
+          // Check if this request is still valid
+          if (lookupToken !== this.currentManagerLookupToken) {
+            return;
+          }
+
           if (select.getSelectedKey() === selectedKey) {
             dialogModel.setProperty("/managerLookupPending", false);
           }

@@ -88,3 +88,43 @@ export const findEmployeeById = async (
 
   return projectEntity<EmployeeEntity>(row, selection);
 };
+
+export const findCostCenterByCode = async (
+  tx: Transaction,
+  clientId: string,
+  code: string,
+  excludeId?: string,
+): Promise<CostCenterEntity | undefined> => {
+  const required: Array<keyof CostCenterEntity> = ['ID', 'client_ID'];
+  const selection = selectColumns(['ID', 'client_ID', 'code'], required);
+
+  const whereClause: Record<string, unknown> = { client_ID: clientId, code };
+  if (excludeId) {
+    whereClause['ID !='] = excludeId;
+  }
+
+  const row = await tx.run(
+    ql.SELECT.one.from('clientmgmt.CostCenters').columns(...(selection as string[])).where(whereClause),
+  );
+
+  if (!isRecord(row) || !hasRequiredFields<CostCenterEntity>(row, required)) {
+    return undefined;
+  }
+
+  return projectEntity<CostCenterEntity>(row, selection);
+};
+
+export const findEmployeesByCostCenter = async (
+  tx: Transaction,
+  costCenterId: string,
+): Promise<number> => {
+  const result = await tx.run(
+    ql.SELECT.from('clientmgmt.Employees').columns('count(*) as count').where({ costCenter_ID: costCenterId }),
+  );
+
+  if (Array.isArray(result) && result.length > 0 && isRecord(result[0])) {
+    return Number(result[0].count) || 0;
+  }
+
+  return 0;
+};

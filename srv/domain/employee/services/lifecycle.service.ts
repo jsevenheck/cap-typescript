@@ -183,8 +183,14 @@ const validateTimeline = (
     throw createServiceError(400, 'Employees with an exit date must have status set to inactive.');
   }
 
-  if (data.status && isInactiveStatus(data.status)) {
-    data.status = 'inactive';
+  // Normalize status to ensure consistency
+  if (data.status) {
+    const normalizedStatus = data.status.trim().toLowerCase();
+    if (normalizedStatus === 'active' || normalizedStatus === 'inactive') {
+      data.status = normalizedStatus as 'active' | 'inactive';
+    } else {
+      throw createServiceError(400, 'Status must be either "active" or "inactive".');
+    }
   }
 };
 
@@ -251,6 +257,14 @@ const validateManagerAndCostCenter = async (
         throw createServiceError(
           400,
           'Employees assigned to a cost center must be managed by the responsible employee.',
+        );
+      }
+
+      // Prevent self-management (circular dependency)
+      if (context.targetId && identifiersMatch(managerToValidate, context.targetId)) {
+        throw createServiceError(
+          400,
+          'An employee cannot be their own manager.',
         );
       }
 

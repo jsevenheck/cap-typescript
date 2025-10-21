@@ -9,7 +9,7 @@ import { normalizeCostCenterCode } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
 import type { ClientEntity, CostCenterEntity } from '../dto/cost-center.dto';
-import { findClientById, findCostCenterById, findEmployeeById } from '../repository/cost-center.repo';
+import { findClientById, findCostCenterById, findCostCenterByCode, findEmployeeById, findEmployeesByCostCenter } from '../repository/cost-center.repo';
 
 export interface CostCenterUpsertContext {
   event: 'CREATE' | 'UPDATE';
@@ -99,6 +99,15 @@ export const prepareCostCenterUpsert = async ({
   const client = await ensureClientExists(tx, clientId);
   ensureUserAuthorizedForCompany(user, client.companyId);
 
+  // Validate cost center code uniqueness per client
+  const finalCode = updates.code ?? (event === 'UPDATE' ? existingCostCenter?.code : data.code);
+  if (finalCode) {
+    const existingByCode = await findCostCenterByCode(tx, client.ID, finalCode, event === 'UPDATE' ? targetId : undefined);
+    if (existingByCode) {
+      throw createServiceError(409, `Cost center code ${finalCode} already exists for this client.`);
+    }
+  }
+
   let normalizedResponsibleId: string | undefined;
   if (data.responsible_ID !== undefined) {
     if (data.responsible_ID === null || typeof data.responsible_ID !== 'string') {
@@ -155,6 +164,15 @@ export const validateCostCenterDeletion = async ({
 
   if (!costCenter) {
     throw createServiceError(404, `Cost center ${targetId} not found.`);
+  }
+
+  // Check for assigned employees before deletion
+  const assignedCount = await findEmployeesByCostCenter(tx, targetId);
+  if (assignedCount > 0) {
+    throw createServiceError(
+      409,
+      `Cannot delete cost center: ${assignedCount} employee(s) are still assigned to it.`
+    );
   }
 
   const client = await ensureClientExists(tx, costCenter.client_ID);

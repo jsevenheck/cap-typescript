@@ -209,12 +209,9 @@ const executeActiveEmployeesQuery = async (
       { or: [{ exitDate: null }, { exitDate: { '>=': today } }] },
     ];
 
-    const statusElement = 'status_code' in elements ? 'status_code' : 'status' in elements ? 'status' : undefined;
-
-    if (statusElement) {
-      const statusFilter: Record<string, unknown> = {};
-      statusFilter[statusElement] = { '=': 'active' };
-      predicates.push(statusFilter);
+    // Directly use 'status' field as defined in schema
+    if ('status' in elements) {
+      predicates.push({ status: { '=': 'active' } });
     }
 
     (query as any).where({ and: predicates });

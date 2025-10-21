@@ -56,8 +56,15 @@ export const anonymizeFormerEmployees = async (
     return 0;
   }
 
-  for (const employee of employeesToAnonymize) {
-    await anonymizeEmployeeRecord(tx, employee.ID, buildAnonymizedEmail(employee.employeeId), ANONYMIZED_PLACEHOLDER);
+  // Batch anonymization in chunks for better performance
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < employeesToAnonymize.length; i += BATCH_SIZE) {
+    const batch = employeesToAnonymize.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(employee =>
+        anonymizeEmployeeRecord(tx, employee.ID, buildAnonymizedEmail(employee.employeeId), ANONYMIZED_PLACEHOLDER)
+      )
+    );
   }
 
   return employeesToAnonymize.length;
