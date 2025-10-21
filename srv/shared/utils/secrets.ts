@@ -10,11 +10,13 @@ interface XsenvServices {
   };
 }
 
-let getServicesFunc: (() => XsenvServices) | null = null;
+type GetServicesFunc = () => XsenvServices;
+
+let getServicesFunc: GetServicesFunc | null = null;
 
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const xsenv = require('@sap/xsenv') as { getServices: typeof getServicesFunc };
+  const xsenv = require('@sap/xsenv') as { getServices: GetServicesFunc };
   getServicesFunc = xsenv.getServices;
 } catch {
   getServicesFunc = null;

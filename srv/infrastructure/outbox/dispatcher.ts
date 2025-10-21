@@ -2,7 +2,7 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
-import { handleAll, ConsecutiveBreaker, TimeoutStrategy } from 'cockatiel';
+import { circuitBreaker, timeout, wrap, handleAll, ConsecutiveBreaker, TimeoutStrategy } from 'cockatiel';
 
 import { postEmployeeNotification } from '../api/third-party/employee.client';
 import {
@@ -39,10 +39,10 @@ const circuitBreakers = new Map<string, ReturnType<typeof createCircuitBreaker>>
  * Opens after 5 consecutive failures, resets after 10 seconds.
  */
 const createCircuitBreaker = () => {
-  const policy = handleAll
-    .circuitBreaker(10_000, new ConsecutiveBreaker(5))
-    .timeout(resolveOutboxTimeout(), TimeoutStrategy.Aggressive);
-  return policy;
+  // TypeScript types don't match runtime API for halfOpenAfter option, using type assertion
+  const breaker = (circuitBreaker as any)(handleAll, new ConsecutiveBreaker(5), { halfOpenAfter: 10_000 });
+  const timeoutPolicy = timeout(resolveOutboxTimeout(), TimeoutStrategy.Aggressive);
+  return wrap(breaker, timeoutPolicy);
 };
 
 /**

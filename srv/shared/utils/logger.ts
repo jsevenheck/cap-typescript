@@ -1,12 +1,14 @@
 // Type-safe wrapper around @sap/logging
 // Note: @sap/logging doesn't have TypeScript definitions, so we define our own interface
 
-let createLoggerFunc: ((config: { appName: string; appVersion: string }) => any) | null = null;
+type CreateLoggerFunc = (config: { appName: string; appVersion: string }) => any;
+
+let createLoggerFunc: CreateLoggerFunc | null = null;
 
 // Try to load @sap/logging dynamically (avoid require() for ESLint)
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const logging = require('@sap/logging') as { createLogger: typeof createLoggerFunc };
+  const logging = require('@sap/logging') as { createLogger: CreateLoggerFunc };
   createLoggerFunc = logging.createLogger;
 } catch {
   // @sap/logging not available (likely in test or development)
