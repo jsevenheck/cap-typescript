@@ -19,11 +19,11 @@ type EmploymentType : String enum {
 ]
 entity Clients : managed, cuid {
   @assert.unique: { name: 'Clients_companyId_unique' }
-  companyId  : String(40) not null;
-  name       : String(120);
-  country    : Association to CommonCountries not null;
-  employees  : Composition of many Employees on employees.client = $self;
-  costCenters: Composition of many CostCenters on costCenters.client = $self;
+  companyId    : String(40) not null;
+  name         : String(120);
+  country_code : String(2)  not null;
+  employees    : Composition of many Employees on employees.client = $self;
+  costCenters  : Composition of many CostCenters on costCenters.client = $self;
 }
 
 @odata.etag: 'modifiedAt'
@@ -51,6 +51,9 @@ entity EmployeeIdCounters {
 
 
 @odata.etag: 'modifiedAt'
+@cds.persistence.indices: [
+  { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] }
+]
 entity CostCenters : managed, cuid {
   code         : String(40)  not null;
   name         : String(120) not null;

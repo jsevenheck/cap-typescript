@@ -12,11 +12,18 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
   const result = await prepareEmployeeContext(req, user);
   Object.assign(req.data, result.updates);
 
-  // Only ensure employee identifier if:
-  // 1. It's an UPDATE with a CHANGED employeeId, OR
-  // 2. The employeeId in the request differs from the existing one
-  if (req.event === 'UPDATE' && req.data.employeeId &&
+  // Validate manually provided employee IDs
+  if (req.event === 'CREATE' && req.data.employeeId) {
+    // User manually provided an employeeId during CREATE - validate uniqueness
+    await ensureEmployeeIdentifier(
+      cds.transaction(req),
+      req.data as Partial<EmployeeEntity>,
+      result.client,
+      undefined,
+    );
+  } else if (req.event === 'UPDATE' && req.data.employeeId &&
       req.data.employeeId !== result.existingEmployee?.employeeId) {
+    // Employee ID changed during UPDATE - validate uniqueness
     await ensureEmployeeIdentifier(
       cds.transaction(req),
       req.data as Partial<EmployeeEntity>,

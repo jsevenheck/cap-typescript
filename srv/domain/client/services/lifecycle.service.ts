@@ -101,12 +101,12 @@ export const prepareClientUpsert = async ({
 
   if (data.country_code !== undefined) {
     if (typeof data.country_code !== 'string') {
-      throw createServiceError(400, 'Country code must be a two-letter ISO code.');
+      throw createServiceError(400, 'Country code must be a string.');
     }
 
     const normalizedCountry = data.country_code.trim().toUpperCase();
     if (!isValidCountryCode(normalizedCountry)) {
-      throw createServiceError(400, 'Country code must be a two-letter ISO code.');
+      throw createServiceError(400, 'Country code must be a valid two-letter ISO 3166-1 alpha-2 code.');
     }
     updates.country_code = normalizedCountry;
   }
