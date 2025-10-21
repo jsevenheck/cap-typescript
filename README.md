@@ -64,13 +64,15 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 ## Authentication & Authorization
 
 * Local profiles keep mocked users (including the HR roles and company attributes) so day-to-day development does not require cloud credentials.
-* The CAP runtime is configured for both IAS (`cds.security.identity`) and XSUAA (`cds.security.xsuaa`) for production deployments.
-* **XSUAA Configuration:** Role-template mappings are defined in `xs-security.json` at the repository root. Three roles are configured:
+* The CAP runtime is configured for **IAS (Identity Authentication Service)** and **AMS (Authorization Management Service)** in production:
+  - **IAS** (`cds.security.identity`): Handles user authentication and identity federation
+  - **AMS** (`cds.requires.auth.ams`): Provides attribute-based access control with CompanyCode filtering
+* **Role Configuration:** Three roles are enforced via `@restrict` annotations in CDS models:
   - `HRAdmin`: Full access to all HR data and operations
   - `HREditor`: Read/write access to assigned company codes (via CompanyCode attributes)
   - `HRViewer`: Read-only access to assigned company codes
-* **AMS Integration:** Authorization decisions are delegated to the Authorization Management Service (AMS). The generated AMS DCL files live in `srv/ams`; run `npm run ams:generate --workspace srv` whenever CDS annotations change.
-* During deployment, bind IAS (`identity` service), XSUAA (`xsuaa` service), and AMS (`authorization` service) instances to the CAP service and approuter. The MTA project ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
+* **AMS DCL Generation:** Authorization policies are defined in `srv/ams/schema.dcl` and deployed via AMS DCL deployer. Run `npm run ams:generate --workspace srv` whenever CDS annotations change.
+* During deployment, bind both IAS (`identity` service, `application` plan) and AMS (`authorization` service, `application` plan) instances to the CAP service and approuter. The MTA project ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
 
 ## Observability & Logging
 
@@ -104,7 +106,6 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 ## Deployment
 
 * `mta.yaml` provisions the following BTP services:
-  - **XSUAA** (`cap-ts-xsuaa`): Role-template management and OAuth2 token issuance, configured via `xs-security.json`
   - **IAS** (`cap-ts-ias`): Identity authentication service for user login
   - **AMS** (`cap-ts-ams`): Authorization management with attribute-based access control
   - **Credential Store** (`cap-ts-credstore`): Secure secret storage with rotation support
