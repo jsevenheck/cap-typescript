@@ -41,21 +41,8 @@ export const deriveCountryCodeFromCompanyId = (companyId?: string | null): strin
     return undefined;
   }
 
-  // Strategy 1: Check if first 2 characters form a valid country code
-  const firstTwoChars = normalized.slice(0, 2);
-  if (isValidCountryCode(firstTwoChars)) {
-    return firstTwoChars;
-  }
-
-  // Strategy 2: Look for a 2-letter country code after a delimiter
-  const match = normalized.match(/(?:^|[-_\s])([A-Z]{2})(?=[-_\s]|$)/);
-  if (match && isValidCountryCode(match[1])) {
-    return match[1];
-  }
-
-  // Strategy 3: Fallback to first 2-letter sequence not surrounded by letters
-  const fallbackMatch = normalized.match(/(?:^|[^A-Z])([A-Z]{2})(?=[^A-Z]|$)/);
-  return fallbackMatch && isValidCountryCode(fallbackMatch[1]) ? fallbackMatch[1] : undefined;
+  const match = normalized.match(/(?:^|[^A-Z])([A-Z]{2})(?=[^A-Z]|$)/);
+  return match ? match[1] : undefined;
 };
 
 export const isValidCountryCode = (value: string): boolean => /^[A-Z]{2}$/.test(value);
