@@ -100,7 +100,7 @@ export const findCostCenterByCode = async (
 
   const whereClause: Record<string, unknown> = { client_ID: clientId, code };
   if (excludeId) {
-    whereClause['ID !='] = excludeId;
+    whereClause.ID = { '!=': excludeId };
   }
 
   const row = await tx.run(
