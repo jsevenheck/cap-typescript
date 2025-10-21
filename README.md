@@ -64,12 +64,55 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
 ## Authentication & Authorization
 
 * Local profiles keep mocked users (including the HR roles and company attributes) so day-to-day development does not require cloud credentials.
-* The CAP runtime is configured for IAS (`cds.security.identity`) and AMS (`cds.requires.auth.ams`). The generated AMS DCL files live in `srv/ams`; run `npm run ams:generate --workspace srv` whenever CDS annotations change.
-* During deployment bind both the IAS (`identity` service, `application` plan) and AMS (`authorization` service, `application` plan) instances to the CAP service and approuter. The MTA project also ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
+* The CAP runtime is configured for both IAS (`cds.security.identity`) and XSUAA (`cds.security.xsuaa`) for production deployments.
+* **XSUAA Configuration:** Role-template mappings are defined in `xs-security.json` at the repository root. Three roles are configured:
+  - `HRAdmin`: Full access to all HR data and operations
+  - `HREditor`: Read/write access to assigned company codes (via CompanyCode attributes)
+  - `HRViewer`: Read-only access to assigned company codes
+* **AMS Integration:** Authorization decisions are delegated to the Authorization Management Service (AMS). The generated AMS DCL files live in `srv/ams`; run `npm run ams:generate --workspace srv` whenever CDS annotations change.
+* During deployment, bind IAS (`identity` service), XSUAA (`xsuaa` service), and AMS (`authorization` service) instances to the CAP service and approuter. The MTA project ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
+
+## Observability & Logging
+
+* **Structured Logging:** The application uses `@sap/logging` for structured, correlation-based logging. Each request receives a unique `x-correlation-id` header for distributed tracing.
+* **Correlation IDs:** All logs include correlation IDs to trace requests across approuter → CAP → outbox → destination service flows.
+* **Log Levels:** Configure via `NODE_ENV`. In production, logs are sent to the Application Logs service bound in `mta.yaml`.
+* **Fallback:** If `@sap/logging` is unavailable, the application falls back to console-based logging with component prefixes.
+
+## Secrets Management
+
+* **BTP Credential Store:** API keys and secrets are loaded from BTP Credential Store service when bound in production.
+* **Environment Variable Fallback:** For local development, secrets can be configured via environment variables:
+  - `EMPLOYEE_EXPORT_API_KEY`: API key for the `/api/employees/active` endpoint
+  - `THIRD_PARTY_EMPLOYEE_SECRET`: Secret for HMAC signing of employee notification payloads
+* **Namespaces:** Secrets are organized by namespace in Credential Store (e.g., `employee-export/api-key`).
+* Bind the Credential Store service (`cap-ts-credstore`) in `mta.yaml` for automatic secret loading at application startup.
+
+## Outbox Pattern & Resilience
+
+* **Outbox Pattern:** Employee creation events are queued in `EmployeeNotificationOutbox` table for reliable, asynchronous delivery to third-party systems.
+* **Circuit Breaker:** HTTP calls to destination services are protected by circuit breakers (opens after 5 consecutive failures, resets after 10 seconds) to prevent cascade failures.
+* **Dead Letter Queue (DLQ):** Messages that fail after 6 retry attempts are moved to `EmployeeNotificationDLQ` for manual inspection and replay.
+* **Exponential Backoff:** Failed deliveries are retried with exponential backoff (base 5 seconds, max 6 attempts).
+* **Configuration:** Outbox behavior can be tuned via environment variables:
+  - `OUTBOX_DISPATCH_INTERVAL_MS`: Polling interval (default: 30000)
+  - `OUTBOX_CONCURRENCY`: Max concurrent deliveries (default: 1)
+  - `OUTBOX_MAX_ATTEMPTS`: Max retry attempts (default: 6)
+  - `OUTBOX_BASE_BACKOFF_MS`: Base backoff delay (default: 5000)
+  - `OUTBOX_RETENTION_HOURS`: Retention window for completed/failed entries (default: 168 hours / 7 days)
 
 ## Deployment
 
-* `mta.yaml` now provisions `cap-ts-ias` and `cap-ts-ams` service instances alongside the existing database, destination, connectivity, HTML5 repo, and logging services.
+* `mta.yaml` provisions the following BTP services:
+  - **XSUAA** (`cap-ts-xsuaa`): Role-template management and OAuth2 token issuance, configured via `xs-security.json`
+  - **IAS** (`cap-ts-ias`): Identity authentication service for user login
+  - **AMS** (`cap-ts-ams`): Authorization management with attribute-based access control
+  - **Credential Store** (`cap-ts-credstore`): Secure secret storage with rotation support
+  - **HANA** (`cap-ts-db`): HDI container for application data
+  - **Destination** (`cap-ts-destination`): Third-party HTTP endpoint configuration
+  - **Connectivity** (`cap-ts-connectivity`): On-premise system connectivity (if needed)
+  - **Application Logs** (`cap-ts-logging`): Centralized structured logging
+  - **HTML5 Application Repository** (`cap-ts-html5-repo-*`): UI5 app hosting
 * Static UI build artefacts are served by the CAP service and the approuter via the `srv-api` destination.
 * The approuter configuration forwards `/odata/v4/*` to the CAP service, enforces IAS authentication on all routes, and exposes the UI as the welcome route.
 

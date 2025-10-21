@@ -1,0 +1,97 @@
+{
+  "xsappname": "cap-ts-hr",
+  "tenant-mode": "dedicated",
+  "description": "Security descriptor for SAP CAP TypeScript HR Application",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.HRAdmin",
+      "description": "HR Administrator - full access to all HR data and operations"
+    },
+    {
+      "name": "$XSAPPNAME.HREditor",
+      "description": "HR Editor - read and write access to assigned company codes"
+    },
+    {
+      "name": "$XSAPPNAME.HRViewer",
+      "description": "HR Viewer - read-only access to assigned company codes"
+    }
+  ],
+  "attributes": [
+    {
+      "name": "CompanyCode",
+      "description": "Company code(s) the user is authorized to access",
+      "valueType": "string"
+    },
+    {
+      "name": "companyCodes",
+      "description": "Legacy company codes attribute (array format)",
+      "valueType": "string"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "HRAdmin",
+      "description": "HR Administrator",
+      "scope-references": [
+        "$XSAPPNAME.HRAdmin"
+      ],
+      "attribute-references": []
+    },
+    {
+      "name": "HREditor",
+      "description": "HR Editor",
+      "scope-references": [
+        "$XSAPPNAME.HREditor"
+      ],
+      "attribute-references": [
+        "CompanyCode",
+        "companyCodes"
+      ]
+    },
+    {
+      "name": "HRViewer",
+      "description": "HR Viewer",
+      "scope-references": [
+        "$XSAPPNAME.HRViewer"
+      ],
+      "attribute-references": [
+        "CompanyCode",
+        "companyCodes"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "HRAdministrator",
+      "description": "HR Administrator - full access",
+      "role-template-references": [
+        "$XSAPPNAME.HRAdmin"
+      ]
+    },
+    {
+      "name": "HREditor",
+      "description": "HR Editor - edit access for assigned companies",
+      "role-template-references": [
+        "$XSAPPNAME.HREditor"
+      ]
+    },
+    {
+      "name": "HRViewer",
+      "description": "HR Viewer - read-only access for assigned companies",
+      "role-template-references": [
+        "$XSAPPNAME.HRViewer"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.cfapps.*.hana.ondemand.com/**",
+      "https://*.applicationstudio.cloud.sap/**"
+    ],
+    "grant-types": [
+      "authorization_code",
+      "refresh_token"
+    ],
+    "token-validity": 3600
+  }
+}

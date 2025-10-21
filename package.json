@@ -39,7 +39,7 @@
         "enabled": true
       },
       "xsuaa": {
-        "enabled": false
+        "enabled": true
       }
     },
     "requires": {

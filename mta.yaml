@@ -38,10 +38,12 @@ modules:
     requires:
       - name: cap-ts-db
       - name: cap-ts-ias
+      - name: cap-ts-xsuaa
       - name: cap-ts-ams
       - name: cap-ts-destination
       - name: cap-ts-connectivity
       - name: cap-ts-logging
+      - name: cap-ts-credstore
 
   # ===================================
   # Database Deployer (HDI Container)
@@ -137,6 +139,7 @@ modules:
     requires:
       - name: cap-ts-html5-repo-runtime
       - name: cap-ts-ias
+      - name: cap-ts-xsuaa
       - name: cap-ts-ams
       - name: cap-ts-destination
       - name: srv-api
@@ -170,6 +173,17 @@ resources:
     parameters:
       service: identity
       service-plan: application
+
+  # XSUAA (Authorization & Role Management)
+  - name: cap-ts-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: cap-ts-hr-${org}-${space}
+        tenant-mode: dedicated
 
   # AMS (Authorization)
   - name: cap-ts-ams
@@ -212,3 +226,13 @@ resources:
     parameters:
       service: application-logs
       service-plan: lite
+
+  # Credential Store Service
+  - name: cap-ts-credstore
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: credstore
+      service-plan: trial
+      config:
+        authorization:
+          default_permissions: [read]
