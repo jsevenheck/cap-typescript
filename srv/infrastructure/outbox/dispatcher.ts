@@ -2,7 +2,7 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
-import { circuitBreaker, timeout, wrap, handleAll, ConsecutiveBreaker, TimeoutStrategy } from 'cockatiel';
+import { circuitBreaker, handleAll, ConsecutiveBreaker } from 'cockatiel';
 
 import { postEmployeeNotification } from '../api/third-party/employee.client';
 import {
@@ -39,10 +39,10 @@ const circuitBreakers = new Map<string, ReturnType<typeof createCircuitBreaker>>
  * Opens after 5 consecutive failures, resets after 10 seconds.
  */
 const createCircuitBreaker = () => {
-  // TypeScript types don't match runtime API for halfOpenAfter option, using type assertion
-  const breaker = (circuitBreaker as any)(handleAll, new ConsecutiveBreaker(5), { halfOpenAfter: 10_000 });
-  const timeoutPolicy = timeout(resolveOutboxTimeout(), TimeoutStrategy.Aggressive);
-  return wrap(breaker, timeoutPolicy);
+  return circuitBreaker(handleAll, {
+    halfOpenAfter: 10_000,
+    breaker: new ConsecutiveBreaker(5),
+  });
 };
 
 /**
@@ -58,7 +58,7 @@ const getCircuitBreaker = (destinationName: string) => {
 /**
  * Move a failed outbox entry to the Dead Letter Queue.
  */
-const moveToDLQ = async (db: any, entry: OutboxEntry, lastError: string): Promise<void> => {
+const moveToDLQ = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
   try {
     // Insert into DLQ
     await db.run(
@@ -67,7 +67,7 @@ const moveToDLQ = async (db: any, entry: OutboxEntry, lastError: string): Promis
         eventType: entry.eventType ?? 'EMPLOYEE_CREATED',
         destinationName: entry.destinationName,
         payload: entry.payload,
-        attempts: entry.attempts ?? 0,
+        attempts,
         lastError,
         failedAt: new Date(),
       }),
@@ -230,7 +230,7 @@ export const processOutbox = async (): Promise<void> => {
 
         if (attempts >= maxAttempts) {
           // Move to DLQ after exhausting all retries
-          await moveToDLQ(db, entry, errorMessage);
+          await moveToDLQ(db, entry, attempts, errorMessage);
         } else {
           // Schedule retry with exponential backoff
           const backoff = Math.pow(2, attempts - 1) * baseBackoff;

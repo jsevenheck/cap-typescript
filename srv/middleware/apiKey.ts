@@ -8,7 +8,6 @@ const INVALID_API_KEY_RESPONSE = { error: 'invalid_api_key' } as const;
 
 // Cache for the configured API key (loaded from Credential Store or env)
 let cachedApiKey: string | undefined;
-let apiKeyLoaded = false;
 
 /**
  * Load API key from Credential Store or environment variable.
@@ -17,7 +16,6 @@ let apiKeyLoaded = false;
 export const loadApiKey = async (): Promise<void> => {
   try {
     cachedApiKey = await getEmployeeExportApiKey();
-    apiKeyLoaded = true;
 
     if (cachedApiKey) {
       logger.info('Employee export API key loaded successfully');
@@ -26,7 +24,6 @@ export const loadApiKey = async (): Promise<void> => {
     }
   } catch (error) {
     logger.error({ err: error }, 'Failed to load employee export API key');
-    apiKeyLoaded = true; // Mark as loaded even if failed, to avoid infinite retries
   }
 };
 
@@ -57,12 +54,6 @@ export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction
   // Use cached API key (loaded from Credential Store or env at startup)
   const configuredKey = cachedApiKey?.trim();
   const providedKey = extractApiKey(req)?.trim();
-
-  if (!apiKeyLoaded) {
-    logger.error('API key not loaded yet, rejecting request');
-    res.status(503).json({ error: 'service_initializing' });
-    return;
-  }
 
   const configuredBuffer = toKeyBuffer(configuredKey);
   const providedBuffer = toKeyBuffer(providedKey);

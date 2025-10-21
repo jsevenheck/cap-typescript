@@ -1134,17 +1134,27 @@ describe('Employee notification outbox', () => {
         SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
       )) as any;
 
-      expect(entry.attempts).toBe(attempt);
-
       if (attempt < 6) {
+        expect(entry.attempts).toBe(attempt);
         expect(entry.status).toBe('PENDING');
         const expectedDelay = Math.pow(2, attempt - 1) * 5000;
         expect(new Date(entry.nextAttemptAt).getTime()).toBe(currentTime + expectedDelay);
         currentTime = currentTime + expectedDelay + 1;
       } else {
-        expect(entry.status).toBe('FAILED');
-        expect(entry.nextAttemptAt).toBeNull();
-        expect(entry.lastError).toContain('network down');
+        // After max attempts, entry should be moved to DLQ and deleted from outbox
+        expect(entry).toBeUndefined();
+
+        const dlqEntry = (await db.run(
+          SELECT.one.from('clientmgmt.EmployeeNotificationDLQ').where({ originalID: entryId }),
+        )) as any;
+
+        expect(dlqEntry).toBeDefined();
+        expect(dlqEntry.originalID).toBe(entryId);
+        expect(dlqEntry.eventType).toBe('EMPLOYEE_CREATED');
+        expect(dlqEntry.destinationName).toBe('employees-fail');
+        expect(dlqEntry.attempts).toBe(6);
+        expect(dlqEntry.lastError).toContain('network down');
+        expect(dlqEntry.failedAt).toBeDefined();
       }
     }
 

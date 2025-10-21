@@ -3,7 +3,7 @@ import request from 'supertest';
 import cds from '@sap/cds';
 
 import activeEmployeesHandler from '../../../domain/employee/handlers/active-employees.read';
-import apiKeyMiddleware from '../../../middleware/apiKey';
+import apiKeyMiddleware, { loadApiKey } from '../../../middleware/apiKey';
 
 describe('GET /api/employees/active', () => {
   const originalApiKey = process.env.EMPLOYEE_EXPORT_API_KEY;
@@ -18,8 +18,9 @@ describe('GET /api/employees/active', () => {
     return app;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.EMPLOYEE_EXPORT_API_KEY = 'test-key';
+    await loadApiKey(); // Reload cached API key from environment
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
     cdsAny.tx = originalTx;
