@@ -65,12 +65,12 @@ cds.on('bootstrap', (app: Application) => {
   logger.info('Application bootstrap complete');
 });
 
-cds.on('served', async () => {
+cds.on('served', () => {
   const authLogger = getLogger('auth');
   authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
-  // Load API key from Credential Store or environment
-  await loadApiKey();
+  // Load API key from Credential Store or environment (async but not awaited)
+  void loadApiKey();
 
   if (process.env.NODE_ENV === 'test') {
     return;

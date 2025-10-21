@@ -13,7 +13,8 @@ interface XsenvServices {
 let getServicesFunc: (() => XsenvServices) | null = null;
 
 try {
-  const xsenv = require('@sap/xsenv');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const xsenv = require('@sap/xsenv') as { getServices: typeof getServicesFunc };
   getServicesFunc = xsenv.getServices;
 } catch {
   getServicesFunc = null;
@@ -26,11 +27,6 @@ interface CredentialStoreCredentials {
   encryption?: {
     client_private_key: string;
   };
-}
-
-interface CredentialStoreSecret {
-  value: string;
-  metadata?: Record<string, unknown>;
 }
 
 let credStoreCache: CredentialStoreCredentials | null | undefined;

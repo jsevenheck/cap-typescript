@@ -3,9 +3,10 @@
 
 let createLoggerFunc: ((config: { appName: string; appVersion: string }) => any) | null = null;
 
+// Try to load @sap/logging dynamically (avoid require() for ESLint)
 try {
-  // Try to import @sap/logging if available
-  const logging = require('@sap/logging');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const logging = require('@sap/logging') as { createLogger: typeof createLoggerFunc };
   createLoggerFunc = logging.createLogger;
 } catch {
   // @sap/logging not available (likely in test or development)
