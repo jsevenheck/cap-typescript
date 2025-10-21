@@ -166,7 +166,11 @@ export const validateCostCenterDeletion = async ({
     throw createServiceError(404, `Cost center ${targetId} not found.`);
   }
 
-  // Check for assigned employees before deletion
+  // Authorize before checking employee assignments to prevent information disclosure
+  const client = await ensureClientExists(tx, costCenter.client_ID);
+  ensureUserAuthorizedForCompany(user, client.companyId);
+
+  // Check for assigned employees before deletion (only after authorization)
   const assignedCount = await findEmployeesByCostCenter(tx, targetId);
   if (assignedCount > 0) {
     throw createServiceError(
@@ -174,7 +178,4 @@ export const validateCostCenterDeletion = async ({
       `Cannot delete cost center: ${assignedCount} employee(s) are still assigned to it.`
     );
   }
-
-  const client = await ensureClientExists(tx, costCenter.client_ID);
-  ensureUserAuthorizedForCompany(user, client.companyId);
 };
