@@ -49,8 +49,8 @@
                             <items>
                                 <StandardListItem
                                         title="{name}"
-                                        description="{= (${companyId} || '') + (${country/name} ? ' • ' + ${country/name} : '') }"
-                                        info="{country/code}"
+                                        description="{= (${companyId} || '') + (${country_code} ? ' • ' + ${country_code} : '') }"
+                                        info="{country_code}"
                                         type="Active"/>
                             </items>
                         </List>
