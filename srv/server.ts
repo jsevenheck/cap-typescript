@@ -65,8 +65,8 @@ cds.on('bootstrap', (app: Application) => {
   logger.info('Application bootstrap complete');
 });
 
-cds.on('served', () => {
-  void (async () => {
+cds.on('served', async () => {
+  try {
     const authLogger = getLogger('auth');
     authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
@@ -83,7 +83,10 @@ cds.on('served', () => {
     ensureShutdownHooks();
 
     logger.info('All services started successfully');
-  })();
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to complete service initialization');
+    throw error; // Re-throw to signal initialization failure to CAP
+  }
 });
 
 export { processOutbox, cleanupOutbox };
