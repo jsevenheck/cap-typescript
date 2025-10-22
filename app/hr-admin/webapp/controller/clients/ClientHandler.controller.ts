@@ -128,19 +128,25 @@ export default class ClientHandler {
     dialog.setBusy(true);
 
     if (data.mode === "create") {
+      console.log("[ClientHandler] Starting client creation", payload);
       const listBinding = this.getClientsBinding();
       const creationContext = listBinding.create(payload) as Context | undefined;
+      console.log("[ClientHandler] Creation context obtained", creationContext);
+
       this.runWithCreationContext(
         creationContext,
         () => {
+          console.error("[ClientHandler] Failed to initialize creation context");
           dialog.setBusy(false);
           MessageBox.error("Failed to initialize client creation context.");
         },
         (context) => {
+          console.log("[ClientHandler] Running with creation context");
           const readyContext = context as CreationContext & ODataContext;
           const model = readyContext.getModel() as ODataModel;
 
           const handleError = (error: unknown): void => {
+            console.error("[ClientHandler] Error during creation", error);
             dialog.setBusy(false);
             const message =
               error instanceof Error && error.message
@@ -153,14 +159,19 @@ export default class ClientHandler {
           let creationPromise: Promise<unknown>;
 
           try {
+            console.log("[ClientHandler] Getting created promise");
             creationPromise = readyContext.created?.() ?? Promise.resolve();
+            console.log("[ClientHandler] Created promise obtained", creationPromise);
           } catch (error) {
+            console.error("[ClientHandler] Error getting created promise", error);
             handleError(error);
             return;
           }
 
+          console.log("[ClientHandler] Submitting batch and waiting for creation");
           Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
+              console.log("[ClientHandler] Client creation successful");
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
