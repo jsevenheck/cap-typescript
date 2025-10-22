@@ -35,8 +35,9 @@ export const ensureUserAuthorizedForCompany = (user: UserContext, companyId?: st
     return;
   }
 
+  // Users without HR roles should be denied access
   if (!hasHrScope(user)) {
-    return;
+    throw createServiceError(403, 'User does not have required HR role.');
   }
 
   const attributeNames = ['CompanyCode', 'companyCodes'];

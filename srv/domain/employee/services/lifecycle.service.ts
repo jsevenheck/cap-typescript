@@ -61,7 +61,8 @@ const loadExistingEmployee = async (tx: Transaction, employeeId: string): Promis
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
   const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
   const sanitizedClientId = sanitizeIdentifier(clientId);
-  const hashSource = sanitizedClientId || clientId;
+  // Always hash sanitized input for consistency
+  const hashSource = sanitizedClientId || sanitizeIdentifier(clientId) || clientId;
   const hashed = createHash('sha256').update(hashSource).digest('hex').toUpperCase();
 
   if (normalizedCompany) {
@@ -260,20 +261,21 @@ const validateManagerAndCostCenter = async (
         );
       }
 
-      // Prevent self-management (circular dependency)
-      if (context.targetId && identifiersMatch(managerToValidate, context.targetId)) {
-        throw createServiceError(
-          400,
-          'An employee cannot be their own manager.',
-        );
-      }
-
       if (!identifiersMatch(managerToValidate, responsibleId)) {
         throw createServiceError(
           400,
           'Employees assigned to a cost center must be managed by the responsible employee.',
         );
       }
+    }
+
+    // Always validate against self-management, regardless of whether values changed
+    // This prevents circular references when cost centers or managers are updated elsewhere
+    if (context.targetId && finalManagerId && identifiersMatch(finalManagerId, context.targetId)) {
+      throw createServiceError(
+        400,
+        'An employee cannot be their own manager.',
+      );
     }
   }
 
@@ -297,6 +299,7 @@ const ensureUniqueEmployeeId = async (
   data: Partial<EmployeeEntity>,
   client: ClientEntity,
   currentEmployeeIdentifier?: string,
+  excludeUuid?: string,
 ): Promise<boolean> => {
   const { client_ID: clientId } = data;
   if (!clientId) {
@@ -311,7 +314,7 @@ const ensureUniqueEmployeeId = async (
     ) {
       return false;
     }
-    const existing = await findEmployeeByEmployeeId(tx, clientId, data.employeeId);
+    const existing = await findEmployeeByEmployeeId(tx, clientId, data.employeeId, excludeUuid);
     if (existing) {
       throw createServiceError(409, `Employee ID ${data.employeeId} already exists.`);
     }
@@ -326,7 +329,7 @@ const ensureUniqueEmployeeId = async (
       const counterPart = String(nextCounter).padStart(EMPLOYEE_ID_COUNTER_LENGTH, '0');
       const generatedId = `${prefix}${counterPart}`;
 
-      const existingEmployeeWithId = await findEmployeeByEmployeeId(tx, clientId, generatedId);
+      const existingEmployeeWithId = await findEmployeeByEmployeeId(tx, clientId, generatedId, excludeUuid);
 
       const persistCounter = async () => {
         if (counter) {
@@ -406,7 +409,8 @@ export const ensureEmployeeIdentifier = async (
   data: Partial<EmployeeEntity>,
   client: ClientEntity,
   existingEmployeeIdentifier?: string,
-): Promise<boolean> => ensureUniqueEmployeeId(tx, data, client, existingEmployeeIdentifier);
+  excludeUuid?: string,
+): Promise<boolean> => ensureUniqueEmployeeId(tx, data, client, existingEmployeeIdentifier, excludeUuid);
 
 export interface EmployeeDeletionContext {
   targetId: string;

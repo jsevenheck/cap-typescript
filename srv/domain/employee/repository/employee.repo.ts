@@ -39,13 +39,24 @@ export const findEmployeeByEmployeeId = async (
   tx: Transaction,
   clientId: string,
   employeeIdentifier: string,
-): Promise<Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined> =>
-  (await tx.run(
+  excludeUuid?: string,
+): Promise<Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined> => {
+  const whereClause: Record<string, unknown> = {
+    employeeId: employeeIdentifier,
+    client_ID: clientId,
+  };
+
+  if (excludeUuid) {
+    whereClause.ID = { '!=': excludeUuid };
+  }
+
+  return (await tx.run(
     ql.SELECT.one
       .from('clientmgmt.Employees')
       .columns('ID', 'employeeId')
-      .where({ employeeId: employeeIdentifier, client_ID: clientId }),
+      .where(whereClause),
   )) as Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined;
+};
 
 export const findEmployeeIdCounter = async (
   tx: Transaction,

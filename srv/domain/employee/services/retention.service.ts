@@ -57,7 +57,7 @@ export const anonymizeFormerEmployees = async (
   }
 
   // Batch anonymization in chunks for better performance
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = parseInt(process.env.ANONYMIZATION_BATCH_SIZE || '100', 10);
   for (let i = 0; i < employeesToAnonymize.length; i += BATCH_SIZE) {
     const batch = employeesToAnonymize.slice(i, i + BATCH_SIZE);
     await Promise.all(

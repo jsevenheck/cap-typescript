@@ -20,15 +20,18 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
       req.data as Partial<EmployeeEntity>,
       result.client,
       undefined,
+      undefined,
     );
   } else if (req.event === 'UPDATE' && req.data.employeeId &&
       req.data.employeeId !== result.existingEmployee?.employeeId) {
     // Employee ID changed during UPDATE - validate uniqueness
+    // Pass the employee UUID to exclude them from the uniqueness check
     await ensureEmployeeIdentifier(
       cds.transaction(req),
       req.data as Partial<EmployeeEntity>,
       result.client,
       result.existingEmployee?.employeeId ?? undefined,
+      result.existingEmployee?.ID,
     );
   }
 };

@@ -31,8 +31,9 @@ interface OutboxEntry {
   eventType?: string;
 }
 
-// Circuit breaker cache: one breaker per destination
-const circuitBreakers = new Map<string, ReturnType<typeof createCircuitBreaker>>();
+// Circuit breaker cache: one breaker per destination with LRU cleanup
+const MAX_CIRCUIT_BREAKERS = 100;
+const circuitBreakers = new Map<string, { breaker: ReturnType<typeof createCircuitBreaker>; lastUsed: number }>();
 
 /**
  * Create a circuit breaker for a specific destination.
@@ -47,12 +48,30 @@ const createCircuitBreaker = () => {
 
 /**
  * Get or create a circuit breaker for a destination.
+ * Implements LRU eviction to prevent unbounded memory growth.
  */
 const getCircuitBreaker = (destinationName: string) => {
-  if (!circuitBreakers.has(destinationName)) {
-    circuitBreakers.set(destinationName, createCircuitBreaker());
+  const existing = circuitBreakers.get(destinationName);
+  if (existing) {
+    existing.lastUsed = Date.now();
+    return existing.breaker;
   }
-  return circuitBreakers.get(destinationName)!;
+
+  // Cleanup old entries if we've hit the limit
+  if (circuitBreakers.size >= MAX_CIRCUIT_BREAKERS) {
+    const sortedEntries = Array.from(circuitBreakers.entries())
+      .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+
+    // Remove oldest 20%
+    const toRemove = Math.floor(MAX_CIRCUIT_BREAKERS * 0.2);
+    for (let i = 0; i < toRemove; i++) {
+      circuitBreakers.delete(sortedEntries[i][0]);
+    }
+  }
+
+  const newBreaker = createCircuitBreaker();
+  circuitBreakers.set(destinationName, { breaker: newBreaker, lastUsed: Date.now() });
+  return newBreaker;
 };
 
 /**

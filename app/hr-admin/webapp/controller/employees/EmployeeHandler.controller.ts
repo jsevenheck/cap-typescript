@@ -311,8 +311,15 @@ export default class EmployeeHandler {
       }
 
       const model = context.getModel() as ODataModel;
-      if (employeeIdValue !== undefined && employeeIdValue !== "") {
-        context.setProperty("employeeId", employeeIdValue);
+      // Validate and sanitize employee ID
+      const trimmedEmployeeId = employeeIdValue?.trim();
+      if (trimmedEmployeeId) {
+        if (trimmedEmployeeId.length > 60) {
+          dialog.setBusy(false);
+          MessageBox.error("Employee ID cannot exceed 60 characters.");
+          return;
+        }
+        context.setProperty("employeeId", trimmedEmployeeId.toUpperCase());
       }
       context.setProperty("firstName", payload.firstName);
       context.setProperty("lastName", payload.lastName);
