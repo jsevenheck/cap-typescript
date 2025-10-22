@@ -180,8 +180,8 @@ export default class CostCenterHandler {
                 ? error.message
                 : "Failed to create cost center";
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch((err) => {
-              console.error("Failed to delete creation context:", err);
+            void readyContext.delete("$auto").catch(() => {
+              // Silently ignore deletion errors for transient creation contexts
             });
           };
 
