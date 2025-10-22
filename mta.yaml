@@ -42,6 +42,7 @@ modules:
       - name: cap-ts-destination
       - name: cap-ts-connectivity
       - name: cap-ts-logging
+      - name: cap-ts-credstore
 
   # ===================================
   # Database Deployer (HDI Container)
@@ -212,3 +213,13 @@ resources:
     parameters:
       service: application-logs
       service-plan: lite
+
+  # Credential Store Service
+  - name: cap-ts-credstore
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: credstore
+      service-plan: trial
+      config:
+        authorization:
+          default_permissions: [read]

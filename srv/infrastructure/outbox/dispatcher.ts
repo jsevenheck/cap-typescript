@@ -2,6 +2,7 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
+import { circuitBreaker, handleAll, ConsecutiveBreaker } from 'cockatiel';
 
 import { postEmployeeNotification } from '../api/third-party/employee.client';
 import {
@@ -11,6 +12,9 @@ import {
   resolveOutboxMaxAttempts,
   resolveOutboxTimeout,
 } from './config';
+import { getLogger } from '../../shared/utils/logger';
+
+const logger = getLogger('outbox-dispatcher');
 
 const ql = cds.ql as typeof cds.ql & {
   DELETE: typeof cds.ql.SELECT;
@@ -24,7 +28,60 @@ interface OutboxEntry {
   status?: string;
   attempts?: number;
   nextAttemptAt?: Date | null;
+  eventType?: string;
 }
+
+// Circuit breaker cache: one breaker per destination
+const circuitBreakers = new Map<string, ReturnType<typeof createCircuitBreaker>>();
+
+/**
+ * Create a circuit breaker for a specific destination.
+ * Opens after 5 consecutive failures, resets after 10 seconds.
+ */
+const createCircuitBreaker = () => {
+  return circuitBreaker(handleAll, {
+    halfOpenAfter: 10_000,
+    breaker: new ConsecutiveBreaker(5),
+  });
+};
+
+/**
+ * Get or create a circuit breaker for a destination.
+ */
+const getCircuitBreaker = (destinationName: string) => {
+  if (!circuitBreakers.has(destinationName)) {
+    circuitBreakers.set(destinationName, createCircuitBreaker());
+  }
+  return circuitBreakers.get(destinationName)!;
+};
+
+/**
+ * Move a failed outbox entry to the Dead Letter Queue.
+ */
+const moveToDLQ = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
+  try {
+    // Insert into DLQ
+    await db.run(
+      ql.INSERT.into('clientmgmt.EmployeeNotificationDLQ').entries({
+        originalID: entry.ID,
+        eventType: entry.eventType ?? 'EMPLOYEE_CREATED',
+        destinationName: entry.destinationName,
+        payload: entry.payload,
+        attempts,
+        lastError,
+        failedAt: new Date(),
+      }),
+    );
+
+    // Delete from outbox
+    await db.run(ql.DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entry.ID }));
+
+    logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Moved failed entry to DLQ');
+  } catch (error) {
+    logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
+    // Keep entry as FAILED in outbox if DLQ move fails
+  }
+};
 
 export const processOutbox = async (): Promise<void> => {
   const db = (cds as any).db ?? (await cds.connect.to('db'));
@@ -41,7 +98,7 @@ export const processOutbox = async (): Promise<void> => {
 
   const selectCandidates = (ql.SELECT as any)
     .from('clientmgmt.EmployeeNotificationOutbox')
-    .columns('ID', 'destinationName', 'payload', 'status', 'attempts', 'nextAttemptAt')
+    .columns('ID', 'destinationName', 'payload', 'status', 'attempts', 'nextAttemptAt', 'eventType')
     .where({ status: { in: ['PENDING', 'PROCESSING'] } })
     .orderBy('nextAttemptAt')
     .limit(candidateLimit);
@@ -127,24 +184,30 @@ export const processOutbox = async (): Promise<void> => {
 
   await Promise.all(
     claimed.map(async (entry) => {
+      const breaker = getCircuitBreaker(entry.destinationName);
+
       try {
-        const destination = await getDestination({ destinationName: entry.destinationName });
-        if (!destination) {
-          throw new Error(`Destination ${entry.destinationName} not found`);
-        }
+        await breaker.execute(async () => {
+          const destination = await getDestination({ destinationName: entry.destinationName });
+          if (!destination) {
+            throw new Error(`Destination ${entry.destinationName} not found`);
+          }
 
-        if ((destination as HttpDestination).url === undefined) {
-          throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
-        }
+          if ((destination as HttpDestination).url === undefined) {
+            throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
+          }
 
-        const httpDestination = destination as HttpDestination;
+          const httpDestination = destination as HttpDestination;
 
-        await postEmployeeNotification({
-          destination: httpDestination,
-          payload: entry.payload,
-          secret: secret ?? undefined,
-          timeoutMs,
+          await postEmployeeNotification({
+            destination: httpDestination,
+            payload: entry.payload,
+            secret: secret ?? undefined,
+            timeoutMs,
+          });
         });
+
+        logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Successfully delivered notification');
 
         await db.run(
           ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
@@ -158,19 +221,32 @@ export const processOutbox = async (): Promise<void> => {
         );
       } catch (error: any) {
         const attempts = (entry.attempts ?? 0) + 1;
-        const backoff = Math.pow(2, attempts - 1) * baseBackoff;
-        const nextAttemptAt = attempts >= maxAttempts ? null : new Date(Date.now() + backoff);
+        const errorMessage = String(error?.message ?? error ?? 'Unknown error');
 
-        await db.run(
-          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-            .set({
-              attempts,
-              lastError: String(error?.message ?? error ?? 'Unknown error'),
-              status: attempts >= maxAttempts ? 'FAILED' : 'PENDING',
-              nextAttemptAt,
-            })
-            .where({ ID: entry.ID }),
+        logger.warn(
+          { err: error, entryId: entry.ID, destinationName: entry.destinationName, attempts },
+          'Failed to deliver notification'
         );
+
+        if (attempts >= maxAttempts) {
+          // Move to DLQ after exhausting all retries
+          await moveToDLQ(db, entry, attempts, errorMessage);
+        } else {
+          // Schedule retry with exponential backoff
+          const backoff = Math.pow(2, attempts - 1) * baseBackoff;
+          const nextAttemptAt = new Date(Date.now() + backoff);
+
+          await db.run(
+            ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+              .set({
+                attempts,
+                lastError: errorMessage,
+                status: 'PENDING',
+                nextAttemptAt,
+              })
+              .where({ ID: entry.ID }),
+          );
+        }
       }
     }),
   );

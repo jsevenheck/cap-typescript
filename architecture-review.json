@@ -1,0 +1,1068 @@
+{
+  "overview": {
+    "summary": "Mature SAP CAP TypeScript application with HR management domain logic, featuring strong domain-driven design, comprehensive testing, AMS-based authorization, and an outbox pattern for reliable event delivery. However, the application lacks critical production readiness features: no multitenancy implementation, no xs-security.json for BTP role mapping, limited observability, no HA/DR strategy, and SQLite-HANA dialect risks. The architecture is solid for single-tenant scenarios but requires significant hardening for enterprise multi-tenant SaaS deployment.",
+    "health_score": 62,
+    "scores": {
+      "correctness": 75,
+      "security": 55,
+      "performance": 60,
+      "reliability": 50,
+      "maintainability": 80,
+      "operability": 40,
+      "scalability": 45,
+      "cost_efficiency": 65,
+      "testability": 85
+    },
+    "top_strengths": [
+      "Clean domain-driven architecture with clear separation of concerns (handlers, services, repositories)",
+      "Comprehensive test coverage (Jest unit + Playwright e2e + business rule validation)",
+      "Proper implementation of optimistic concurrency control via ETags and modifiedAt timestamps",
+      "Outbox pattern for reliable asynchronous event delivery with exponential backoff and retry logic",
+      "Type-safe TypeScript implementation with strong typing throughout the codebase",
+      "AMS (Authorization Management Service) integration for attribute-based access control with CompanyCode filtering",
+      "Well-designed CDS models using managed aspects, compositions, and appropriate constraints"
+    ],
+    "major_risks": [
+      "No multitenancy implementation: missing tenant isolation, no cds.context.tenant usage, shared schema risks data leakage",
+      "Missing xs-security.json: no XSUAA role-template mapping prevents proper BTP authorization in production",
+      "SQLite dev / HANA production mismatch: high risk of dialect-specific bugs, date/time handling, constraint violations",
+      "No observability strategy: no structured logging, no distributed tracing, no metrics collection, no correlation IDs",
+      "Single-region deployment with no documented HA/DR strategy: no RTO/RPO targets, no failover procedures",
+      "API key management: stored in environment variables with no rotation strategy, no secret manager integration",
+      "No circuit breaker for third-party HTTP calls: cascade failures possible if downstream services fail",
+      "Missing audit logging for GDPR/compliance: no tracking of sensitive data access, modifications, or deletions"
+    ],
+    "assumptions": [
+      "Application is intended for single-tenant deployment (no MTX subscriber management detected)",
+      "HANA hdi-shared service plan is sufficient for current data volumes and throughput",
+      "Destination service provides all necessary connectivity to third-party systems",
+      "IAS (Identity Authentication Service) handles all authentication flows, no custom IdP integration needed",
+      "Outbox retention of 168 hours (7 days) is sufficient for debugging and reconciliation",
+      "Employee notification failures after 6 retries are acceptable business losses",
+      "CompanyCode attributes in IAS/AMS are consistently synchronized with client.companyId values",
+      "AMS DCL policy deployer runs successfully during every deployment cycle",
+      "No requirement for real-time employee notifications (30s polling interval acceptable)",
+      "Application serves EMEA region only (no multi-region data residency requirements)",
+      "No requirement for more than 10,000 employees per client (sequential ID generation may scale poorly)"
+    ],
+    "scope": {
+      "files_reviewed": [
+        "package.json",
+        "db/schema.cds",
+        "srv/service.cds",
+        "srv/attributes.cds",
+        "srv/handlers.ts",
+        "srv/server.ts",
+        "srv/domain/client/handlers/on-create.ts",
+        "srv/domain/client/services/lifecycle.service.ts",
+        "srv/domain/employee/handlers/on-create.ts",
+        "srv/domain/employee/handlers/on-create.after.ts",
+        "srv/infrastructure/outbox/dispatcher.ts",
+        "srv/infrastructure/outbox/config.ts",
+        "srv/middleware/apiKey.ts",
+        "srv/shared/utils/auth.ts",
+        "srv/test/domain/client/client-service.test.ts",
+        "mta.yaml",
+        "approuter/xs-app.json",
+        "approuter/package.json",
+        "srv/ams/schema.dcl",
+        "README.md"
+      ],
+      "issues_total_found": 24,
+      "issues_listed": 24,
+      "issues_truncated": false,
+      "note_on_truncation": "All findings documented. For deeper analysis of specific subsystems (e.g., UI5 app, AMS policies, HANA HDI artifacts), request a focused review."
+    }
+  },
+  "architecture_views": {
+    "context_view": "HR management SaaS serving internal HR administrators, editors, and viewers. Upstream: SAP IAS for authentication, SAP AMS for authorization policies. Downstream: third-party employee notification systems via SAP Destination service (HTTP POST with HMAC signatures). Frontend: SAPUI5/Fiori Elements app served via HTML5 Application Repository. Entry: SAP Approuter enforcing IAS authentication and CSRF protection. Backend: Node.js CAP service exposing OData v4 ClientService. Persistence: HANA HDI container (production) or SQLite (dev/test). Asynchronous: Outbox-based event dispatcher polling every 30s for reliable delivery.",
+    "component_view": [
+      {
+        "name": "Approuter",
+        "responsibility": "Central entry point, IAS authentication enforcement, CSRF protection, routing to backend and HTML5 repo",
+        "interfaces": [
+          "HTTP routes: /odata/v4/* → srv-api destination",
+          "HTTP routes: /* → html5-apps-repo-rt"
+        ],
+        "deps": [
+          "cap-ts-ias (IAS application plan)",
+          "cap-ts-ams (authorization application plan)",
+          "cap-ts-html5-repo-runtime",
+          "cap-ts-destination"
+        ]
+      },
+      {
+        "name": "ClientService (CAP srv)",
+        "responsibility": "OData v4 API for Clients, Employees, CostCenters; business rule enforcement; AMS authorization; outbox event publishing",
+        "interfaces": [
+          "OData v4: /odata/v4/clients (CRUD on Clients, Employees, CostCenters, Countries)",
+          "Action: /odata/v4/clients/anonymizeFormerEmployees",
+          "REST: GET /api/employees/active (API key auth)",
+          "Health: GET /health"
+        ],
+        "deps": [
+          "HANA HDI container (cap-ts-db)",
+          "IAS (cap-ts-ias)",
+          "AMS (cap-ts-ams)",
+          "Destination service (cap-ts-destination)",
+          "Connectivity service (cap-ts-connectivity)",
+          "Application Logs (cap-ts-logging)"
+        ]
+      },
+      {
+        "name": "Outbox Dispatcher",
+        "responsibility": "Background polling of EmployeeNotificationOutbox, claim-based concurrency control, exponential backoff retry, third-party HTTP POST with HMAC",
+        "interfaces": [
+          "Timer: 30s interval (OUTBOX_DISPATCH_INTERVAL_MS)",
+          "HTTP POST: via Destination service with x-signature-sha256 header"
+        ],
+        "deps": [
+          "Destination service",
+          "@sap-cloud-sdk/connectivity",
+          "@sap-cloud-sdk/http-client"
+        ]
+      },
+      {
+        "name": "DB Deployer",
+        "responsibility": "HDI container schema deployment (CDS to HANA artifacts)",
+        "interfaces": [
+          "Deployment task: hdb buildpack"
+        ],
+        "deps": [
+          "cap-ts-db (HDI container)"
+        ]
+      },
+      {
+        "name": "AMS DCL Deployer",
+        "responsibility": "Upload AMS authorization policies (DCL files) to AMS service",
+        "interfaces": [
+          "Deployment task: javascript.nodejs buildpack, npm start"
+        ],
+        "deps": [
+          "cap-ts-ias (X509_GENERATED credential)",
+          "cap-ts-ams"
+        ]
+      },
+      {
+        "name": "HR Admin UI (UI5)",
+        "responsibility": "Fiori Elements app for HR personnel, OData consumption, CRUD operations",
+        "interfaces": [
+          "Served via HTML5 Application Repository",
+          "Consumes /odata/v4/clients"
+        ],
+        "deps": [
+          "cap-ts-html5-repo-runtime",
+          "srv-api destination"
+        ]
+      }
+    ],
+    "data_view": {
+      "stores": [
+        "HANA HDI container (cap-ts-db): hdi-shared service plan, stores Clients, Employees, CostCenters, EmployeeIdCounters, EmployeeNotificationOutbox",
+        "SQLite in-memory (test profile): cds.requires.db.credentials.filename = ':memory:'",
+        "SQLite file (dev profile): sqlite.db in repo root"
+      ],
+      "tenancy_model": "single-tenant (no MTX implementation detected, no cds.context.tenant usage, shared schema for all users)",
+      "sensitive_data": [
+        "PII in Employees: firstName, lastName, email, location",
+        "Business identifiers: companyId, employeeId",
+        "Secrets: EMPLOYEE_EXPORT_API_KEY, THIRD_PARTY_EMPLOYEE_SECRET in environment variables"
+      ],
+      "retention_policies": [
+        "Outbox: completed/failed entries retained for 168 hours (OUTBOX_RETENTION_HOURS), cleanup every 6 hours",
+        "Employees: anonymizeFormerEmployees action sets firstName/lastName to 'ANONYMIZED', clears location/positionLevel, anonymizes email",
+        "No documented archival or purge strategy for inactive clients or employees beyond anonymization"
+      ]
+    },
+    "runtime_view": [
+      {
+        "scenario": "Create Employee",
+        "flow": [
+          "1. Approuter validates IAS token, enforces CSRF",
+          "2. CAP srv checks @restrict annotation, queries AMS for CompanyCode attributes",
+          "3. on('CREATE', Employees) handler: validate entryDate, exitDate, status consistency",
+          "4. ensureEmployeeIdentifier: generate sequential employeeId (COMP001X000001 format), retry up to 5 times on collision",
+          "5. Auto-assign manager if costCenter provided",
+          "6. INSERT into Employees",
+          "7. on.after('CREATE', Employees): enqueue EMPLOYEE_CREATED to outbox if THIRD_PARTY_EMPLOYEE_DESTINATION set",
+          "8. Commit transaction",
+          "9. Background: Outbox dispatcher (30s poll) claims entry, POSTs to destination with HMAC signature"
+        ],
+        "consistency": "strong within transaction (Employees + Outbox INSERT in same TX); eventual for downstream notifications",
+        "idempotency": true
+      },
+      {
+        "scenario": "Update Client",
+        "flow": [
+          "1. Approuter + AMS authorization check",
+          "2. ensureOptimisticConcurrency: validate If-Match header or modifiedAt in payload",
+          "3. Normalize companyId, derive country_code if changed",
+          "4. Check duplicate companyId across all clients",
+          "5. UPDATE Clients",
+          "6. Managed aspect updates modifiedAt automatically"
+        ],
+        "consistency": "strong (single UPDATE in transaction with ETag validation)",
+        "idempotency": false
+      },
+      {
+        "scenario": "Anonymize Former Employees",
+        "flow": [
+          "1. @requires: HREditor or HRAdmin",
+          "2. Validate 'before' date parameter",
+          "3. SELECT employees WHERE status='inactive' AND exitDate < before",
+          "4. For each: UPDATE firstName='ANONYMIZED', lastName='ANONYMIZED', email='anonymized-{UUID}', location=NULL, positionLevel=NULL",
+          "5. Return count of anonymized records"
+        ],
+        "consistency": "strong (all UPDATEs in single transaction)",
+        "idempotency": true
+      },
+      {
+        "scenario": "Process Outbox",
+        "flow": [
+          "1. SELECT candidates: status IN ('PENDING','PROCESSING'), ORDER BY nextAttemptAt, LIMIT concurrency*4",
+          "2. Filter claimable: PENDING with nextAttemptAt <= now, or PROCESSING with nextAttemptAt > claimTtl ago (stale claims)",
+          "3. Optimistic lock: UPDATE status='PROCESSING', nextAttemptAt=now WHERE ID=? AND status=? AND nextAttemptAt=?",
+          "4. For each claimed entry (max concurrency=1 by default): getDestination, executeHttpRequest with timeout, HMAC signature",
+          "5. On success: UPDATE status='COMPLETED', deliveredAt=now, lastError=NULL",
+          "6. On error: attempts++, exponential backoff nextAttemptAt = now + 2^(attempts-1) * 5000ms, status='FAILED' if attempts>=6"
+        ],
+        "consistency": "eventual (at-least-once delivery semantics, idempotency required by downstream)",
+        "idempotency": false
+      }
+    ],
+    "deployment_view": {
+      "environment": "Cloud Foundry (mta.yaml defines cf-based resources)",
+      "nodes": [
+        "cap-ts-approuter: approuter.nodejs, 256MB mem, 256MB disk",
+        "cap-ts-srv: nodejs, 512MB mem, 512MB disk, binds to db/ias/ams/destination/connectivity/logging",
+        "cap-ts-db-deployer: hdb, 256MB mem, 512MB disk, one-time HDI deployment",
+        "cap-ts-ams-deployer: javascript.nodejs, 256MB mem, no-route, tasks-based DCL upload",
+        "cap-ts-app-deployer: com.sap.application.content, uploads UI5 app to HTML5 repo",
+        "cap-ts-app-hr-admin: html5, UI5 build artifacts"
+      ],
+      "scaling": "No autoscaling rules detected in mta.yaml. Default Cloud Foundry manual scaling (cf scale). No HPA/HPAv2 for Kyma. No documented scaling thresholds or policies."
+    }
+  },
+  "findings": [
+    {
+      "id": "ARC-001",
+      "severity": "Critical",
+      "category": "security",
+      "location": {
+        "file": null,
+        "symbol": null,
+        "lines": null,
+        "description": "Missing xs-security.json in repository root and approuter directory"
+      },
+      "description": "No xs-security.json file exists to define XSUAA role-templates, scopes, and attribute mappings for BTP deployment. The application relies on IAS for authentication but lacks the XSUAA security descriptor required to map IAS groups/roles to application roles (HRAdmin, HREditor, HRViewer). Without xs-security.json, role assignments in BTP Cockpit will fail, and @restrict/@requires annotations will not enforce authorization correctly in production.",
+      "impact": "Authorization bypass in production: users may gain access to endpoints without proper role checks. BTP role assignment UI will not function. Deployment to BTP may fail or result in open-access service endpoints. Compliance and audit failures due to lack of role-scope governance.",
+      "evidence": [
+        "mta.yaml references cap-ts-ias (IAS service) but no XSUAA service resource defined",
+        "No xs-security.json found in approuter/ or repository root",
+        "srv/service.cds uses @restrict with roles HRAdmin/HREditor/HRViewer but no XSUAA configuration to enforce them",
+        "package.json cds.security.xsuaa.enabled = false"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "# No xs-security.json exists",
+        "after": "Create xs-security.json at repo root:\n\n{\n  \"xsappname\": \"cap-ts-hr\",\n  \"tenant-mode\": \"dedicated\",\n  \"scopes\": [\n    {\"name\": \"$XSAPPNAME.HRAdmin\", \"description\": \"HR Administrator\"},\n    {\"name\": \"$XSAPPNAME.HREditor\", \"description\": \"HR Editor\"},\n    {\"name\": \"$XSAPPNAME.HRViewer\", \"description\": \"HR Viewer\"}\n  ],\n  \"role-templates\": [\n    {\"name\": \"HRAdmin\", \"scope-references\": [\"$XSAPPNAME.HRAdmin\"]},\n    {\"name\": \"HREditor\", \"scope-references\": [\"$XSAPPNAME.HREditor\"]},\n    {\"name\": \"HRViewer\", \"scope-references\": [\"$XSAPPNAME.HRViewer\"]}\n  ],\n  \"oauth2-configuration\": {\n    \"redirect-uris\": [\"https://*.cfapps.*.hana.ondemand.com/**\"]\n  }\n}\n\nUpdate mta.yaml to add XSUAA resource:\n\nresources:\n  - name: cap-ts-xsuaa\n    type: org.cloudfoundry.managed-service\n    parameters:\n      service: xsuaa\n      service-plan: application\n      path: ./xs-security.json\n\nBind cap-ts-xsuaa to cap-ts-srv and cap-ts-approuter modules.\n\nUpdate package.json: cds.security.xsuaa.enabled = true",
+        "rollback_plan": "If XSUAA breaks IAS flow, temporarily set cds.security.xsuaa.enabled=false and redeploy. Investigate IAS↔XSUAA trust configuration in BTP Cockpit."
+      },
+      "references": [
+        "CAPire – Security & Authorization (XSUAA configuration)",
+        "BTP Security Guide – xs-security.json",
+        "OWASP Top 10 (A01:2021) – Broken Access Control"
+      ]
+    },
+    {
+      "id": "ARC-002",
+      "severity": "Critical",
+      "category": "data",
+      "location": {
+        "file": null,
+        "symbol": null,
+        "lines": null,
+        "description": "Entire application codebase"
+      },
+      "description": "No multitenancy (MTX) implementation: application uses a single shared HANA schema for all users. No cds.context.tenant calls, no tenant isolation in queries, no HDI container per tenant, no subscriber onboarding/offboarding logic. All users share the same Clients, Employees, CostCenters tables, relying solely on AMS CompanyCode attribute filtering for data isolation. This is insufficient for true multi-tenant SaaS: a bug in AMS policy or attribute misconfiguration could expose data across tenants.",
+      "impact": "Data leakage risk: if AMS attribute filtering fails (misconfiguration, policy bug, IAS sync issue), users may read/write data from other tenants. Compliance violations (GDPR, SOC2, ISO27001) due to lack of hard tenant boundaries. Scalability issues: all tenants share same DB resources, noisy neighbor problems, no per-tenant backup/restore. Cannot offer tenant-specific schema extensions or migrations.",
+      "evidence": [
+        "No cds.context.tenant usage in srv/ handlers or queries",
+        "mta.yaml uses single HDI container (cap-ts-db) for all tenants",
+        "No @sap/cds-mtx or @sap/cds-mtxs dependency in package.json",
+        "No subscriber management service defined in mta.yaml",
+        "db/schema.cds entities lack tenant_ID foreign keys or tenant discriminator columns",
+        "srv/service.cds @restrict clauses use CompanyCode attributes but no tenant context validation"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "Single HDI container, no tenant context",
+        "after": "Implement MTX:\n\n1. Add dependencies:\n   npm install @sap/cds-mtxs --workspace srv\n\n2. Update package.json cds config:\n   \"cds\": {\n     \"requires\": {\n       \"multitenancy\": true,\n       \"extensibility\": false,\n       \"db\": {\n         \"kind\": \"hana\",\n         \"multiTenant\": true,\n         \"vcap\": {\"label\": \"service-manager\"}\n       }\n     }\n   }\n\n3. Add Service Manager resource in mta.yaml:\n   resources:\n     - name: cap-ts-sm\n       type: org.cloudfoundry.managed-service\n       parameters:\n         service: service-manager\n         service-plan: container\n\n4. Bind cap-ts-sm to cap-ts-srv.\n\n5. Implement cds.on('served', async () => { await cds.mtx.in(cds.context.tenant) }) in handlers.\n\n6. Add tenant_ID columns to Clients, Employees, CostCenters if schema-per-tenant not used.\n\n7. Build subscriber onboarding endpoint: POST /-/cds/saas-provisioning/tenant/{tenantId}.\n\n8. Ensure all CDS queries include tenant filter automatically via cds.tx().\n\n9. Test tenant isolation: create 2 test tenants, verify data invisible across boundaries.",
+        "rollback_plan": "Remove multitenancy config, redeploy with single HDI container. Requires data migration if tenants already provisioned."
+      },
+      "references": [
+        "CAPire – Multitenancy (MTX)",
+        "BTP Multi-Tenant SaaS Architecture",
+        "OWASP – Insecure Design (A04:2021)"
+      ]
+    },
+    {
+      "id": "ARC-003",
+      "severity": "Critical",
+      "category": "reliability",
+      "location": {
+        "file": "package.json",
+        "symbol": "cds.requires.db",
+        "lines": "46-51",
+        "description": "Dev environment uses SQLite, production uses HANA (implicit from mta.yaml HDI container)"
+      },
+      "description": "SQLite (dev/test) and HANA (production) dialect mismatch creates high risk of dialect-specific bugs: date/time functions (SQLite uses strings, HANA native types), constraint enforcement (SQLite weak FK checks), transaction isolation levels, collation differences, LIMIT/OFFSET semantics, UUID generation, concurrent write handling. Tests pass on SQLite but may fail in production on HANA.",
+      "impact": "Production incidents: queries work in dev but fail in HANA (e.g., date arithmetic). Data corruption: SQLite allows invalid FK values during development, HANA rejects at deployment. Performance degradation: SQLite query plans differ from HANA. Concurrency bugs: optimistic locking behaves differently under load.",
+      "evidence": [
+        "package.json: cds.requires.db.kind = 'sqlite' (line 47)",
+        "mta.yaml: cap-ts-db resource = com.sap.xs.hdi-container (HANA)",
+        "No documented testing on HANA Cloud trial or local HANA instance",
+        "srv/test uses in-memory SQLite (cds.[test].requires.db.credentials.filename = ':memory:')",
+        "Date handling in validation.ts may differ (e.g., new Date() parsing)"
+      ],
+      "suggested_fix": {
+        "diff": "--- a/package.json\n+++ b/package.json\n@@ -44,7 +44,11 @@\n     },\n     \"requires\": {\n       \"db\": {\n-        \"kind\": \"sqlite\",\n+        \"kind\": \"sql\",\n+        \"[development]\": {\n+          \"kind\": \"sqlite\"\n+        },\n+        \"[production]\": {\n+          \"kind\": \"hana\"\n+        },\n         \"credentials\": {\n           \"filename\": \"sqlite.db\"\n         }",
+        "before": "cds.requires.db.kind = 'sqlite' globally",
+        "after": "Use profile-specific DB kinds:\n\npackage.json:\n\"cds\": {\n  \"requires\": {\n    \"db\": {\n      \"kind\": \"sql\",\n      \"impl\": \"@cap-js/hana\",\n      \"[development]\": {\"kind\": \"sqlite\"},\n      \"[production]\": {\"kind\": \"hana\"},\n      \"[test]\": {\"kind\": \"sqlite\", \"credentials\": {\"filename\": \":memory:\"}}\n    }\n  }\n}\n\nAdd @cap-js/hana to dependencies: npm install @cap-js/hana --workspace srv\n\nCreate CI pipeline stage 'integration-test-hana' that runs tests against HANA Cloud trial:\n- Set CDS_ENV=hana-test\n- Bind to HANA trial HDI container\n- Run npm test --workspace srv\n- Validate date/time handling, constraints, concurrency\n\nDocument in README: Local dev = SQLite, CI integration tests = HANA, Prod = HANA.",
+        "rollback_plan": "Revert to kind='sqlite' if HANA CI tests block development. Schedule HANA integration tests as nightly job instead of PR gate."
+      },
+      "references": [
+        "CAPire – Databases (HANA best practices)",
+        "CAP Release Notes – SQL dialect differences",
+        "Twelve-Factor App – Dev/Prod parity"
+      ]
+    },
+    {
+      "id": "ARC-004",
+      "severity": "Critical",
+      "category": "observability",
+      "location": {
+        "file": "srv/server.ts",
+        "symbol": null,
+        "lines": "48-49",
+        "description": "Logger fallback: (cds as any).log?.('auth') ?? console"
+      },
+      "description": "No structured logging framework: application uses console.log fallback throughout (server.ts:48, handlers). No correlation IDs, no distributed tracing, no log aggregation to Application Logs service. Cannot trace requests across Approuter → CAP → Outbox → Destination flows. Debugging production incidents requires manual log inspection, no alerting on error patterns.",
+      "impact": "Blind spots in production: cannot correlate user requests with backend errors, outbox failures, or downstream HTTP calls. Incident response time increased (MTTR). No proactive alerting on error rates, latency spikes, or outbox backlog. Compliance issues: audit logs lack context (who, what, when). Performance tuning impossible without detailed traces.",
+      "evidence": [
+        "srv/server.ts:48-49: const authLogger = (cds as any).log?.('auth') ?? console",
+        "srv/domain/employee/handlers/on-create.after.ts:20-25: getServiceLogger() returns console as fallback",
+        "No @sap/logging or pino dependencies in package.json",
+        "mta.yaml binds cap-ts-logging (application-logs service) but no instrumentation code",
+        "No correlation-id middleware in server.ts or approuter xs-app.json",
+        "No OpenTelemetry or Dynatrace OneAgent integration"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "console.log fallback, no structured logging",
+        "after": "Integrate structured logging:\n\n1. Install @sap/logging:\n   npm install @sap/logging --workspace srv\n\n2. Update srv/server.ts:\n   import { getLogger } from '@sap/logging';\n   const logger = getLogger('cap-ts-hr');\n   cds.on('bootstrap', (app) => {\n     app.use((req, res, next) => {\n       req.correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();\n       res.setHeader('x-correlation-id', req.correlationId);\n       logger.setLoggingContext({correlationId: req.correlationId});\n       next();\n     });\n   });\n\n3. Replace console.log calls with logger.info/warn/error:\n   logger.error({err, employeeId}, 'Failed to create employee');\n\n4. Configure Application Logs binding in package.json:\n   \"cds\": {\n     \"requires\": {\n       \"logs\": {\n         \"kind\": \"application-logs\",\n         \"vcap\": {\"label\": \"application-logs\"}\n       }\n     }\n   }\n\n5. Add correlation-id to outbox dispatcher HTTP calls:\n   headers: {'x-correlation-id': cds.context.id}\n\n6. Update approuter xs-app.json to propagate correlation-id:\n   \"routes\": [{\n     \"source\": \"^/odata/v4/(.*)$\",\n     \"destination\": \"srv-api\",\n     \"authenticationType\": \"ias\",\n     \"csrfProtection\": true,\n     \"xCorrelationId\": true\n   }]\n\n7. Set up log-based alerts in BTP Cockpit: ERROR rate > 5/min, Outbox FAILED entries.",
+        "rollback_plan": "If @sap/logging causes errors, wrap in try-catch and fallback to console. Monitor memory usage (logging can increase heap)."
+      },
+      "references": [
+        "BTP Application Logging Service",
+        "SAP Cloud SDK – Logging and Tracing",
+        "Twelve-Factor App – Logs as event streams",
+        "SRE Handbook – Observability"
+      ]
+    },
+    {
+      "id": "ARC-005",
+      "severity": "Major",
+      "category": "reliability",
+      "location": {
+        "file": "srv/infrastructure/outbox/dispatcher.ts",
+        "symbol": "processOutbox",
+        "lines": "29-177",
+        "description": "Outbox dispatcher HTTP calls to third-party destinations"
+      },
+      "description": "No circuit breaker pattern for third-party HTTP calls in outbox dispatcher. If downstream employee notification service is slow or down, outbox dispatcher will retry indefinitely (up to 6 attempts per entry) without backoff ceiling, potentially blocking other entries. No bulkhead isolation: all outbox entries (even for different destinations) share the same concurrency pool (default 1). No health checks before attempting HTTP POST.",
+      "impact": "Cascade failure: if one destination is slow, all outbox processing stalls. Resource exhaustion: long-running HTTP calls hold DB connections and memory. Poison pill messages: malformed destination config or payloads cause repeated failures, exhausting retries. No fallback or manual intervention possible.",
+      "evidence": [
+        "dispatcher.ts:142-147: postEmployeeNotification called without circuit breaker",
+        "config.ts:8: DEFAULT_OUTBOX_CONCURRENCY = 1 (no parallelism across destinations)",
+        "No circuit breaker state management (open/half-open/closed)",
+        "No timeout escalation: OUTBOX_TIMEOUT_MS fixed at 15s, no jitter",
+        "No dead-letter queue for FAILED entries (deleted after 168h)"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "Direct HTTP call in try-catch with fixed timeout",
+        "after": "Implement circuit breaker:\n\n1. Install resilience library:\n   npm install cockatiel --workspace srv\n\n2. Wrap HTTP calls in circuit breaker (dispatcher.ts):\n   import { circuitBreaker, Policy, TimeoutStrategy } from 'cockatiel';\n   \n   const breakers = new Map<string, Policy>();\n   \n   const getBreaker = (destinationName: string) => {\n     if (!breakers.has(destinationName)) {\n       breakers.set(destinationName, Policy\n         .handleAll()\n         .circuitBreaker(10_000, Policy.ConsecutiveBreaker(5)) // open after 5 consecutive failures, reset after 10s\n         .timeout(resolveOutboxTimeout(), TimeoutStrategy.Aggressive)\n       );\n     }\n     return breakers.get(destinationName)!;\n   };\n   \n   // In processOutbox loop:\n   const breaker = getBreaker(entry.destinationName);\n   await breaker.execute(() => postEmployeeNotification({...}));\n\n3. Add destination-level concurrency:\n   Group entries by destinationName, apply separate concurrency limits per destination.\n\n4. Add dead-letter queue:\n   CREATE TABLE EmployeeNotificationDLQ (\n     ID UUID PRIMARY KEY,\n     originalEntry LargeString,\n     failureReason String(500),\n     createdAt Timestamp\n   );\n   \n   On FAILED after 6 attempts:\n   INSERT INTO DLQ, keep original entry for manual replay.\n\n5. Add health check endpoint for downstream:\n   GET /health before attempting POST, skip if unhealthy.",
+        "rollback_plan": "Remove cockatiel if it causes issues. Keep DLQ insertion. Monitor breaker open rate."
+      },
+      "references": [
+        "Cloud Native Patterns – Circuit Breaker",
+        "Release It! – Stability Patterns",
+        "Microsoft Azure – Bulkhead Pattern"
+      ]
+    },
+    {
+      "id": "ARC-006",
+      "severity": "Major",
+      "category": "security",
+      "location": {
+        "file": "srv/middleware/apiKey.ts",
+        "symbol": "apiKeyMiddleware",
+        "lines": "29-52",
+        "description": "API key stored in environment variable EMPLOYEE_EXPORT_API_KEY"
+      },
+      "description": "API key for /api/employees/active endpoint stored in plain environment variable with no rotation strategy, no secret manager integration, no expiration. If leaked (logs, crash dumps, Cloud Foundry env inspection), attackers gain read access to all active employee data including PII (names, emails, locations). No audit logging of API key usage.",
+      "impact": "Data breach risk: leaked API key enables bulk PII exfiltration. No revocation mechanism: must redeploy app to rotate key. Compliance violations (GDPR, SOC2): secrets should be encrypted at rest, rotated quarterly, usage audited. Cloud Foundry 'cf env' command exposes key to platform admins.",
+      "evidence": [
+        "apiKey.ts:30: const configuredKey = process.env.EMPLOYEE_EXPORT_API_KEY",
+        "README.md:103: EMPLOYEE_EXPORT_API_KEY environment variable documented",
+        "No integration with BTP Credential Store service in mta.yaml",
+        "No key rotation script or documentation",
+        "No audit log entry when /api/employees/active is called with valid key"
+      ],
+      "suggested_fix": {
+        "diff": "--- a/srv/middleware/apiKey.ts\n+++ b/srv/middleware/apiKey.ts\n@@ -1,4 +1,5 @@\n import crypto from 'node:crypto';\n+import { getSecret } from '@sap/xsenv';\n import type { NextFunction, Request, Response } from 'express';\n \n const INVALID_API_KEY_RESPONSE = { error: 'invalid_api_key' } as const;\n@@ -27,7 +28,15 @@\n };\n \n export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction): void => {\n-  const configuredKey = process.env.EMPLOYEE_EXPORT_API_KEY?.trim();\n+  let configuredKey: string | undefined;\n+  try {\n+    const credStore = getSecret('cap-ts-credstore');\n+    configuredKey = credStore?.namespace?.['employee-export-api-key']?.value;\n+  } catch {\n+    configuredKey = process.env.EMPLOYEE_EXPORT_API_KEY?.trim(); // fallback for local dev\n+  }\n+  \n+  // TODO: Log API key usage to audit log\n   const providedKey = extractApiKey(req)?.trim();",
+        "before": "process.env.EMPLOYEE_EXPORT_API_KEY",
+        "after": "1. Add Credential Store service in mta.yaml:\n   resources:\n     - name: cap-ts-credstore\n       type: org.cloudfoundry.managed-service\n       parameters:\n         service: credstore\n         service-plan: trial\n         config:\n           authorization:\n             default_permissions: [read]\n\n2. Bind cap-ts-credstore to cap-ts-srv.\n\n3. Store API key in Credential Store:\n   cf create-service-key cap-ts-credstore admin\n   curl -X POST <credstore-url>/api/v1/credentials \\\n     -H \"Authorization: Bearer $TOKEN\" \\\n     -d '{\"namespace\":\"employee-export\",\"name\":\"api-key\",\"value\":\"<strong-key>\",\"metadata\":{\"expiresAt\":\"2025-10-21T00:00:00Z\"}}'\n\n4. Update apiKeyMiddleware to fetch from Credential Store (see diff above).\n\n5. Add audit logging:\n   import { AuditLogging } from '@sap/audit-logging';\n   const auditLog = AuditLogging.v2('cap-ts-hr');\n   auditLog.securityMessage('API key access to /api/employees/active').by(req.ip).log();\n\n6. Document key rotation SOP:\n   - Generate new key: openssl rand -hex 32\n   - Update Credential Store: POST /api/v1/credentials with new value\n   - Wait 5 minutes for propagation\n   - Revoke old key\n   - Notify external systems\n   - Rotate quarterly or immediately on suspected leak\n\n7. Add key expiration check: reject keys older than 90 days.",
+        "rollback_plan": "If Credential Store unavailable, fallback to env var. Add try-catch around getSecret()."
+      },
+      "references": [
+        "BTP Credential Store",
+        "OWASP – Cryptographic Failures (A02:2021)",
+        "NIST SP 800-57 – Key Management"
+      ]
+    },
+    {
+      "id": "ARC-007",
+      "severity": "Major",
+      "category": "performance",
+      "location": {
+        "file": "srv/service.cds",
+        "symbol": "Clients",
+        "lines": "16-20",
+        "description": "@restrict annotation on Clients entity"
+      },
+      "description": "No pagination limits enforced on OData queries: clients can request unlimited $top values (e.g., GET /Clients?$top=1000000) causing memory exhaustion, slow response times, and potential DoS. CAP defaults to $top=1000 but can be overridden by clients. No $skiptoken cursor pagination for large result sets. No query complexity limits (e.g., deeply nested $expand on Clients → Employees → CostCenters → Employees can create N^2 queries).",
+      "impact": "Denial of Service: malicious or buggy clients request huge datasets, exhaust Node.js heap (512MB memory limit per mta.yaml), cause 503 errors for all users. Performance degradation: large result sets increase HANA→CAP network transfer, JSON serialization overhead, Approuter buffering. Cost: high HANA CPU usage for large queries, egress charges for transferring MB of data per request.",
+      "evidence": [
+        "service.cds: no @cds.query.limit annotation on entities",
+        "No rate limiting middleware in server.ts",
+        "mta.yaml: cap-ts-srv memory=512MB (low for large datasets)",
+        "No query complexity analysis or APM instrumentation",
+        "No documentation of recommended $top limits for clients"
+      ],
+      "suggested_fix": {
+        "diff": "--- a/srv/service.cds\n+++ b/srv/service.cds\n@@ -5,6 +5,7 @@\n service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {\n   @restrict: [\n     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },\n+    { grant: 'READ', to: 'HRViewer',  where: '(companyId in $user.CompanyCode or companyId in $user.companyCodes)' }\n-    { grant: 'READ', to: 'HRViewer',  where: '(companyId in $user.CompanyCode or companyId in $user.companyCodes)' },\n+  ]\n+  @cds.query.limit: {default: 100, max: 500}\n   @description: 'Updating or deleting a client requires optimistic concurrency control: supply an If-Match header when the service exposes ETags or include the latest modifiedAt timestamp in the payload.'",
+        "before": "No @cds.query.limit annotation",
+        "after": "1. Add pagination limits in service.cds:\n   @cds.query.limit: {default: 100, max: 500}\n   entity Clients as projection on db.Clients {...};\n   \n   @cds.query.limit: {default: 50, max: 200}\n   entity Employees as projection on db.Employees {...};\n   \n   @cds.query.limit: {default: 50, max: 200}\n   entity CostCenters as projection on db.CostCenters {...};\n\n2. Add rate limiting middleware (server.ts):\n   import rateLimit from 'express-rate-limit';\n   cds.on('bootstrap', (app) => {\n     const limiter = rateLimit({\n       windowMs: 60 * 1000, // 1 minute\n       max: 100, // max 100 requests per minute per IP\n       message: {error: 'rate_limit_exceeded'},\n       standardHeaders: true,\n       legacyHeaders: false,\n     });\n     app.use('/odata/v4', limiter);\n   });\n\n3. Implement $expand depth limit:\n   Add custom middleware to reject $expand nesting > 2 levels:\n   app.use((req, res, next) => {\n     const expand = req.query.$expand;\n     if (expand && expand.split('/').length > 2) {\n       return res.status(400).json({error: 'expand_depth_exceeded'});\n     }\n     next();\n   });\n\n4. Document in API guidelines:\n   - Default page size: 100\n   - Max page size: 500\n   - Use $skiptoken for pagination beyond 500 records\n   - Limit $expand to 2 levels\n   - Rate limit: 100 requests/minute\n\n5. Monitor query performance:\n   Add APM instrumentation (Dynatrace, App Insights) to track:\n   - Query duration p95/p99\n   - Result set sizes\n   - $expand depth distribution\n   - Rate limit hits",
+        "rollback_plan": "If rate limiter causes false positives, increase windowMs or max. Disable @cds.query.limit.max temporarily and monitor."
+      },
+      "references": [
+        "CAPire – Query Limits",
+        "OData v4 – Server-Driven Paging",
+        "OWASP – Unvalidated Redirects and Forwards"
+      ]
+    },
+    {
+      "id": "ARC-008",
+      "severity": "Major",
+      "category": "data",
+      "location": {
+        "file": "db/schema.cds",
+        "symbol": "EmployeeNotificationOutbox",
+        "lines": "69-78",
+        "description": "Outbox cleanup retention window"
+      },
+      "description": "Outbox retention window (168 hours = 7 days) deletes completed and failed messages permanently. No archival to cheaper storage (S3, HANA Native Store). No mechanism to replay failed messages after deletion. No monitoring of outbox backlog or failure trends. If outbox processing is disabled (e.g., during maintenance window), entries accumulate and may exceed retention before being processed.",
+      "impact": "Data loss: failed employee notifications older than 7 days are deleted without trace, cannot be replayed for reconciliation. Operational blindness: no historical data to analyze failure patterns, identify problematic destinations, or detect downstream degradation trends. Compliance: cannot prove notification delivery for audit (e.g., GDPR data subject access requests).",
+      "evidence": [
+        "config.ts:9: DEFAULT_OUTBOX_RETENTION_HOURS = 168",
+        "cleanup.ts: DELETE FROM outbox WHERE status IN ('COMPLETED','FAILED') AND modifiedAt < cutoff",
+        "No archival logic before DELETE",
+        "No monitoring dashboard for outbox KPIs (pending count, failure rate, oldest pending entry age)"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "DELETE completed/failed entries after 168 hours",
+        "after": "1. Add archival table (db/schema.cds):\n   entity EmployeeNotificationOutboxArchive : cuid, managed {\n     originalID        : UUID not null;\n     eventType         : String(60);\n     destinationName   : String(500);\n     payload           : LargeString;\n     status            : String(20);\n     attempts          : Integer;\n     deliveredAt       : Timestamp;\n     lastError         : LargeString;\n     archivedAt        : Timestamp not null default CURRENT_TIMESTAMP;\n   }\n\n2. Update cleanup.ts to archive before delete:\n   const toArchive = await db.run(\n     SELECT.from('clientmgmt.EmployeeNotificationOutbox')\n       .where({status: {in: ['COMPLETED','FAILED']}, modifiedAt: {'<': cutoff}})\n   );\n   \n   if (toArchive.length) {\n     await db.run(\n       INSERT.into('clientmgmt.EmployeeNotificationOutboxArchive')\n         .entries(toArchive.map(e => ({\n           originalID: e.ID,\n           eventType: e.eventType,\n           destinationName: e.destinationName,\n           payload: e.payload,\n           status: e.status,\n           attempts: e.attempts,\n           deliveredAt: e.deliveredAt,\n           lastError: e.lastError,\n         })))\n     );\n     \n     await db.run(DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({ID: {in: toArchive.map(e => e.ID)}}));\n   }\n\n3. Archive table retention: 1 year, then export to S3/Data Lake.\n\n4. Add manual replay function:\n   action replayArchivedNotification(archiveID: UUID) returns Boolean;\n   \n   Implementation: fetch from archive, re-insert into outbox with status=PENDING.\n\n5. Add monitoring queries (expose as OData actions for ops team):\n   - Pending count: COUNT(*) WHERE status='PENDING'\n   - Failure rate: COUNT(*) WHERE status='FAILED' / total last 24h\n   - Oldest pending: MIN(nextAttemptAt) WHERE status='PENDING'\n   - Backlog age: MAX(createdAt - now) WHERE status='PENDING'\n\n6. Set up BTP alerts:\n   - Pending count > 1000: warning\n   - Oldest pending > 1 hour: critical\n   - Failure rate > 10%: warning",
+        "rollback_plan": "If archival causes performance issues, batch archive in chunks of 1000. If disk fills, reduce retention to 72h temporarily."
+      },
+      "references": [
+        "Event-Driven Architecture – Outbox Pattern",
+        "CAP Best Practices – Long-term Data Retention",
+        "SRE Handbook – Monitoring and Alerting"
+      ]
+    },
+    {
+      "id": "ARC-009",
+      "severity": "Major",
+      "category": "security",
+      "location": {
+        "file": "srv/server.ts",
+        "symbol": "GET /health",
+        "lines": "40-42",
+        "description": "Health endpoint and audit logging"
+      },
+      "description": "No audit logging for sensitive operations: anonymizeFormerEmployees action (GDPR data subject erasure), client/employee deletion, bulk exports via /api/employees/active. Cannot prove compliance with data subject access requests (DSAR), right-to-erasure, or detect insider threats. Health endpoint returns 200 OK without checking downstream dependencies (HANA, Destination service, AMS) - false positives in HA scenarios.",
+      "impact": "Compliance violations: GDPR Article 30 requires logs of processing activities involving personal data. Insider threat detection: no forensic trail if HR admin abuses access. False availability metrics: /health returns 200 even if HANA connection pool exhausted. Incident response: cannot identify root cause (which admin deleted which client when).",
+      "evidence": [
+        "server.ts:40-42: /health returns static {status:'ok'}, no dependency checks",
+        "No audit log calls in handlers (anonymize-former-employees.action.ts, on-delete.ts)",
+        "No @sap/audit-logging dependency in package.json",
+        "mta.yaml binds cap-ts-logging but no audit log configuration"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "/health returns {status:'ok'}, no audit logging",
+        "after": "1. Implement deep health check (server.ts):\n   app.get('/health', async (req, res) => {\n     const checks = {\n       database: false,\n       ams: false,\n       destination: false,\n     };\n     \n     try {\n       const db = await cds.connect.to('db');\n       await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID').limit(1));\n       checks.database = true;\n     } catch {}\n     \n     try {\n       const ams = await cds.connect.to('ams');\n       // Minimal AMS health check (evaluate a dummy policy)\n       checks.ams = Boolean(ams);\n     } catch {}\n     \n     try {\n       const dest = await getDestination({destinationName: 'srv-api'});\n       checks.destination = Boolean(dest);\n     } catch {}\n     \n     const healthy = checks.database && checks.ams;\n     res.status(healthy ? 200 : 503).json({\n       status: healthy ? 'ok' : 'degraded',\n       checks,\n       timestamp: new Date().toISOString(),\n     });\n   });\n\n2. Add audit logging:\n   npm install @sap/audit-logging --workspace srv\n   \n   // In handlers/anonymize-former-employees.action.ts:\n   import { AuditLogging } from '@sap/audit-logging';\n   const auditLog = AuditLogging.v2('cap-ts-hr');\n   \n   // After anonymization:\n   auditLog.dataModificationMessage('anonymize_former_employees')\n     .tenant(cds.context.tenant || 'default')\n     .by(req.user.id)\n     .objectId({type: 'anonymize_action', id: 'batch'})\n     .attribute('before_date', before)\n     .attribute('anonymized_count', count)\n     .log();\n   \n   // In on-delete.ts:\n   auditLog.dataModificationMessage('delete_employee')\n     .by(req.user.id)\n     .objectId({type: 'Employee', id: req.data.ID})\n     .attribute('employeeId', existingEmployee.employeeId)\n     .attribute('client_ID', existingEmployee.client_ID)\n     .log();\n\n3. Configure audit log in mta.yaml:\n   # Already bound cap-ts-logging, no changes needed\n   # Logs flow to Application Logs → SAP Audit Log Service\n\n4. Document audit events:\n   - Employee CRUD: create/update/delete with user, timestamp, companyId\n   - Client CRUD: create/update/delete\n   - CostCenter CRUD: create/update/delete\n   - anonymizeFormerEmployees: user, before date, count\n   - /api/employees/active: IP, timestamp, result count\n\n5. Retention: audit logs kept 10 years per GDPR Article 30.",
+        "rollback_plan": "If audit logging increases latency, make async: auditLog.log() returns Promise, don't await. If deep health checks cause false negatives, add timeouts (2s per check)."
+      },
+      "references": [
+        "BTP Audit Log Service",
+        "GDPR Article 30 – Records of Processing Activities",
+        "OWASP – Logging and Monitoring Failures (A09:2021)",
+        "Health Check API Patterns"
+      ]
+    },
+    {
+      "id": "ARC-010",
+      "severity": "Minor",
+      "category": "performance",
+      "location": {
+        "file": "srv/domain/employee/services/identifiers.ts",
+        "symbol": "ensureEmployeeIdentifier",
+        "lines": null,
+        "description": "Employee ID generation with retry loop"
+      },
+      "description": "Employee ID generation uses a sequential counter with collision retry (up to 5 attempts). Under high concurrency (e.g., bulk import of 1000 employees), collision rate increases, retries exhaust quickly, and requests fail with 500 error. No batching or pre-allocation of ID ranges. No monitoring of collision rate or retry exhaustion.",
+      "impact": "Bulk import failures: importing 100+ employees concurrently causes 500 errors due to retry exhaustion. User experience degradation: slow employee creation (multiple DB round-trips per retry). Scalability ceiling: single-threaded counter updates limit throughput to ~10 creates/sec per client.",
+      "evidence": [
+        "identifiers.ts: EMPLOYEE_ID_RETRIES = 5 (low for high concurrency)",
+        "identifiers.ts: generateEmployeeId() uses SELECT lastCounter + UPDATE in separate queries (race condition window)",
+        "No batching or pre-allocation logic",
+        "No monitoring of collision rate or retry metrics"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "Sequential counter with 5 retries",
+        "after": "Optimize ID generation:\n\n1. Increase retry limit to 20 for high-concurrency scenarios.\n\n2. Add SELECT FOR UPDATE to minimize collision window:\n   const counter = await tx.run(\n     SELECT.one.from('clientmgmt.EmployeeIdCounters')\n       .where({client_ID: clientId})\n       .forUpdate()\n   );\n   \n   // Update counter in same transaction\n   await tx.run(\n     UPDATE('clientmgmt.EmployeeIdCounters')\n       .set({lastCounter: counter.lastCounter + 1})\n       .where({client_ID: clientId})\n   );\n\n3. Implement ID range pre-allocation for bulk imports:\n   action allocateEmployeeIdRange(client_ID: UUID, count: Integer) returns { from: Integer, to: Integer };\n   \n   // Allocate range of 100 IDs, cache in application memory, dispense without DB round-trip per create.\n\n4. Add collision rate metric:\n   import { Counter } from 'prom-client';\n   const collisionCounter = new Counter({\n     name: 'employee_id_collisions_total',\n     help: 'Total employee ID generation collisions',\n     labelNames: ['client_id'],\n   });\n   \n   // Increment on each retry:\n   collisionCounter.labels(clientId).inc();\n\n5. Consider UUID-based employee IDs (breaking change):\n   Migrate from COMP001X000001 to UUID, eliminates collisions entirely.\n   Requires UI/API changes to display human-friendly IDs separately (display-only).",
+        "rollback_plan": "If FOR UPDATE causes deadlocks, reduce concurrency. If pre-allocation complicates logic, keep retry approach but increase limit to 20."
+      },
+      "references": [
+        "CAP Best Practices – Concurrency Control",
+        "Distributed Systems – ID Generation Strategies",
+        "Twitter Snowflake ID"
+      ]
+    },
+    {
+      "id": "ARC-011",
+      "severity": "Minor",
+      "category": "maintainability",
+      "location": {
+        "file": "srv/domain/client/services/lifecycle.service.ts",
+        "symbol": "HR_ADMIN_ROLE",
+        "lines": "18-20",
+        "description": "Hard-coded role names in multiple files"
+      },
+      "description": "Role names (HRAdmin, HREditor, HRViewer) hard-coded as string literals in 10+ files (lifecycle.service.ts, auth.ts, service.cds). Changing role names requires search-replace across codebase, high risk of missed occurrences. No single source of truth. Typos in role strings cause silent authorization failures.",
+      "impact": "Maintenance burden: renaming roles (e.g., for localization or rebranding) requires 20+ file edits. Bug risk: typo in @requires annotation (e.g., 'HRAdmim') causes authorization bypass or false denials. Onboarding friction: new developers must memorize role strings, no IDE autocomplete.",
+      "evidence": [
+        "lifecycle.service.ts:18-20: export const HR_ADMIN_ROLE = 'HRAdmin' (partial improvement)",
+        "service.cds:7: @restrict: [..., to: 'HRAdmin'] (string literal)",
+        "auth.ts:37: possibleRoles = ['HRAdmin', 'HRViewer', 'HREditor'] (array literal)",
+        "Multiple handlers use string literals for role checks"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "Role names hard-coded as string literals in CDS and TypeScript",
+        "after": "1. Create shared constants (srv/shared/constants.ts):\n   export const ROLES = {\n     HR_ADMIN: 'HRAdmin',\n     HR_EDITOR: 'HREditor',\n     HR_VIEWER: 'HRViewer',\n   } as const;\n   \n   export type Role = typeof ROLES[keyof typeof ROLES];\n\n2. Update TypeScript files:\n   import { ROLES } from '../../shared/constants';\n   \n   if (userHasRole(user, ROLES.HR_ADMIN)) {...}\n\n3. Update CDS files (service.cds):\n   // CDS doesn't support imports, use @cds.compile.to.hdbtable for role refs\n   // Or document in comments:\n   // Role constants: see srv/shared/constants.ts\n   @restrict: [\n     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' }, // ROLES.HR_ADMIN\n   ]\n\n4. Add type-safe role builder:\n   const restrict = (roles: Role[], grants: string[], where?: string) => ({\n     grant: grants,\n     to: roles.join(' '),\n     where,\n   });\n   \n   // Usage:\n   @restrict: [\n     ...restrict([ROLES.HR_ADMIN], ['READ','CREATE','UPDATE','DELETE']),\n   ]\n\n5. Add ESLint rule to ban string literals for roles:\n   // .eslintrc.js:\n   rules: {\n     'no-restricted-syntax': [\n       'error',\n       {\n         selector: 'Literal[value=/^HR(Admin|Editor|Viewer)$/]',\n         message: 'Use ROLES constant from shared/constants.ts instead of string literals',\n       },\n     ],\n   }",
+        "rollback_plan": "Constants are backward-compatible, no rollback needed. If CDS annotations break, revert to string literals temporarily."
+      },
+      "references": [
+        "Clean Code – Constants over Magic Strings",
+        "TypeScript – const assertions",
+        "ESLint – no-restricted-syntax"
+      ]
+    },
+    {
+      "id": "ARC-012",
+      "severity": "Suggestion",
+      "category": "documentation",
+      "location": {
+        "file": "README.md",
+        "symbol": null,
+        "lines": null,
+        "description": "Missing architecture decision records (ADRs) and runbooks"
+      },
+      "description": "No architecture decision records (ADRs) documenting why TypeScript over Java, why SQLite for dev, why AMS over CAP built-in @restrict, why outbox over Event Mesh direct publish. No operational runbooks for common incidents: outbox backlog, HANA connection pool exhausted, AMS policy conflicts, employee ID collision storm. README covers basics but lacks troubleshooting, disaster recovery, scaling guidance.",
+      "impact": "Knowledge loss: architectural decisions undocumented, new team members cannot understand trade-offs. Incident response delay: no runbooks, ops team must reverse-engineer solutions during outages. Technical debt: no record of why certain anti-patterns exist (e.g., SQLite-HANA mismatch), cannot safely refactor.",
+      "evidence": [
+        "No docs/ or adr/ directory in repository",
+        "README.md documents happy-path setup, no error scenarios",
+        "No TROUBLESHOOTING.md or RUNBOOK.md",
+        "No disaster recovery plan (RTO/RPO)",
+        "No capacity planning guidance (employees per client, requests per second)"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "README.md only",
+        "after": "1. Create docs/adr/ directory:\n   docs/adr/0001-typescript-migration.md\n   docs/adr/0002-ams-authorization.md\n   docs/adr/0003-outbox-pattern.md\n   docs/adr/0004-sqlite-dev-hana-prod.md\n   \n   # Template (MADR format):\n   # Title: [short title]\n   # Date: YYYY-MM-DD\n   # Status: accepted | deprecated | superseded\n   # Context: [problem statement]\n   # Decision: [chosen solution]\n   # Consequences: [trade-offs]\n\n2. Create RUNBOOK.md:\n   # Runbook: CAP TypeScript HR Application\n   \n   ## Incident: Outbox Backlog Growing\n   Symptoms: Pending outbox entries > 1000, oldest entry > 1 hour\n   Diagnosis: Check destination health, OUTBOX_CONCURRENCY, HANA locks\n   Resolution: Scale concurrency, clear stale locks, manual replay\n   \n   ## Incident: 503 Service Unavailable\n   Symptoms: /health returns 503, HANA connection errors in logs\n   Diagnosis: Check HANA HDI container status, connection pool exhaustion\n   Resolution: Restart app, scale memory, tune pool size\n   \n   ## Incident: Employee Creation Fails 500\n   Symptoms: High employee ID collision rate, retry exhaustion\n   Diagnosis: Check concurrent creates, collision metrics\n   Resolution: Batch imports, increase retry limit\n\n3. Create DISASTER_RECOVERY.md:\n   # Disaster Recovery Plan\n   \n   ## RTO/RPO Targets\n   RTO: 4 hours (time to restore service)\n   RPO: 1 hour (acceptable data loss)\n   \n   ## Backup Strategy\n   HANA: Automated daily backups, 30-day retention\n   Outbox: Archived to S3 after 7 days\n   \n   ## Failover Procedure\n   1. Detect outage (BTP monitoring)\n   2. Promote standby HANA database (if HA configured)\n   3. Redeploy app to secondary region\n   4. Update DNS/Approuter routing\n   5. Validate /health endpoint\n   6. Notify stakeholders\n\n4. Create ARCHITECTURE.md:\n   # Architecture Overview\n   [Include architecture_views from this review]\n   \n   ## Component Diagram\n   [Mermaid diagram]\n   \n   ## Data Flow\n   [Sequence diagrams for key scenarios]\n   \n   ## Scaling Limits\n   - Max employees per client: 100,000 (sequential ID limit)\n   - Max requests per second: 50 (without autoscaling)\n   - Max concurrent outbox entries: 10 (with concurrency=10)\n\n5. Link from README:\n   ## Documentation\n   - [Architecture](docs/ARCHITECTURE.md)\n   - [Runbook](docs/RUNBOOK.md)\n   - [ADRs](docs/adr/)\n   - [Disaster Recovery](docs/DISASTER_RECOVERY.md)",
+        "rollback_plan": "N/A (documentation only)"
+      },
+      "references": [
+        "Architecture Decision Records (MADR)",
+        "SRE Handbook – Runbooks",
+        "Twelve-Factor App – Documentation"
+      ]
+    },
+    {
+      "id": "ARC-013",
+      "severity": "Suggestion",
+      "category": "testing",
+      "location": {
+        "file": "srv/test/domain/client/client-service.test.ts",
+        "symbol": null,
+        "lines": null,
+        "description": "Test coverage gaps: no load tests, no chaos engineering, no contract tests"
+      },
+      "description": "Comprehensive unit and integration tests (Jest + Playwright) but missing: load/performance tests (can app handle 100 concurrent creates?), chaos engineering (HANA connection drop, destination timeout), contract tests (does UI5 app match OData $metadata?), security tests (SQLi, XSS, JWT manipulation). No documented test coverage % targets.",
+      "impact": "Production surprises: load limits unknown until live traffic hits. Brittleness: no confidence that app survives partial failures (DB timeout, AMS down). API drift: UI and backend schemas diverge, runtime errors. Vulnerability discovery delayed: security tests in PR reviews, not automated.",
+      "evidence": [
+        "No k6, JMeter, or Gatling scripts in repository",
+        "No chaos-monkey or fault-injection tests",
+        "No Pact or Spring Cloud Contract tests for OData schema",
+        "No OWASP ZAP or Snyk scans in CI pipeline (.github/workflows/)",
+        "Test coverage not measured (no jest --coverage in default npm test)"
+      ],
+      "suggested_fix": {
+        "diff": null,
+        "before": "Unit + e2e tests only",
+        "after": "1. Add load tests (tests/load/):\n   npm install --save-dev k6\n   \n   // load-test-create-employees.js\n   import http from 'k6/http';\n   import { check } from 'k6';\n   \n   export let options = {\n     stages: [\n       { duration: '1m', target: 10 },  // ramp up\n       { duration: '5m', target: 50 },  // sustained load\n       { duration: '1m', target: 0 },   // ramp down\n     ],\n     thresholds: {\n       http_req_duration: ['p(95)<500'], // 95% of requests < 500ms\n       http_req_failed: ['rate<0.01'],   // <1% failure rate\n     },\n   };\n   \n   export default function () {\n     const res = http.post('http://localhost:4004/odata/v4/clients/Employees', JSON.stringify({\n       firstName: 'Load',\n       lastName: 'Test',\n       email: `load-${Date.now()}@example.com`,\n       entryDate: '2024-01-01',\n       client_ID: '<uuid>',\n     }), {\n       headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ...' },\n     });\n     \n     check(res, {\n       'status is 201': (r) => r.status === 201,\n       'response time < 500ms': (r) => r.timings.duration < 500,\n     });\n   }\n   \n   // Run: k6 run tests/load/load-test-create-employees.js\n\n2. Add chaos tests (tests/chaos/):\n   // Use toxiproxy or similar to inject faults\n   npm install --save-dev toxiproxy-node-client\n   \n   // chaos-hana-timeout.test.ts\n   test('survives HANA timeout', async () => {\n     const toxiproxy = new Toxiproxy('http://localhost:8474');\n     const hana = await toxiproxy.get('hana');\n     \n     await hana.addToxic({type: 'timeout', attributes: {timeout: 5000}});\n     \n     const res = await http.get('/odata/v4/clients/Clients');\n     expect(res.status).toBe(503); // graceful degradation\n     \n     await hana.removeToxic('timeout');\n   });\n\n3. Add contract tests:\n   npm install --save-dev @pact-foundation/pact\n   \n   // consumer test (UI5 app):\n   const provider = new Pact({\n     consumer: 'hr-admin-ui',\n     provider: 'ClientService',\n   });\n   \n   it('fetches clients', async () => {\n     await provider.addInteraction({\n       state: 'clients exist',\n       uponReceiving: 'a request for clients',\n       withRequest: {\n         method: 'GET',\n         path: '/odata/v4/clients/Clients',\n       },\n       willRespondWith: {\n         status: 200,\n         body: Matchers.eachLike({companyId: 'COMP-001'}),\n       },\n     });\n   });\n   \n   // Publish pact to broker, verify in provider tests\n\n4. Add security tests:\n   # OWASP ZAP scan in CI:\n   - name: Security scan\n     run: |\n       docker run -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable \\\n         zap-baseline.py -t http://localhost:4004 -r zap-report.html\n   \n   # Snyk dependency scan:\n   - name: Snyk scan\n     run: npx snyk test --all-projects\n\n5. Add test coverage targets:\n   Update package.json:\n   \"jest\": {\n     \"coverageThreshold\": {\n       \"global\": {\n         \"branches\": 80,\n         \"functions\": 80,\n         \"lines\": 80,\n         \"statements\": 80\n       }\n     }\n   }\n   \n   Run: npm run test:backend -- --coverage\n\n6. Document test strategy:\n   docs/TESTING.md:\n   # Test Strategy\n   - Unit tests: 80% coverage target\n   - Integration tests: all CRUD operations, authorization, business rules\n   - Load tests: 50 RPS sustained, p95 latency < 500ms\n   - Chaos tests: DB timeout, destination failure, AMS unavailable\n   - Contract tests: UI ↔ OData schema compatibility\n   - Security tests: OWASP Top 10, dependency vulnerabilities",
+        "rollback_plan": "Skip load/chaos tests in PR pipeline if too slow. Run as nightly jobs instead."
+      },
+      "references": [
+        "k6 Load Testing",
+        "Chaos Engineering Principles",
+        "Pact Contract Testing",
+        "OWASP ZAP",
+        "Google SRE – Testing for Reliability"
+      ]
+    }
+  ],
+  "security_posture": {
+    "authn_authz": [
+      "Authentication: SAP IAS (Identity Authentication Service) via approuter, IAS application plan bound in mta.yaml. Approuter enforces IAS tokens on all routes.",
+      "Authorization: Hybrid model - CAP @restrict/@requires annotations + AMS (Authorization Management Service) for attribute-based access control (ABAC).",
+      "Role mapping: @restrict annotations use HRAdmin, HREditor, HRViewer roles. AMS DCL schema defines CompanyCode/companyCodes attributes.",
+      "Attribute filtering: @restrict where clauses filter by '(companyId in $user.CompanyCode or companyId in $user.companyCodes)'. Relies on IAS↔AMS attribute synchronization.",
+      "Gap: No xs-security.json for XSUAA role-template mapping. IAS roles must be manually mapped to application roles in BTP Cockpit.",
+      "Gap: Mocked users in dev/test have hard-coded roles and attributes. Risk of committing production credentials to package.json.",
+      "Gap: No OAuth2 token validation beyond IAS. No JWT expiry checks, no token revocation list."
+    ],
+    "data_protection": [
+      "PII storage: Employees table stores firstName, lastName, email, location (unencrypted at application layer, relies on HANA transparent data encryption).",
+      "Anonymization: anonymizeFormerEmployees action sets firstName/lastName='ANONYMIZED', email='anonymized-{UUID}', clears location/positionLevel. Complies with GDPR right-to-erasure.",
+      "Encryption at rest: HANA HDI container uses TDE (Transparent Data Encryption) by default on BTP HANA Cloud.",
+      "Encryption in transit: HTTPS enforced by Cloud Foundry routing, approuter, HANA connections use TLS 1.2+.",
+      "Gap: No field-level encryption for highly sensitive data (e.g., social security numbers, bank accounts) - not present in current schema.",
+      "Gap: No data masking for non-production environments. Full production data accessible in dev/test if copied.",
+      "Gap: No GDPR data retention policy enforced at DB level (e.g., auto-delete inactive employees after 7 years).",
+      "Gap: Outbox payload stored as LargeString JSON (unencrypted), may contain PII if employee data included in notifications."
+    ],
+    "multi_tenant_isolation": [
+      "Current state: No multitenancy implementation. Single HDI container shared by all users.",
+      "Isolation mechanism: AMS attribute-based filtering (CompanyCode) is soft boundary, not physical isolation.",
+      "Risk: AMS policy bug or attribute misconfiguration exposes data across companies/tenants.",
+      "Risk: No tenant context in queries (cds.context.tenant unused). If MTX added later, requires full data migration.",
+      "Recommendation: Implement schema-per-tenant or HDI-container-per-tenant model. See finding ARC-002."
+    ],
+    "secrets_management": [
+      "Secrets stored in: environment variables (EMPLOYEE_EXPORT_API_KEY, THIRD_PARTY_EMPLOYEE_SECRET, IAS_CLIENT_SECRET).",
+      "Rotation: Manual - requires app redeploy to change secrets. No documented rotation schedule.",
+      "Access control: Cloud Foundry 'cf env' command exposes secrets to platform admins. No RBAC on secret access.",
+      "Gap: No integration with BTP Credential Store or HashiCorp Vault.",
+      "Gap: Secrets visible in cf env, mta.yaml (if committed), crash dumps, log files if printed accidentally.",
+      "Recommendation: Migrate to BTP Credential Store, implement quarterly rotation, add expiration checks. See finding ARC-006."
+    ],
+    "threats": [
+      "STRIDE analysis:",
+      "Spoofing: Mitigated by IAS authentication. Risk: JWT token theft if HTTPS compromised or XSS in UI5 app.",
+      "Tampering: Mitigated by optimistic concurrency (ETags). Risk: replay attacks if ETag leaked, no request signing beyond HMAC in outbox.",
+      "Repudiation: Partially mitigated by managed aspects (createdBy, modifiedBy). Risk: no audit logs, cannot prove who deleted data.",
+      "Information Disclosure: Partially mitigated by @restrict. Risk: no tenant isolation, API key leakage, PII in logs if not sanitized.",
+      "Denial of Service: Risk: no rate limiting, no pagination limits (see finding ARC-007), outbox backlog can exhaust memory.",
+      "Elevation of Privilege: Risk: missing xs-security.json allows role bypass, AMS policy bugs grant excessive access."
+    ]
+  },
+  "multitenancy_assessment": {
+    "model": "single-tenant (no MTX detected)",
+    "isolation_gaps": [
+      "No physical tenant isolation: all data in single HDI container, single DB schema.",
+      "No logical tenant isolation: no tenant_ID foreign keys or discriminator columns in entities.",
+      "No cds.context.tenant usage: queries do not filter by tenant.",
+      "No tenant-specific extensions: cannot offer per-tenant schema customizations.",
+      "AMS attribute filtering is weak isolation: relies on IAS attribute synchronization, policy correctness."
+    ],
+    "tenant_lifecycle": [
+      "Onboarding: N/A (no subscriber management). Manual client creation via OData POST to Clients.",
+      "Upgrade: N/A (no per-tenant schema versions). All users upgraded simultaneously when app redeployed.",
+      "Offboarding: N/A (no automated tenant deletion). Manual DELETE of Clients, Employees, CostCenters.",
+      "Recommendation: Implement MTX subscriber callbacks: /-/cds/saas-provisioning/tenant/{tenantId} for PUT (onboard), DELETE (offboard)."
+    ],
+    "mtx_ops": [
+      "HDI container management: Single container (cap-ts-db) deployed via cap-ts-db-deployer module.",
+      "Migrations: No documented zero-downtime migration strategy. DB changes require app downtime.",
+      "Safeguards: Managed aspects (createdAt, modifiedAt) prevent accidental overwrites. ETag concurrency control prevents lost updates.",
+      "Recommendation: Add @sap/cds-mtxs, implement tenant-aware migrations, document rollback procedures."
+    ]
+  },
+  "data_and_persistence": {
+    "schema_evolution": [
+      "Current approach: HDI deployer runs .hdbtable artifacts on deploy. Breaking changes (e.g., drop column) cause deployment failure.",
+      "Zero-downtime: Not supported. Schema changes require app downtime.",
+      "Migrations: No formal migration scripts. Developers manually adjust CDS models, hope HDI deployer handles it.",
+      "ETag usage: @odata.etag: 'modifiedAt' on Clients, Employees, CostCenters. Optimistic concurrency enforced in handlers (ensureOptimisticConcurrency).",
+      "Recommendation: Implement formal migration strategy (e.g., Flyway for HANA, or CAP delta deployments). Document additive-only schema changes for ZDM.",
+      "Recommendation: Add schema version table, track applied migrations, support rollback."
+    ],
+    "indexing_hotspots": [
+      "Declared indexes:",
+      "- Clients_companyId_idx on Clients(companyId) - good for WHERE companyId lookups",
+      "- CostCenters_code_client_unique on CostCenters(client_ID, code) - enforces uniqueness, supports JOINs",
+      "- Outbox_status_nextAttempt_idx on EmployeeNotificationOutbox(status, nextAttemptAt) - critical for outbox polling",
+      "Missing indexes:",
+      "- Employees(client_ID) - JOIN to Clients on every query, no explicit index (may rely on FK index)",
+      "- Employees(status, exitDate) - needed for anonymizeFormerEmployees query",
+      "- Employees(costCenter_ID) - JOIN to CostCenters",
+      "- CostCenters(client_ID) - JOIN to Clients",
+      "Recommendation: Add composite index on Employees(status, exitDate) for anonymization queries.",
+      "Recommendation: Profile HANA slow queries (M_EXPENSIVE_STATEMENTS view), add indexes based on actual workload."
+    ],
+    "transactionality": [
+      "CAP transactions: cds.tx() and cds.transaction(req) used consistently in handlers. Good practice.",
+      "Outbox pattern: Employee creation + outbox INSERT in same transaction. Ensures exactly-once publishing (at-least-once delivery).",
+      "Isolation level: HANA default (READ COMMITTED). Optimistic locking via ETags prevents lost updates.",
+      "Gap: No distributed transactions (2PC) between CAP and Destination service. Outbox relies on eventual consistency.",
+      "Gap: Long-running transactions (e.g., bulk anonymization) may lock rows, block other operations.",
+      "Recommendation: Add transaction timeout limits (default 30s), break bulk operations into smaller batches."
+    ],
+    "retention_privacy": [
+      "GDPR compliance:",
+      "- Data minimization: Stores only necessary PII (name, email, location). No social security numbers, birth dates.",
+      "- Right-to-erasure: anonymizeFormerEmployees action implements pseudonymization.",
+      "- Right-to-access: No documented DSAR (Data Subject Access Request) export endpoint. Clients can query via OData but no bulk export.",
+      "Retention policy:",
+      "- Active employees: indefinite retention.",
+      "- Inactive employees: anonymized after cutoff date (manual action, no automated schedule).",
+      "- Outbox: 168 hours retention, then deleted.",
+      "Gap: No automated retention enforcement (e.g., delete employees inactive > 7 years).",
+      "Gap: No DSAR export endpoint (e.g., GET /gdpr/export?employeeId=X returns all data for employee).",
+      "Recommendation: Add cron job for automated anonymization (e.g., monthly). Add DSAR export action."
+    ]
+  },
+  "integration_and_messaging": {
+    "interfaces": [
+      "OData v4: /odata/v4/clients (Clients, Employees, CostCenters, Countries entities)",
+      "Actions: /odata/v4/clients/anonymizeFormerEmployees(before: Date) → Integer",
+      "REST: GET /api/employees/active (API key auth, returns JSON array)",
+      "Health: GET /health → {status: 'ok'}",
+      "No GraphQL, gRPC, or WebSocket endpoints.",
+      "No server-sent events (SSE) or webhooks for real-time notifications."
+    ],
+    "messaging": [
+      "Outbox pattern: EmployeeNotificationOutbox table, background polling (30s interval), exponential backoff retries.",
+      "Dispatcher: processOutbox() claims entries via optimistic lock (UPDATE WHERE status=? AND nextAttemptAt=?), concurrency=1 by default.",
+      "Idempotency: Outbox ensures at-least-once delivery. Downstream consumers must implement idempotency (e.g., check if employee already notified).",
+      "HMAC signing: x-signature-sha256 header (HMAC-SHA256 of payload + THIRD_PARTY_EMPLOYEE_SECRET) for authenticity.",
+      "Gap: No Event Mesh or Kafka integration for high-throughput messaging.",
+      "Gap: No poison message handling (malformed payloads cause repeated failures until max attempts).",
+      "Gap: No DLQ (dead-letter queue) for permanently failed messages - deleted after retention.",
+      "Recommendation: Integrate Event Mesh for event-driven architecture, add DLQ for failed messages. See finding ARC-005, ARC-008."
+    ],
+    "consistency": [
+      "Within service: Strong consistency (ACID transactions via HANA).",
+      "Across services: Eventual consistency (outbox → destination HTTP POST).",
+      "Saga pattern: Not implemented. No compensating transactions for failed downstream operations.",
+      "Idempotency keys: Not used. Downstream services must deduplicate by employeeId or employeeUUID.",
+      "Recommendation: Add correlation-id to outbox payloads, implement idempotency key support (e.g., Idempotency-Key header in HTTP POST)."
+    ]
+  },
+  "operations_and_sre": {
+    "slo_targets": {
+      "availability": "Not documented. Assume 99.5% (Cloud Foundry default, ~3.6h downtime/month)",
+      "latency_p95_ms": "Not documented. Recommend 500ms for OData GET, 1000ms for POST/PATCH/DELETE",
+      "error_budget_policy": "Not documented. Recommend: If error rate > 1% for 1 hour, halt deployments, investigate"
+    },
+    "observability": [
+      "Logging: Console fallback (see finding ARC-004). Application Logs service bound but not instrumented.",
+      "Metrics: No Prometheus, Grafana, or BTP metrics collected. No custom metrics (e.g., outbox backlog, employee creation rate).",
+      "Tracing: No distributed tracing (OpenTelemetry, Dynatrace). Cannot trace request flow across approuter → CAP → HANA → Destination.",
+      "Dashboards: No operational dashboards for SLOs, error rates, latency percentiles.",
+      "Alerting: No BTP alerts configured (error rate, response time, outbox backlog).",
+      "Recommendation: Implement structured logging, add Prometheus metrics, integrate Dynatrace OneAgent, create SLO dashboards."
+    ],
+    "resilience": [
+      "Timeouts: OUTBOX_TIMEOUT_MS = 15s for HTTP calls. No timeout on HANA queries (relies on HANA server timeout).",
+      "Retries: Outbox retries up to 6 times with exponential backoff (2^(attempts-1) * 5000ms).",
+      "Circuit breaker: Not implemented (see finding ARC-005).",
+      "Bulkheads: No resource isolation (all requests share same Node.js event loop, HANA connection pool).",
+      "Graceful degradation: /health returns 200 even if HANA slow (false positive).",
+      "Rate limiting: Not implemented (see finding ARC-007).",
+      "Recommendation: Add circuit breaker, rate limiting, connection pool tuning, timeout on all external calls."
+    ],
+    "deployability": [
+      "CI/CD: GitHub Actions workflows (.github/workflows/backend-ci.yml, frontend-build.yml). Runs tests on push.",
+      "Artifact: MTA archive (mtar) via 'cf deploy mta.yaml'.",
+      "Blue/green: Not documented. Cloud Foundry supports zero-downtime deployments via 'cf push --strategy rolling' but not configured.",
+      "Canaries: Not implemented. No progressive rollout.",
+      "Feature flags: Not implemented. All features deployed to all users simultaneously.",
+      "Rollback: Manual 'cf push' of previous mtar. No automated rollback on error rate spike.",
+      "Recommendation: Add blue/green deployments, canary releases (10% → 50% → 100%), feature flags (LaunchDarkly, Unleash), automated rollback."
+    ]
+  },
+  "performance_notes": [
+    {
+      "issue_id": "ARC-007",
+      "hotspot": "srv/service.cds - OData queries without pagination limits",
+      "analysis": {
+        "current_complexity": "O(n) for fetching all Clients/Employees/CostCenters, where n = total rows. No LIMIT clause unless $top specified by client.",
+        "bottleneck": "Network transfer (HANA → CAP → Approuter → Client), JSON serialization, memory allocation for large result sets."
+      },
+      "improvement": "Add @cds.query.limit: {default: 100, max: 500}. Implement cursor-based pagination ($skiptoken). Expected: reduce p95 latency from ~2s to <500ms for large result sets, reduce memory usage by 80%."
+    },
+    {
+      "issue_id": "ARC-010",
+      "hotspot": "srv/domain/employee/services/identifiers.ts - generateEmployeeId",
+      "analysis": {
+        "current_complexity": "O(retries * n) where n = DB round-trip time. 5 retries per employee, 2 queries per retry (SELECT + UPDATE). Under 50 concurrent creates, collision rate ~10%, causing ~0.5 extra retries per create.",
+        "bottleneck": "Sequential counter updates (no batching), optimistic lock collisions under high concurrency."
+      },
+      "improvement": "Use SELECT FOR UPDATE to reduce collision window. Pre-allocate ID ranges for bulk imports. Expected: reduce collision rate to <1%, increase throughput from 10/sec to 50/sec per client."
+    },
+    {
+      "issue_id": "NEW-PERF-001",
+      "hotspot": "srv/domain/employee/handlers/on-create.after.ts - N+1 query in outbox enrichment",
+      "analysis": {
+        "current_complexity": "Potential N+1 if multiple employees created in batch: each enqueueEmployeeCreatedNotification calls tx.run independently. If 100 employees created, 100 INSERT statements to outbox.",
+        "bottleneck": "DB round-trips, no batching."
+      },
+      "improvement": "Batch outbox INSERTs: collect all notifications in memory, execute single INSERT with 100 entries. Expected: reduce bulk employee creation time from 30s to 5s for 100 employees."
+    }
+  ],
+  "style_and_maintainability": {
+    "modularity": [
+      "Domain-driven structure: srv/domain/{client,employee,cost-center}/{handlers,services,repository,dto}. Clear separation of concerns.",
+      "Infrastructure layer: srv/infrastructure/{outbox,api} decoupled from domain logic. Good hexagonal architecture.",
+      "Shared utilities: srv/shared/{utils,types} for cross-cutting concerns (auth, errors, normalization).",
+      "Minimal coupling: handlers depend on services, services depend on repositories. No circular dependencies detected.",
+      "Recommendation: Consider introducing domain events (e.g., EmployeeCreatedEvent) instead of direct outbox calls in handlers for better testability."
+    ],
+    "consistency": [
+      "CDS conventions: Entities use managed aspect, compositions for 1:n, associations for references. Consistent.",
+      "Handler patterns: All use cds.tx() for transactions, buildUserContext() for authorization, createServiceError() for errors. Consistent.",
+      "Naming: camelCase for variables, PascalCase for entities, kebab-case for files. Consistent.",
+      "Gap: Some role names hard-coded as strings (see finding ARC-011).",
+      "Gap: Mix of export default and module.exports in handlers (handlers.ts:13-15). Prefer one style."
+    ],
+    "docs": [
+      "README.md: Comprehensive getting-started, scripts, deployment, environment variables. Good.",
+      "Inline comments: Minimal in handlers, good JSDoc in service layer (lifecycle.service.ts).",
+      "Gap: No architecture diagrams (see finding ARC-012).",
+      "Gap: No API documentation (Swagger/OpenAPI for /api/employees/active).",
+      "Gap: No sequence diagrams for complex flows (outbox processing, employee creation with retry).",
+      "Recommendation: Generate OpenAPI spec from OData $metadata, add Mermaid diagrams to README."
+    ],
+    "dependencies": [
+      "CAP version: @sap/cds@9.3.1 (latest stable, good)",
+      "TypeScript: 5.6.3 (latest, good)",
+      "Cloud SDK: @sap-cloud-sdk/connectivity@3.23.0 (not latest 4.x, but stable)",
+      "UI5: @ui5/cli@4.0.30 (latest, good)",
+      "Gap: No Snyk or Dependabot vulnerability scanning in CI.",
+      "Gap: No package-lock.json audit in CI (npm audit).",
+      "Recommendation: Add 'npm audit --audit-level=moderate' to CI, schedule weekly dependency updates."
+    ]
+  },
+  "cost_and_sizing": {
+    "drivers": [
+      "HANA HDI container: hdi-shared service plan (~$200-500/month depending on data volume and compute)",
+      "IAS + AMS: application plans (~$100-200/month for authentication and authorization)",
+      "Destination + Connectivity: lite plans (free tier, up to 5 destinations)",
+      "HTML5 Application Repository: app-host + app-runtime plans (~$50/month)",
+      "Application Logs: lite plan (free tier, 1GB logs/day)",
+      "Cloud Foundry app runtime: 512MB srv + 256MB approuter + 256MB db-deployer = 1GB total (~$50-100/month)",
+      "Outbound traffic: HTTP POSTs to third-party destinations (depends on notification volume, ~$0.12/GB egress)"
+    ],
+    "right_sizing": [
+      "HANA: hdi-shared suitable for <100GB data, <100 concurrent connections. For >500 concurrent users or >1TB data, upgrade to hdi-large or hana-cloud-enterprise.",
+      "CAP srv: 512MB memory sufficient for <50 RPS. For >100 RPS, scale to 1GB or add autoscaling.",
+      "Approuter: 256MB sufficient (lightweight proxy). No changes needed unless >500 RPS.",
+      "Outbox concurrency: default 1 entry at a time. If >100 notifications/hour, increase to 5-10.",
+      "Recommendation: Monitor HANA storage growth, CAP memory usage, outbox backlog. Set up autoscaling rules (CPU >70% → add instance)."
+    ],
+    "optimizations": [
+      "HANA compression: Use column-store compression for large tables (Employees, Outbox). Expected: 50-70% storage reduction.",
+      "Outbox archival: Move old entries to S3 (see finding ARC-008). Expected: reduce HANA storage cost by 20%.",
+      "Cache frequently accessed data: e.g., Countries entity (rarely changes). Use @cds.cache annotation or Redis. Expected: reduce HANA load by 10-15%.",
+      "Connection pooling: Tune HANA connection pool size (default 10, increase to 20 for high concurrency). Expected: reduce connection exhaustion errors.",
+      "Lazy loading: Avoid SELECT * in queries. Specify columns explicitly. Expected: reduce network transfer by 30-40%."
+    ]
+  },
+  "good_practices": [
+    "Clean domain-driven architecture with clear separation of handlers, services, repositories, DTOs.",
+    "Comprehensive testing: Jest unit tests, Playwright e2e tests, authorization tests, business rule validation.",
+    "Optimistic concurrency control via ETags and modifiedAt timestamps prevents lost updates.",
+    "Outbox pattern for reliable asynchronous event delivery with exponential backoff and retry logic.",
+    "TypeScript for type safety and improved developer experience (IDE autocomplete, compile-time checks).",
+    "AMS (Authorization Management Service) for attribute-based access control with CompanyCode filtering.",
+    "Managed aspects (createdAt, createdBy, modifiedAt, modifiedBy) for audit trail and concurrency control.",
+    "Health endpoint (/health) for platform readiness probes.",
+    "Custom API key authentication for /api/employees/active with timing-safe comparison (crypto.timingSafeEqual).",
+    "Proper use of CAP transactions (cds.tx) ensures ACID guarantees.",
+    "GitHub Actions CI/CD pipelines for automated testing on push.",
+    "MTA deployment descriptor for Cloud Foundry with proper service bindings.",
+    "Approuter enforces IAS authentication and CSRF protection on all routes.",
+    "Environment-specific configuration (dev/test/production profiles) for flexible deployment.",
+    "Comprehensive README.md with clear getting-started, scripts, environment variables, architecture mapping."
+  ],
+  "prioritized_action_items": [
+    {
+      "issue_id": "ARC-002",
+      "title": "Implement multitenancy (MTX) with tenant isolation",
+      "severity": "Critical",
+      "impact": "Prevents data leakage, enables true SaaS, supports per-tenant scaling and compliance",
+      "effort": "major refactor",
+      "owner_suggestion": "Platform/Architecture team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-001",
+      "title": "Create xs-security.json and integrate XSUAA",
+      "severity": "Critical",
+      "impact": "Prevents authorization bypass in production, enables BTP role assignment UI",
+      "effort": "moderate",
+      "owner_suggestion": "Security team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-003",
+      "title": "Unify dev/test/prod databases or add HANA integration tests",
+      "severity": "Critical",
+      "impact": "Prevents production incidents due to SQLite-HANA dialect differences",
+      "effort": "moderate",
+      "owner_suggestion": "DevOps/QA team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-004",
+      "title": "Implement structured logging and distributed tracing",
+      "severity": "Critical",
+      "impact": "Enables production debugging, incident response, SLO monitoring, compliance",
+      "effort": "moderate",
+      "owner_suggestion": "Observability/SRE team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-006",
+      "title": "Migrate secrets to BTP Credential Store with rotation",
+      "severity": "Major",
+      "impact": "Prevents data breach from leaked API keys, supports compliance audits",
+      "effort": "moderate",
+      "owner_suggestion": "Security team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-005",
+      "title": "Add circuit breaker and DLQ for outbox dispatcher",
+      "severity": "Major",
+      "impact": "Prevents cascade failures, enables manual replay of failed messages",
+      "effort": "moderate",
+      "owner_suggestion": "Backend team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-009",
+      "title": "Implement audit logging for sensitive operations",
+      "severity": "Major",
+      "impact": "Enables GDPR compliance, forensic analysis, insider threat detection",
+      "effort": "moderate",
+      "owner_suggestion": "Security/Compliance team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-007",
+      "title": "Add pagination limits and rate limiting",
+      "severity": "Major",
+      "impact": "Prevents DoS attacks, reduces cost, improves performance",
+      "effort": "quick fix",
+      "owner_suggestion": "Backend team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-008",
+      "title": "Implement outbox archival and monitoring",
+      "severity": "Major",
+      "impact": "Prevents data loss, enables failure trend analysis, supports reconciliation",
+      "effort": "moderate",
+      "owner_suggestion": "Backend team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-010",
+      "title": "Optimize employee ID generation for high concurrency",
+      "severity": "Minor",
+      "impact": "Prevents bulk import failures, increases throughput",
+      "effort": "moderate",
+      "owner_suggestion": "Backend team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-011",
+      "title": "Centralize role name constants",
+      "severity": "Minor",
+      "impact": "Reduces maintenance burden, prevents typo bugs",
+      "effort": "quick fix",
+      "owner_suggestion": "Backend team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-012",
+      "title": "Create ADRs, runbooks, and disaster recovery docs",
+      "severity": "Suggestion",
+      "impact": "Reduces incident response time, preserves architectural knowledge",
+      "effort": "moderate",
+      "owner_suggestion": "Architecture/SRE team",
+      "blocked_by": []
+    },
+    {
+      "issue_id": "ARC-013",
+      "title": "Add load, chaos, contract, and security tests",
+      "severity": "Suggestion",
+      "impact": "Discovers production limits, prevents brittleness, catches vulnerabilities early",
+      "effort": "major refactor",
+      "owner_suggestion": "QA/Security team",
+      "blocked_by": []
+    }
+  ],
+  "open_questions": [
+    "What is the target number of tenants (companies) and users per tenant? This impacts multitenancy design (schema-per-tenant vs shared schema).",
+    "What are the SLA requirements? RTO (Recovery Time Objective) and RPO (Recovery Point Objective) for disaster recovery?",
+    "What is the expected peak load? Concurrent users, requests per second, employees per client, bulk import sizes?",
+    "Are there data residency requirements? Multi-region deployment, GDPR country restrictions?",
+    "What is the compliance scope? GDPR, SOC2, ISO27001, HIPAA? This impacts audit logging, encryption, retention policies.",
+    "What is the outbox notification SLA? Can employee notifications be delayed by minutes/hours/days? Impacts outbox polling interval and concurrency.",
+    "Is there a requirement for real-time employee notifications? If so, consider Event Mesh or WebSocket instead of polling outbox.",
+    "What is the expected HANA data volume growth rate? GB per month, helps size HDI container service plan.",
+    "Are there plans to integrate with SAP SuccessFactors or SAP S/4HANA? This impacts OData client patterns, replication strategies.",
+    "What is the cost budget? Monthly spend limit for HANA, IAS, AMS, Cloud Foundry runtime? Helps right-size service plans.",
+    "Is there a requirement for offline mobile access? If so, need to implement local data sync, conflict resolution.",
+    "What is the user authentication source? Azure AD, Google Workspace, on-premise LDAP? Impacts IAS federation configuration.",
+    "Are there any legacy systems that must integrate with this application? REST, SOAP, file-based ETL?",
+    "What is the testing strategy for production deployment? Canary releases, blue/green, feature flags?",
+    "Is there a requirement for custom reports or BI dashboards? SAP Analytics Cloud, Power BI, Tableau integration?",
+    "What is the incident response process? On-call rotation, escalation paths, postmortem templates?",
+    "Are there any plans to open-source this application or make it available as a BTP SaaS offering?",
+    "What is the expected employee churn rate? Impacts anonymization schedule, data retention policy.",
+    "Are there any hard latency requirements? p95 < 200ms? p99 < 1s? This impacts caching strategy, HANA query optimization.",
+    "Is there a requirement for bulk import/export? CSV, Excel, SAP data transfer files? Impacts batch processing, job scheduling."
+  ]
+}

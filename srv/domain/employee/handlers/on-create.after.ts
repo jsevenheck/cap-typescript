@@ -16,16 +16,9 @@ import type { EmployeeEntity } from '../dto/employee.dto';
 import { createServiceError } from '../../../shared/utils/errors';
 import { requireRequestUser } from '../../shared/request-context';
 import { getEmployeeContext, prepareEmployeeContext } from './context';
+import { getLogger } from '../../../shared/utils/logger';
 
-const getServiceLogger = () => {
-  const typedCds = cds as unknown as { log?: (component: string) => { error: (...args: unknown[]) => void } };
-  if (typeof typedCds.log === 'function') {
-    return typedCds.log('client-service');
-  }
-  return console;
-};
-
-const logger = getServiceLogger();
+const logger = getLogger('employee-service');
 
 export const onCreateEvent = async (
   req: Request,

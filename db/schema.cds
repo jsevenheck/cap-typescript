@@ -76,3 +76,14 @@ entity EmployeeNotificationOutbox : managed, cuid {
   deliveredAt   : Timestamp;
   lastError     : LargeString;
 }
+
+// Dead Letter Queue for permanently failed messages
+entity EmployeeNotificationDLQ : managed, cuid {
+  originalID      : UUID         not null;
+  eventType       : String(60)   not null;
+  destinationName : String(500)  not null;
+  payload         : LargeString  not null;
+  attempts        : Integer      not null;
+  lastError       : LargeString;
+  failedAt        : Timestamp    not null;
+}
