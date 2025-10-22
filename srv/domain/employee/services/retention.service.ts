@@ -10,9 +10,59 @@ import type { UserContext } from '../../../shared/utils/auth';
 import { collectAttributeValues, userHasRole } from '../../../shared/utils/auth';
 import { HR_ADMIN_ROLE } from '../../client/services/lifecycle.service';
 import { anonymizeEmployeeRecord, listEmployeesForAnonymization } from '../repository/employee.repo';
+import { getLogger } from '../../../shared/utils/logger';
+
+const logger = getLogger('employee-retention');
 
 const ANONYMIZED_PLACEHOLDER = 'ANONYMIZED';
 const ANONYMIZED_EMAIL_DOMAIN = 'example.invalid';
+const DEFAULT_BATCH_SIZE = 100;
+const MAX_BATCH_SIZE = 10000;
+
+/**
+ * Safely parse and validate the anonymization batch size from environment variable.
+ * Returns a positive integer between 1 and MAX_BATCH_SIZE (10000).
+ * Logs a warning and returns DEFAULT_BATCH_SIZE if the value is invalid.
+ */
+const getValidatedBatchSize = (): number => {
+  const envValue = process.env.ANONYMIZATION_BATCH_SIZE;
+
+  if (!envValue) {
+    return DEFAULT_BATCH_SIZE;
+  }
+
+  const parsed = parseInt(envValue, 10);
+
+  // Check for NaN
+  if (Number.isNaN(parsed)) {
+    logger.warn(
+      { configuredValue: envValue, defaultValue: DEFAULT_BATCH_SIZE },
+      'Invalid ANONYMIZATION_BATCH_SIZE: not a number. Using default.'
+    );
+    return DEFAULT_BATCH_SIZE;
+  }
+
+  // Check for values <= 0
+  if (parsed <= 0) {
+    logger.warn(
+      { configuredValue: parsed, defaultValue: DEFAULT_BATCH_SIZE },
+      'Invalid ANONYMIZATION_BATCH_SIZE: must be positive. Using default.'
+    );
+    return DEFAULT_BATCH_SIZE;
+  }
+
+  // Check for unreasonably large values
+  if (parsed > MAX_BATCH_SIZE) {
+    logger.warn(
+      { configuredValue: parsed, maxValue: MAX_BATCH_SIZE },
+      'ANONYMIZATION_BATCH_SIZE exceeds maximum. Using maximum allowed value.'
+    );
+    return MAX_BATCH_SIZE;
+  }
+
+  // Value is valid
+  return parsed;
+};
 
 const buildAnonymizedEmail = (employeeId?: string): string => {
   const sanitized = typeof employeeId === 'string' ? sanitizeIdentifier(employeeId).toLowerCase() : '';
@@ -57,9 +107,9 @@ export const anonymizeFormerEmployees = async (
   }
 
   // Batch anonymization in chunks for better performance
-  const BATCH_SIZE = parseInt(process.env.ANONYMIZATION_BATCH_SIZE || '100', 10);
-  for (let i = 0; i < employeesToAnonymize.length; i += BATCH_SIZE) {
-    const batch = employeesToAnonymize.slice(i, i + BATCH_SIZE);
+  const batchSize = getValidatedBatchSize();
+  for (let i = 0; i < employeesToAnonymize.length; i += batchSize) {
+    const batch = employeesToAnonymize.slice(i, i + batchSize);
     await Promise.all(
       batch.map(employee =>
         anonymizeEmployeeRecord(tx, employee.ID, buildAnonymizedEmail(employee.employeeId), ANONYMIZED_PLACEHOLDER)
