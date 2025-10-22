@@ -1,6 +1,8 @@
 // Type-safe wrapper around @sap/logging
 // Note: @sap/logging doesn't have TypeScript definitions, so we define our own interface
 
+import { randomUUID } from 'node:crypto';
+
 type CreateLoggerFunc = (config: { appName: string; appVersion: string }) => any;
 
 let createLoggerFunc: CreateLoggerFunc | null = null;
@@ -90,5 +92,5 @@ export const extractOrGenerateCorrelationId = (headers: Record<string, string | 
   }
 
   // Generate new UUID v4
-  return crypto.randomUUID();
+  return randomUUID();
 };
