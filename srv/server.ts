@@ -65,23 +65,25 @@ cds.on('bootstrap', (app: Application) => {
   logger.info('Application bootstrap complete');
 });
 
-cds.on('served', async () => {
-  const authLogger = getLogger('auth');
-  authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
+cds.on('served', () => {
+  void (async () => {
+    const authLogger = getLogger('auth');
+    authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
-  // Load API key from Credential Store or environment before accepting requests
-  await loadApiKey();
+    // Load API key from Credential Store or environment before accepting requests
+    await loadApiKey();
 
-  if (process.env.NODE_ENV === 'test') {
-    return;
-  }
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
 
-  const outboxLogger = getLogger('outbox');
-  registerTimer(scheduleOutboxProcessing(processOutbox, outboxLogger));
-  registerTimer(scheduleOutboxCleanup(cleanupOutbox, outboxLogger));
-  ensureShutdownHooks();
+    const outboxLogger = getLogger('outbox');
+    registerTimer(scheduleOutboxProcessing(processOutbox, outboxLogger));
+    registerTimer(scheduleOutboxCleanup(cleanupOutbox, outboxLogger));
+    ensureShutdownHooks();
 
-  logger.info('All services started successfully');
+    logger.info('All services started successfully');
+  })();
 });
 
 export { processOutbox, cleanupOutbox };
