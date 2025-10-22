@@ -97,6 +97,7 @@ export default class ClientHandler {
               this.selection.clearClient();
             })
             .catch((error: Error) => {
+              console.error("Error deleting client:", error);
               MessageBox.error(error.message ?? "Failed to delete client");
             });
         }
@@ -108,20 +109,39 @@ export default class ClientHandler {
     const dialog = this.byId("clientDialog") as Dialog;
     const dialogModel = this.models.getClientModel();
     const data = dialogModel.getData();
-    const countryCode = data.client.country_code?.trim() ?? "";
+    
+    // Extract country code from various formats
+    let countryCode = data.client.country_code?.trim() ?? "";
+    
+    // If format is "Country Name (XX)", extract the code
+    const codeMatch = countryCode.match(/\(([A-Z]{2})\)$/i);
+    if (codeMatch) {
+      countryCode = codeMatch[1];
+    }
+    
     const payload = {
       companyId: data.client.companyId?.trim() ?? "",
       name: data.client.name?.trim() ?? "",
       country_code: countryCode ? countryCode.toUpperCase() : null,
     };
 
+    // Enhanced validation
     if (!payload.companyId || !payload.name) {
       MessageBox.error("Company ID and Name are required.");
       return;
     }
 
     if (!payload.country_code) {
-      MessageBox.error("Country is required.");
+      MessageBox.error("Country code is required.");
+      return;
+    }
+
+    // Validate country code format (must be exactly 2 letters)
+    if (!/^[A-Z]{2}$/i.test(payload.country_code)) {
+      MessageBox.error(
+        "Country code must be exactly 2 letters (e.g., 'BH' for Bahrain, 'US' for United States).\n\n" +
+        `You entered: '${payload.country_code}'`
+      );
       return;
     }
 
@@ -141,11 +161,34 @@ export default class ClientHandler {
           const model = readyContext.getModel() as ODataModel;
 
           const handleError = (error: unknown): void => {
+            console.error("Error creating client:", error);
             dialog.setBusy(false);
-            const message =
-              error instanceof Error && error.message
-                ? error.message
-                : "Failed to create client";
+            
+            let message = "Failed to create client";
+            
+            // Enhanced error message extraction for OData errors
+            if (error instanceof Error) {
+              message = error.message;
+            } else if (error && typeof error === 'object') {
+              const odataError = error as any;
+              
+              // Try to extract the most detailed error message available
+              if (odataError.error?.message) {
+                message = odataError.error.message;
+              } else if (odataError.message) {
+                message = odataError.message;
+              } else if (odataError.statusText) {
+                message = odataError.statusText;
+              } else if (odataError.responseText) {
+                try {
+                  const parsed = JSON.parse(odataError.responseText);
+                  message = parsed.error?.message || parsed.message || message;
+                } catch (e) {
+                  // If parsing fails, use default message
+                }
+              }
+            }
+            
             MessageBox.error(message);
             void readyContext.delete("$auto").catch(() => undefined);
           };
@@ -159,7 +202,18 @@ export default class ClientHandler {
             return;
           }
 
-          Promise.all([creationPromise, model.submitBatch("$auto")])
+          // Add timeout protection (30 seconds)
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error("Operation timed out after 30 seconds. Please check your network connection and try again."));
+            }, 30000);
+          });
+
+          // Race between the actual operation and timeout
+          Promise.race([
+            Promise.all([creationPromise, model.submitBatch("$auto")]),
+            timeoutPromise
+          ])
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
@@ -180,14 +234,25 @@ export default class ClientHandler {
       context.setProperty("companyId", payload.companyId);
       context.setProperty("name", payload.name);
       context.setProperty("country_code", payload.country_code ?? null);
-      model
-        .submitBatch("$auto")
+      
+      // Add timeout for update as well
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Update operation timed out after 30 seconds."));
+        }, 30000);
+      });
+      
+      Promise.race([
+        model.submitBatch("$auto"),
+        timeoutPromise
+      ])
         .then(() => {
           dialog.setBusy(false);
           dialog.close();
           MessageToast.show("Client updated");
         })
         .catch((error: Error) => {
+          console.error("Error updating client:", error);
           dialog.setBusy(false);
           MessageBox.error(error.message ?? "Failed to update client");
         });
