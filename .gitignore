@@ -8,33 +8,17 @@ Desktop.ini
 .project
 .classpath
 .settings/
-out/
 
-# --- Java/Maven
-**/target/
+# --- Logs & Temp
 *.log
 *.tmp
 *.swp
-*.h2.db
-*.mv.db
-*.trace.db
-.mvn/wrapper/maven-wrapper.jar
+npm-debug.log*
 
-# --- CAP Java: generated
-/db/src/gen/
-# alle generierten Java/Resourcen
-/srv/src/gen/
+# --- CAP: Generated
 /srv/gen/
-# generierte OData/CSN-Artefakte
-/srv/src/main/resources/edmx/
-/srv/src/main/resources/csn.json
-# generiertes Schema aus cds deploy --to h2 --dry
-/srv/src/main/resources/schema.sql
-
-# Falls Build woanders Ressourcen ablegt (seltener)
-**/src/main/resources/**/edmx/
-**/src/main/resources/**/csn.json
-**/src/main/resources/odata/
+/gen/
+/ams/
 
 # --- Node/UI5/TS
 **/node_modules/
@@ -45,13 +29,14 @@ out/
 **/.parcel-cache/
 **/.npm/
 **/.pnpm-store/
-app/**/*.tsbuildinfo
-/srv/node_modules/
-/npm-debug.log*
-/ams/
-/gen/
+**/*.tsbuildinfo
 
-# --- Env/Secrets
+# --- TypeScript Build
+srv/**/*.js
+srv/**/*.js.map
+!srv/**/*.config.js
+
+# --- Environment & Secrets
 .env
 .env.*
 default-env.json
@@ -60,20 +45,18 @@ default-env.json
 mta_archives/
 mta_op/
 
-# Approuter
+# --- Approuter
 approuter/node_modules/
 approuter/resources/
 approuter/default-env.json
 approuter/package-lock.json
 
-# TypeScript build artifacts
-**/*.tsbuildinfo
-srv/**/*.js
-srv/**/*.js.map
-
-# Playwright
+# --- Testing
 playwright-report/
 test-results/
+coverage/
 
-# SQLite runtime files
-sqlite.db
+# --- SQLite Databases
+*.db
+!db/data/**
+db/*.db

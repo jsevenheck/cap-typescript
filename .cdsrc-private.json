@@ -1,5 +1,11 @@
 {
   "requires": {
+    "db": {
+      "kind": "sqlite",
+      "credentials": {
+        "filename": "./db/sqlite.db"    
+      }
+    },
     "auth": {
       "kind": "mocked"
     },

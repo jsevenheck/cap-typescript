@@ -49,6 +49,12 @@
       "urlPath": "/odata/v4"
     },
     "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "filename": "../db/sqlite.db"
+        }
+      },
       "auth": {
         "kind": "mocked",
         "users": {
@@ -122,6 +128,16 @@
             "label": "authorization",
             "service": "authorization",
             "plan": "application"
+          }
+        }
+      }
+    },
+    "[test]": {
+      "requires": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "filename": "../db/test.db"
           }
         }
       }

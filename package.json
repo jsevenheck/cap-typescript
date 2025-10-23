@@ -14,7 +14,10 @@
     "test:frontend": "playwright test",
     "lint": "npm run lint --workspace srv",
     "start": "npm run build && npm run start:runtime",
-    "start:runtime": "npm run start --workspace srv"
+    "start:runtime": "npm run start --workspace srv",
+    "deploy": "cds deploy --to sqlite:db/sqlite.db",
+    "deploy:clean": "rm -f db/*.db && npm run deploy",
+    "dev:fresh": "npm run deploy:clean && npm run dev"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -46,7 +49,7 @@
       "db": {
         "kind": "sqlite",
         "credentials": {
-          "filename": "./sqlite.db"
+          "filename": "./db/sqlite.db"
         }
       },
       "auth": {
@@ -142,7 +145,7 @@
         "db": {
           "kind": "sqlite",
           "credentials": {
-            "filename": "./test.db"
+            "filename": "./db/test.db"
           }
         }
       }
