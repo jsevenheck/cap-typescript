@@ -46,7 +46,7 @@
       "db": {
         "kind": "sqlite",
         "credentials": {
-          "filename": "sqlite.db"
+          "filename": "./sqlite.db"
         }
       },
       "auth": {
@@ -142,7 +142,7 @@
         "db": {
           "kind": "sqlite",
           "credentials": {
-            "filename": ":memory:"
+            "filename": "./test.db"
           }
         }
       }

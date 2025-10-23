@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
 
-import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
+import apiKeyMiddleware/*, { loadApiKey } */from './middleware/apiKey';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import { processOutbox } from './infrastructure/outbox/dispatcher';
@@ -74,7 +74,8 @@ cds.on('served', async () => {
     authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
     // Load API key from Credential Store or environment before accepting requests
-    await loadApiKey();
+    //auskommentiert für local dev
+    //await loadApiKey();
 
     if (process.env.NODE_ENV === 'test') {
       return;
