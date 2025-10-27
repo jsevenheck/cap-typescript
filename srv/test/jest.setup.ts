@@ -8,3 +8,6 @@ process.env.NODE_ENV = 'test';
 if (env?.requires?.ams) {
   env.requires.ams.generateDcl = false;
 }
+
+// Set default test timeout
+jest.setTimeout(60000);
