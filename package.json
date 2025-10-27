@@ -31,6 +31,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
+    "@cap-js/hana": "^2",
     "@ui5/cli": "^4.0.30"
   },
   "cds": {

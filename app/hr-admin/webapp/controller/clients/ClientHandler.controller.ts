@@ -210,8 +210,9 @@ export default class ClientHandler {
           });
 
           // Race between the actual operation and timeout
+          // Note: created() already triggers the submit internally, so we don't need to call submitBatch separately
           Promise.race([
-            Promise.all([creationPromise, model.submitBatch("$auto")]),
+            creationPromise,
             timeoutPromise
           ])
             .then(() => {

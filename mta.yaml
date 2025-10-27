@@ -30,7 +30,9 @@ modules:
       commands:
         - npm ci
         - npm run build
-      ignore: ["test", "types"]
+      ignore:
+        - "test"
+        - "types"
     provides:
       - name: srv-api
         properties:
@@ -95,7 +97,8 @@ modules:
         - npm ci
         - npm run build
       build-result: dist
-      supported-platforms: []
+      supported-platforms:
+        []
     requires:
       - name: cap-ts-html5-repo-runtime
       - name: srv-api
@@ -222,4 +225,5 @@ resources:
       service-plan: trial
       config:
         authorization:
-          default_permissions: [read]
+          default_permissions:
+            - read
