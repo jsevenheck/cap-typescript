@@ -9,6 +9,7 @@ import { executeHttpRequest } from '@sap-cloud-sdk/http-client';
 
 import { cleanupOutbox, processOutbox } from '../../../server';
 
+// Use cds.test() to start server and auto-deploy database with test data
 const cap = cds.test(path.join(__dirname, '..', '..', '..'));
 const encoded = Buffer.from('dev:dev').toString('base64');
 const authConfig = {
@@ -54,6 +55,15 @@ let db: any;
 
 beforeAll(async () => {
   db = await cds.connect.to('db');
+
+  // Deploy the database schema and seed data
+  // This ensures all tables are created before tests run
+  try {
+    await (cds as any).deploy(path.join(__dirname, '..', '..', '..')).to(db);
+  } catch (error) {
+    // If deployment fails, it might already be deployed, continue
+    console.log('Database deployment info:', error);
+  }
 });
 
 const captureErrorStatus = async (promise: Promise<unknown>): Promise<number> => {

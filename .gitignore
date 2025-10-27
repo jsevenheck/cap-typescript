@@ -58,5 +58,7 @@ coverage/
 
 # --- SQLite Databases
 *.db
+*.sqlite
 !db/data/**
 db/*.db
+srv/*.sqlite

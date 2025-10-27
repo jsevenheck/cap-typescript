@@ -20,7 +20,7 @@
     "dev:fresh": "npm run deploy:clean && npm run dev"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
