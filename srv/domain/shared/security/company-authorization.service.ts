@@ -17,6 +17,7 @@ const getUserCompanyCodes = (user: UserContext): string[] => {
 /**
  * Checks if a user is authorized to access data for a specific company.
  * HR admin users have access to all companies.
+ * Company code comparison is case-insensitive.
  */
 const isAuthorizedForCompany = (user: UserContext, companyId: string): boolean => {
   // HR admin users bypass company restrictions
@@ -31,7 +32,9 @@ const isAuthorizedForCompany = (user: UserContext, companyId: string): boolean =
     return false;
   }
 
-  return userCompanies.includes(companyId);
+  // Case-insensitive comparison for company codes
+  const companyIdLower = companyId.toLowerCase();
+  return userCompanies.some((code) => code.toLowerCase() === companyIdLower);
 };
 
 /**
