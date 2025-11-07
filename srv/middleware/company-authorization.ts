@@ -65,7 +65,13 @@ export class CompanyAuthorization {
 
     for (const client of clients) {
       const clientId = this.extractId(client);
-      const candidate = typeof client.companyId === 'string' ? client.companyId : existingClients.get(clientId ?? '')?.companyId;
+      const existing = clientId ? existingClients.get(clientId) : undefined;
+
+      if (existing) {
+        this.ensureClientAccess(existing.ID, `client ${existing.ID}`);
+      }
+
+      const candidate = typeof client.companyId === 'string' ? client.companyId : existing?.companyId;
       const normalized = normalizeCompanyId(candidate ?? undefined);
 
       if (!normalized) {
@@ -88,6 +94,10 @@ export class CompanyAuthorization {
       const employeeId = this.extractId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
       const clientId = this.resolveAssociationId(employee, 'client', existing?.client_ID);
+
+      if (existing?.client_ID) {
+        targetClientIds.add(existing.client_ID);
+      }
       if (clientId) {
         targetClientIds.add(clientId);
       }
@@ -98,18 +108,16 @@ export class CompanyAuthorization {
     for (const employee of employees) {
       const employeeId = this.extractId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
+      if (existing?.client_ID) {
+        this.ensureClientAccess(existing.client_ID, `employee ${employeeId ?? '(new)'} (current assignment)`);
+      }
       const clientId = this.resolveAssociationId(employee, 'client', existing?.client_ID);
 
       if (!clientId) {
         throw createServiceError(400, 'Employee must reference a client.');
       }
 
-      const companyId = this.clientCompanyCache.get(clientId);
-      if (!companyId) {
-        throw createServiceError(404, `Client ${clientId} not found.`);
-      }
-
-      this.ensureCompanyAllowed(companyId, `employee ${employeeId ?? '(new)'}`);
+      this.ensureClientAccess(clientId, `employee ${employeeId ?? '(new)'}`);
     }
   }
 
@@ -125,6 +133,10 @@ export class CompanyAuthorization {
       const costCenterId = this.extractId(costCenter);
       const existing = costCenterId ? existingCostCenters.get(costCenterId) : undefined;
       const clientId = this.resolveAssociationId(costCenter, 'client', existing?.client_ID);
+
+      if (existing?.client_ID) {
+        targetClientIds.add(existing.client_ID);
+      }
       if (clientId) {
         targetClientIds.add(clientId);
       }
@@ -135,18 +147,16 @@ export class CompanyAuthorization {
     for (const costCenter of costCenters) {
       const costCenterId = this.extractId(costCenter);
       const existing = costCenterId ? existingCostCenters.get(costCenterId) : undefined;
+      if (existing?.client_ID) {
+        this.ensureClientAccess(existing.client_ID, `cost center ${costCenterId ?? '(new)'} (current assignment)`);
+      }
       const clientId = this.resolveAssociationId(costCenter, 'client', existing?.client_ID);
 
       if (!clientId) {
         throw createServiceError(400, 'Cost center must reference a client.');
       }
 
-      const companyId = this.clientCompanyCache.get(clientId);
-      if (!companyId) {
-        throw createServiceError(404, `Client ${clientId} not found.`);
-      }
-
-      this.ensureCompanyAllowed(companyId, `cost center ${costCenterId ?? '(new)'}`);
+      this.ensureClientAccess(clientId, `cost center ${costCenterId ?? '(new)'}`);
     }
   }
 
@@ -254,6 +264,15 @@ export class CompanyAuthorization {
         this.clientCompanyCache.set(id, null);
       }
     }
+  }
+
+  private ensureClientAccess(clientId: string, context: string): void {
+    const companyId = this.clientCompanyCache.get(clientId);
+    if (companyId == null) {
+      throw createServiceError(404, `Client ${clientId} not found.`);
+    }
+
+    this.ensureCompanyAllowed(companyId, context);
   }
 
   private resolveAssociationId(data: any, relation: string, fallback?: string | null): string | null {
