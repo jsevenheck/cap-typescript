@@ -7,7 +7,7 @@ import { ParallelDispatcher, enqueueOutboxEntry } from '../../../infrastructure/
 import OutboxMetrics from '../../../infrastructure/outbox/metrics';
 import { OutboxCleanup } from '../../../infrastructure/outbox/cleanup';
 
-const cap = cds.test(path.join(__dirname, '..', '..', '..'));
+cds.test(path.join(__dirname, '..', '..', '..'));
 
 const OUTBOX_TABLE = 'clientmgmt.EmployeeNotificationOutbox';
 const DLQ_TABLE = 'clientmgmt.EmployeeNotificationDLQ';

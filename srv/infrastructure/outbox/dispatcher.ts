@@ -339,11 +339,11 @@ export const enqueueOutboxEntry = async (
   config: OutboxConfig,
   metrics: OutboxMetrics,
 ): Promise<void> => {
-  const maxAttempts = config.enqueueMaxAttempts === 0 ? Number.POSITIVE_INFINITY : config.enqueueMaxAttempts;
+  const maxAttempts =
+    config.enqueueMaxAttempts === 0 ? Number.POSITIVE_INFINITY : config.enqueueMaxAttempts;
 
   let attempt = 1;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  while (attempt <= maxAttempts) {
     try {
       await tx.run(
         ql.INSERT.into(OUTBOX_TABLE).entries({

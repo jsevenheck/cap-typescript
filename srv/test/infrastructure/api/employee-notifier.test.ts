@@ -11,7 +11,7 @@ import axios from 'axios';
 
 import { EmployeeThirdPartyNotifier } from '../../../infrastructure/api/third-party/employee-notifier';
 
-const cap = cds.test(path.join(__dirname, '..', '..', '..'));
+cds.test(path.join(__dirname, '..', '..', '..'));
 const mockedAxios = axios as unknown as { create: jest.Mock };
 
 const buildMockClient = (postImpl?: jest.Mock): { post: jest.Mock } => {
