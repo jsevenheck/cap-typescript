@@ -231,6 +231,19 @@ const validateManagerAndCostCenter = async (
   const existingManagerId = normalizeIdentifier(existing?.manager_ID);
   let finalManagerId = managerExplicit ? requestedManagerId : existingManagerId;
 
+  // Validate manager belongs to same client (if manager is explicitly provided)
+  if (requestedManagerId) {
+    const manager = await findEmployeeById(tx, requestedManagerId, ['client_ID']);
+
+    if (!manager) {
+      throw createServiceError(404, `Manager with ID ${requestedManagerId} not found.`);
+    }
+
+    if (manager.client_ID && manager.client_ID !== client.ID) {
+      throw createServiceError(400, 'Manager must belong to the same client.');
+    }
+  }
+
   if (finalCostCenterId) {
     const costCenter = await findCostCenterById(tx, finalCostCenterId);
 

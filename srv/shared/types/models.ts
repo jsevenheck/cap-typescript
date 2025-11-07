@@ -3,6 +3,8 @@ export interface ClientEntity {
   companyId: string;
   name?: string;
   country_code: string;
+  notificationEndpoint?: string;
+  country_code_code?: string; // Association to Countries
 }
 
 export interface EmployeeEntity {
@@ -17,6 +19,8 @@ export interface EmployeeEntity {
   exitDate?: string;
   status?: string;
   employmentType?: string;
+  isManager?: boolean;
+  anonymizedAt?: string;
   client_ID: string;
   manager_ID?: string;
   costCenter_ID?: string;

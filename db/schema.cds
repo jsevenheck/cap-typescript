@@ -19,29 +19,39 @@ type EmploymentType : String enum {
 ]
 entity Clients : managed, cuid {
   @assert.unique: { name: 'Clients_companyId_unique' }
-  companyId    : String(40) not null;
-  name         : String(120);
-  country_code : String(2)  not null;
-  employees    : Composition of many Employees on employees.client = $self;
-  costCenters  : Composition of many CostCenters on costCenters.client = $self;
+  companyId            : String(40) not null;
+  name                 : String(120);
+  country_code         : String(2)  not null;
+  notificationEndpoint : String(500);
+  country              : Association to CommonCountries;
+  employees            : Composition of many Employees on employees.client = $self;
+  costCenters          : Composition of many CostCenters on costCenters.client = $self;
 }
 
 @odata.etag: 'modifiedAt'
+@PersonalData: { dataSubjectRole: 'Employee' }
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
-  employeeId    : String(60)  not null;
-  firstName     : String(60)  not null;
-  lastName      : String(60)  not null;
-  email         : String(120) not null;
-  location      : String(80);
-  positionLevel : String(40);
-  entryDate     : Date not null;
-  exitDate      : Date;
-  status        : EmployeeStatus default 'active';
-  employmentType: EmploymentType default 'internal';
-  client        : Association to Clients not null;
-  manager       : Association to Employees;
-  costCenter    : Association to CostCenters;
+  employeeId     : String(60)  not null;
+  @PersonalData.IsPotentiallyPersonal
+  firstName      : String(60)  not null;
+  @PersonalData.IsPotentiallyPersonal
+  lastName       : String(60)  not null;
+  @PersonalData.IsPotentiallyPersonal
+  email          : String(120) not null;
+  @PersonalData.IsPotentiallyPersonal
+  location       : String(80);
+  positionLevel  : String(40);
+  entryDate      : Date not null;
+  exitDate       : Date;
+  status         : EmployeeStatus default 'active';
+  employmentType : EmploymentType default 'internal';
+  isManager      : Boolean default false;
+  @PersonalData.IsPotentiallyPersonal
+  anonymizedAt   : Timestamp;
+  client         : Association to Clients not null;
+  manager        : Association to Employees;
+  costCenter     : Association to CostCenters;
 }
 
 entity EmployeeIdCounters {
