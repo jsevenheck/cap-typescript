@@ -109,7 +109,7 @@ export class CompanyAuthorization {
       const employeeId = this.extractId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
       if (existing?.client_ID) {
-        this.ensureClientAccess(existing.client_ID, `employee ${employeeId ?? '(new)'} (current assignment)`);
+        this.ensureClientAccess(existing.client_ID, `employee ${employeeId ?? '(new)'}`);
       }
       const clientId = this.resolveAssociationId(employee, 'client', existing?.client_ID);
 
@@ -148,7 +148,7 @@ export class CompanyAuthorization {
       const costCenterId = this.extractId(costCenter);
       const existing = costCenterId ? existingCostCenters.get(costCenterId) : undefined;
       if (existing?.client_ID) {
-        this.ensureClientAccess(existing.client_ID, `cost center ${costCenterId ?? '(new)'} (current assignment)`);
+        this.ensureClientAccess(existing.client_ID, `cost center ${costCenterId ?? '(new)'}`);
       }
       const clientId = this.resolveAssociationId(costCenter, 'client', existing?.client_ID);
 
