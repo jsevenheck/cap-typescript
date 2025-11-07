@@ -206,14 +206,29 @@ describe('Client Integrity Validation', () => {
       expect(managerResponse.status).toBe(201);
       const managerId = managerResponse.data.ID;
 
+      // Fetch employee to get ETag for optimistic concurrency
+      const fetchResponse = await http.get<Record<string, any>>(
+        `/odata/v4/clients/Employees(${employeeId})`,
+        authConfig,
+      );
+      const modifiedAt = fetchResponse.data.modifiedAt as string;
+      const etag = `"${modifiedAt}"`;
+
       // Try to update employee with manager from different client
+      const patchConfig = {
+        ...authConfig,
+        headers: {
+          ...authConfig.headers,
+          'If-Match': etag,
+        },
+      };
       const status = await captureErrorStatus(
-        http.patch(`/odata/v4/clients/Employees(${employeeId})`, { manager_ID: managerId }, authConfig),
+        http.patch(`/odata/v4/clients/Employees(${employeeId})`, { manager_ID: managerId }, patchConfig),
       );
       expect(status).toBe(400);
 
       const errorMessage = await captureErrorMessage(
-        http.patch(`/odata/v4/clients/Employees(${employeeId})`, { manager_ID: managerId }, authConfig),
+        http.patch(`/odata/v4/clients/Employees(${employeeId})`, { manager_ID: managerId }, patchConfig),
       );
       expect(errorMessage).toContain('Manager must belong to the same client');
     });
@@ -251,11 +266,26 @@ describe('Client Integrity Validation', () => {
       );
       const employeeId = employeeResponse.data.ID;
 
+      // Fetch employee to get ETag for optimistic concurrency
+      const fetchResponse = await http.get<Record<string, any>>(
+        `/odata/v4/clients/Employees(${employeeId})`,
+        authConfig,
+      );
+      const modifiedAt = fetchResponse.data.modifiedAt as string;
+      const etag = `"${modifiedAt}"`;
+
       // Remove manager
+      const patchConfig = {
+        ...authConfig,
+        headers: {
+          ...authConfig.headers,
+          'If-Match': etag,
+        },
+      };
       const updateResponse = await http.patch(
         `/odata/v4/clients/Employees(${employeeId})`,
         { manager_ID: null },
-        authConfig,
+        patchConfig,
       );
       expect(updateResponse.status).toBe(200);
     });

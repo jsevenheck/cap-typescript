@@ -23,7 +23,6 @@ entity Clients : managed, cuid {
   name                 : String(120);
   country_code         : String(2)  not null;
   notificationEndpoint : String(500);
-  country              : Association to CommonCountries;
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
 }

@@ -11,3 +11,10 @@ if (env?.requires?.ams) {
 
 // Set default test timeout
 jest.setTimeout(60000);
+
+// Mock p-limit to avoid ESM module issues in tests
+jest.mock('p-limit', () => {
+  return jest.fn(() => {
+    return (fn: () => Promise<unknown>) => fn();
+  });
+});
