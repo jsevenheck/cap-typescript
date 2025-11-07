@@ -374,7 +374,10 @@ describe('ClientService authorization', () => {
           }),
         ),
       ),
-    ).rejects.toMatchObject({ message: expect.stringContaining('Forbidden') });
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED_COMPANY',
+      message: expect.stringContaining('User is not authorized'),
+    });
   });
 
   it('accepts IAS CompanyCode attributes provided as array values', async () => {
@@ -410,7 +413,10 @@ describe('ClientService authorization', () => {
           }),
         ),
       ),
-    ).rejects.toMatchObject({ message: expect.stringContaining('Forbidden') });
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED_COMPANY',
+      message: expect.stringContaining('User is not authorized'),
+    });
   });
 
   const expectCompanyRestriction = async (companyCodes: string[]) =>
@@ -433,7 +439,8 @@ describe('ClientService authorization', () => {
       (error) => {
         const status = (error as any).statusCode ?? (error as any).code;
         expect([403, '403']).toContain(status);
-        expect((error as Error).message).toContain('Forbidden: company code not assigned');
+        expect((error as any).code).toBe('UNAUTHORIZED_COMPANY');
+        expect((error as Error).message).toContain('User is not authorized');
       },
     );
 

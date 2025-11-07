@@ -15,6 +15,50 @@ export const startCapServer = async (): Promise<RunningServer> => {
   process.env.CDS_PROFILES = process.env.CDS_PROFILES ?? 'test';
   const projectRoot = path.resolve(__dirname, '../..');
   const tsConfig = path.join(projectRoot, 'srv/tsconfig.json');
+  const forwardStdout = (chunk: Buffer) => {
+    process.stdout.write(chunk);
+  };
+  const forwardStderr = (chunk: Buffer) => {
+    process.stderr.write(chunk);
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const deploy = spawn(
+      'node',
+      ['-r', 'ts-node/register/transpile-only', './node_modules/@sap/cds-dk/bin/cds.js', 'deploy'],
+      {
+        cwd: projectRoot,
+        env: {
+          ...process.env,
+          TS_NODE_PROJECT: tsConfig,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+
+    const cleanup = () => {
+      deploy.stdout.off('data', forwardStdout);
+      deploy.stderr.off('data', forwardStderr);
+    };
+
+    deploy.stdout.on('data', forwardStdout);
+    deploy.stderr.on('data', forwardStderr);
+
+    deploy.on('error', (error) => {
+      cleanup();
+      reject(error);
+    });
+
+    deploy.on('exit', (code) => {
+      cleanup();
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`cds deploy failed with exit code ${code ?? 'unknown'}`));
+      }
+    });
+  });
+
   const child = spawn(
     'node',
     ['-r', 'ts-node/register/transpile-only', './node_modules/@sap/cds-dk/bin/cds.js', 'run', '--in-memory?', '--port', '0'],
@@ -29,14 +73,6 @@ export const startCapServer = async (): Promise<RunningServer> => {
   ) as ChildProcessWithoutNullStreams;
 
   const urlPattern = /server listening on \{ url: '([^']+)' \}/i;
-
-  const forwardStdout = (chunk: Buffer) => {
-    process.stdout.write(chunk);
-  };
-
-  const forwardStderr = (chunk: Buffer) => {
-    process.stderr.write(chunk);
-  };
 
   child.stderr.on('data', forwardStderr);
 

@@ -5,14 +5,21 @@ import type { ClientEntity } from '../dto/client.dto';
 import { prepareClientUpsert } from '../services/lifecycle.service';
 import { buildUserContext } from '../../../shared/utils/auth';
 import { buildConcurrencyContext, deriveTargetId, requireRequestUser } from '../../shared/request-context';
+import { enforceClientCompany } from '../../shared/security/company-authorization.service';
 
 const handleClientUpsert = async (req: Request): Promise<void> => {
   const user = buildUserContext(requireRequestUser(req));
+  const targetId = deriveTargetId(req);
+
+  await enforceClientCompany(req, [
+    { ...(req.data as Partial<ClientEntity>), ID: targetId ?? (req.data as Partial<ClientEntity>).ID },
+  ]);
+
   const concurrency = buildConcurrencyContext(req, 'clientmgmt.Clients');
   const { updates } = await prepareClientUpsert({
     event: req.event as 'CREATE' | 'UPDATE',
     data: req.data as Partial<ClientEntity>,
-    targetId: deriveTargetId(req),
+    targetId,
     user,
     tx: cds.transaction(req),
     concurrency,

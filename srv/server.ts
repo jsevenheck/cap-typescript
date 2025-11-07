@@ -6,26 +6,14 @@ import activeEmployeesHandler from './domain/employee/handlers/active-employees.
 
 import { processOutbox } from './infrastructure/outbox/dispatcher';
 import { cleanupOutbox } from './infrastructure/outbox/cleanup';
-import { scheduleOutboxCleanup, scheduleOutboxProcessing } from './infrastructure/outbox/scheduler';
+import {
+  startNotificationOutboxScheduler,
+  scheduledDispatch,
+  purgeCompleted,
+  shutdownDispatcher,
+} from './domain/employee/services/notification-outbox.service';
 import { resolveAuthProviderName } from './shared/utils/authProvider';
 import { initializeLogger, getLogger, extractOrGenerateCorrelationId, setCorrelationId } from './shared/utils/logger';
-
-const outboxTimers: NodeJS.Timeout[] = [];
-
-const registerTimer = (timer?: NodeJS.Timeout): void => {
-  if (timer) {
-    outboxTimers.push(timer);
-  }
-};
-
-const clearOutboxTimers = (): void => {
-  while (outboxTimers.length) {
-    const timer = outboxTimers.pop();
-    if (timer) {
-      clearInterval(timer);
-    }
-  }
-};
 
 let shutdownHooksRegistered = false;
 const ensureShutdownHooks = (): void => {
@@ -33,8 +21,27 @@ const ensureShutdownHooks = (): void => {
     return;
   }
   shutdownHooksRegistered = true;
-  cds.on('shutdown', clearOutboxTimers);
-  process.on('exit', clearOutboxTimers);
+  const outboxLogger = getLogger('outbox');
+  const gracefulShutdown = async (): Promise<void> => {
+    try {
+      await shutdownDispatcher();
+    } catch (error) {
+      outboxLogger.error({ err: error }, 'Failed to shutdown notification dispatcher gracefully');
+    }
+  };
+
+  cds.on('shutdown', () => {
+    void gracefulShutdown();
+  });
+
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+  for (const signal of signals) {
+    process.once(signal, () => {
+      void gracefulShutdown().finally(() => {
+        process.exit(0);
+      });
+    });
+  }
 };
 
 // Initialize structured logger
@@ -81,10 +88,16 @@ cds.on('served', async () => {
       return;
     }
 
-    const outboxLogger = getLogger('outbox');
-    registerTimer(scheduleOutboxProcessing(processOutbox, outboxLogger));
-    registerTimer(scheduleOutboxCleanup(cleanupOutbox, outboxLogger));
+    startNotificationOutboxScheduler();
     ensureShutdownHooks();
+
+    void scheduledDispatch().catch((error) => {
+      logger.warn({ err: error }, 'Initial outbox dispatch failed');
+    });
+
+    void purgeCompleted().catch((error) => {
+      logger.warn({ err: error }, 'Initial outbox cleanup failed');
+    });
 
     logger.info('All services started successfully');
   } catch (error) {
