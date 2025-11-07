@@ -3,7 +3,6 @@ import type { Transaction } from '@sap/cds';
 
 import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
 import { circuitBreaker, handleAll, ConsecutiveBreaker } from 'cockatiel';
-import pLimit from 'p-limit';
 
 import { postEmployeeNotification } from '../api/third-party/employee.client';
 import {
@@ -292,7 +291,8 @@ export const processOutbox = async (): Promise<void> => {
     return;
   }
 
-  // Process entries in parallel with p-limit
+  // Process entries in parallel with p-limit (dynamic import for ESM compatibility)
+  const pLimit = (await import('p-limit')).default;
   const limit = pLimit(workers);
   const timeoutMs = resolveOutboxTimeout();
   const maxAttempts = resolveOutboxMaxAttempts();
