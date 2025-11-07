@@ -13,6 +13,9 @@ interface RequestWithQuery extends Request {
  * - HR admin users can read all clients
  * - Other users can only read clients from their assigned companies
  *
+ * Company codes are normalized (trimmed and uppercased) to ensure consistent
+ * matching with database values regardless of IAS attribute casing.
+ *
  * @param req - The CAP request context
  */
 export const onRead = async (req: Request): Promise<void> => {
@@ -34,8 +37,12 @@ export const onRead = async (req: Request): Promise<void> => {
     return;
   }
 
+  // Normalize company codes to uppercase for consistent database matching
+  // This handles IAS returning codes in different cases (e.g., 'comp-001' vs 'COMP-001')
+  const normalizedCompanies = userCompanies.map((code) => code.toUpperCase());
+
   // Filter clients to only those the user is authorized for
-  reqWithQuery.query?.where({ companyId: { in: userCompanies } });
+  reqWithQuery.query?.where({ companyId: { in: normalizedCompanies } });
 };
 
 export default onRead;

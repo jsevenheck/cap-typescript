@@ -38,13 +38,14 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn(() => false);
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode' || name === 'companyCodes') {
-        return ['ACME', 'GLOBEX'];
+        return ['acme', 'globex'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Codes are normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME', 'GLOBEX'] } });
   });
 
@@ -61,13 +62,14 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn(() => false);
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode' || name === 'companyCodes') {
-        return ['ACME'];
+        return ['acme'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Code is normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME'] } });
   });
 
@@ -75,13 +77,14 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn(() => false);
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode') {
-        return ['ACME'];
+        return ['acme'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Code is normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME'] } });
   });
 
@@ -89,13 +92,14 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn(() => false);
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'companyCodes') {
-        return ['ACME', 'GLOBEX'];
+        return ['acme', 'globex'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Codes are normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME', 'GLOBEX'] } });
   });
 
@@ -103,16 +107,17 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn(() => false);
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode') {
-        return ['ACME'];
+        return ['acme'];
       }
       if (name === 'companyCodes') {
-        return ['GLOBEX', 'INITECH'];
+        return ['globex', 'initech'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // All codes are normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith(
       expect.objectContaining({
         companyId: expect.objectContaining({
@@ -126,13 +131,14 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn((role: string) => role === 'HRViewer');
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode' || name === 'companyCodes') {
-        return ['ACME'];
+        return ['acme'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Code is normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME'] } });
   });
 
@@ -140,13 +146,57 @@ describe('Client READ Handler', () => {
     (mockRequest.user as any).is = jest.fn((role: string) => role === 'HREditor');
     (mockRequest.user as any).attr = jest.fn((name: string) => {
       if (name === 'CompanyCode' || name === 'companyCodes') {
-        return ['ACME'];
+        return ['acme'];
       }
       return [];
     });
 
     await onRead(mockRequest);
 
+    // Code is normalized to uppercase
     expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['ACME'] } });
+  });
+
+  it('should normalize lowercase company codes to uppercase', async () => {
+    (mockRequest.user as any).is = jest.fn(() => false);
+    (mockRequest.user as any).attr = jest.fn((name: string) => {
+      if (name === 'CompanyCode' || name === 'companyCodes') {
+        return ['comp-001', 'comp-002'];
+      }
+      return [];
+    });
+
+    await onRead(mockRequest);
+
+    expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['COMP-001', 'COMP-002'] } });
+  });
+
+  it('should normalize mixed-case company codes to uppercase', async () => {
+    (mockRequest.user as any).is = jest.fn(() => false);
+    (mockRequest.user as any).attr = jest.fn((name: string) => {
+      if (name === 'CompanyCode' || name === 'companyCodes') {
+        return ['Comp-001', 'COMP-002', 'comp-003'];
+      }
+      return [];
+    });
+
+    await onRead(mockRequest);
+
+    expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['COMP-001', 'COMP-002', 'COMP-003'] } });
+  });
+
+  it('should handle whitespace-padded company codes from IAS', async () => {
+    (mockRequest.user as any).is = jest.fn(() => false);
+    (mockRequest.user as any).attr = jest.fn((name: string) => {
+      if (name === 'CompanyCode') {
+        return [' comp-001 ', ' comp-002'];
+      }
+      return [];
+    });
+
+    await onRead(mockRequest);
+
+    // collectAttributeValues already trims, so we should get normalized uppercase codes
+    expect(mockQuery.where).toHaveBeenCalledWith({ companyId: { in: ['COMP-001', 'COMP-002'] } });
   });
 });
