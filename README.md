@@ -103,6 +103,103 @@ To collect coverage for the backend run `npm run test --workspace srv -- --cover
   - `OUTBOX_BASE_BACKOFF_MS`: Base backoff delay (default: 5000)
   - `OUTBOX_RETENTION_HOURS`: Retention window for completed/failed entries (default: 168 hours / 7 days)
 
+## Enterprise Features
+
+### Data Integrity & Security
+
+**Client Integrity Validation** (`srv/domain/shared/integrity-handler.ts`):
+* Validates cross-entity relationships to prevent data inconsistencies:
+  - Employee manager must belong to same client as employee
+  - Employee cost center must belong to same client as employee
+  - Cost center responsible employee must belong to same client as cost center
+* Efficient caching minimizes database queries during batch operations
+* Clear, actionable error messages guide users to fix violations
+
+**Company-Based Authorization** (already present):
+* `HRAdmin`: Full access across all companies
+* `HREditor`/`HRViewer`: Restricted to assigned company codes
+* Enforced at both declarative (CDS `@restrict`) and imperative (service layer) levels
+* `ensureUserAuthorizedForCompany()` validates access on every operation
+
+**GDPR Compliance**:
+* `@PersonalData` annotations on Employee entity fields
+* `anonymizedAt` timestamp tracks anonymization for auditing
+* Personal data fields marked with `@PersonalData.IsPotentiallyPersonal`
+
+**Schema Enhancements**:
+* `Clients.notificationEndpoint`: External webhook URL for employee notifications
+* `Clients.country`: Association to CommonCountries for better data modeling
+* `Employees.isManager`: Boolean flag for manager identification
+* `Employees.anonymizedAt`: Timestamp for GDPR anonymization tracking
+
+### Enhanced Async Processing
+
+**Parallel Outbox Dispatcher** (`srv/infrastructure/outbox/dispatcher.ts`):
+* **p-limit integration**: True parallel processing with configurable worker count (default: 4)
+* **Batch processing**: Processes multiple messages per cycle (default: 20)
+* **Claim-based locking**: Supports distributed processing across multiple instances
+* **Circuit breaker**: Per-destination fault tolerance (opens after 5 failures)
+* **Exponential backoff**: Smart retry strategy for transient failures
+* **Dead Letter Queue**: Permanently failed messages moved to DLQ for inspection
+
+**Prometheus Metrics** (`srv/infrastructure/outbox/metrics.ts`):
+* `outbox_messages_enqueued_total` - Messages enqueued by event type (counter)
+* `outbox_messages_dispatched_total` - Successfully dispatched (counter)
+* `outbox_messages_failed_total` - Failed deliveries by destination/reason (counter)
+* `outbox_messages_dlq_total` - Messages moved to DLQ (counter)
+* `outbox_messages_pending` - Current pending count (gauge)
+* `outbox_processing_duration_seconds` - Processing latency (histogram)
+
+**Third-Party Notifier** (`srv/infrastructure/api/third-party/employee-notifier.ts`):
+* Prepares and enqueues employee creation notifications
+* Groups employees by client notification endpoint
+* Enriches payloads with client metadata (companyId, name)
+* HMAC-SHA256 request signing for authentication (`x-signature-sha256` header)
+* Graceful error handling - employee creation succeeds even if notification fails
+
+**Environment Variables** (additional):
+* `OUTBOX_BATCH_SIZE`: Batch size for processing (default: 20)
+* `OUTBOX_DISPATCHER_WORKERS`: Parallel worker count (default: 4)
+* `OUTBOX_ENQUEUE_MAX_ATTEMPTS`: Max enqueue retry attempts (default: 0 = unlimited)
+* `THIRD_PARTY_EMPLOYEE_DESTINATION`: Destination name for HTTP calls
+* `THIRD_PARTY_EMPLOYEE_SECRET`: HMAC signing secret
+
+### Utility Libraries
+
+**Association Helpers** (`srv/shared/utils/association.ts`):
+* `extractAssociationId()`: Extract ID from association (supports both `field_ID` and `{ field: { ID } }`)
+* `resolveAssociation()`: Get full association object
+* `hasAssociation()`: Check if association is set
+* `extractAssociationIds()`: Batch extract multiple associations
+
+**Validation Helpers** (`srv/shared/utils/validation.ts`):
+* `isValidEmail()`: RFC 5322 email validation
+* `isValidUrl()`: HTTP/HTTPS URL validation
+* `isValidDate()`: Date validation
+* `isInDateRange()`: Date range checking
+* `isValidUUID()`: UUID v4 validation
+* `isValidLength()`: String length validation
+* `matchesPattern()`: Regex pattern matching
+
+**Error Builders** (`srv/shared/utils/errors.ts`):
+* `ErrorBuilder.badRequest()`: 400 with details
+* `ErrorBuilder.forbidden()`: 403
+* `ErrorBuilder.notFound()`: 404 with entity/ID
+* `ErrorBuilder.conflict()`: 409
+* `ErrorBuilder.preconditionFailed()`: 412 for optimistic locking
+* `ErrorBuilder.unprocessableEntity()`: 422 for validation
+* `ErrorBuilder.internalServerError()`: 500
+
+### Architecture
+
+See `docs/ARCHITECTURE.md` for detailed documentation on:
+* Layered architecture (Handler → Service → Repository)
+* Domain-driven design patterns
+* Data flow and transaction management
+* Authorization and concurrency control
+* Async processing patterns
+* Testing strategies
+
 ## Deployment
 
 * `mta.yaml` provisions the following BTP services:

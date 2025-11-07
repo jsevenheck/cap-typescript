@@ -55,14 +55,21 @@ export const prepareEmployeesCreatedNotifications = async (
     };
   }
 
+  interface ClientRecord {
+    ID: string;
+    companyId: string;
+    name?: string;
+    notificationEndpoint?: string;
+  }
+
   const clients = await tx.run(
     // @ts-expect-error - CDS QL types
     tx.context.cds.ql.SELECT.from('clientmgmt.Clients')
       .columns('ID', 'companyId', 'name', 'notificationEndpoint')
       .where({ ID: { in: clientIds } }),
-  );
+  ) as ClientRecord[];
 
-  const clientMap = new Map(clients.map((c: any) => [c.ID, c]));
+  const clientMap = new Map(clients.map((c) => [c.ID, c]));
 
   // Group employees by notification endpoint
   const payloadsByEndpoint = new Map<string, EmployeeNotificationPayload[]>();

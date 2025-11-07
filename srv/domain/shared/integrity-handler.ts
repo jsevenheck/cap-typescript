@@ -55,7 +55,7 @@ const fetchClientId = async (
       .from(entityName)
       .columns('client_ID')
       .where({ ID: entityId }),
-  );
+  ) as { client_ID?: string } | undefined;
 
   const clientId = result?.client_ID ?? null;
 
