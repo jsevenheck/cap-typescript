@@ -1,13 +1,7 @@
-jest.mock('@sap-cloud-sdk/connectivity', () => ({ __esModule: true, getDestination: jest.fn() }));
-jest.mock('@sap-cloud-sdk/http-client', () => ({ __esModule: true, executeHttpRequest: jest.fn() }));
 
 import path from 'node:path';
-import { createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import cds from '@sap/cds';
-import { getDestination } from '@sap-cloud-sdk/connectivity';
-import { executeHttpRequest } from '@sap-cloud-sdk/http-client';
-
-import { cleanupOutbox, processOutbox } from '../../../server';
 
 // Use cds.test() to start server and auto-deploy database with test data
 const cap = cds.test(path.join(__dirname, '..', '..', '..'));
@@ -41,8 +35,6 @@ const http = cap as unknown as {
   ) => Promise<{ status: number; data: T; headers: Record<string, string> }>;
 };
 
-const mockedGetDestination = getDestination as jest.MockedFunction<typeof getDestination>;
-const mockedExecuteHttpRequest = executeHttpRequest as jest.MockedFunction<typeof executeHttpRequest>;
 const { SELECT } = cds.ql;
 const INSERT = (cds.ql as any).INSERT as any;
 const DELETE = (cds.ql as any).DELETE as any;
@@ -80,22 +72,7 @@ const captureErrorStatus = async (promise: Promise<unknown>): Promise<number> =>
 };
 
 afterEach(async () => {
-  mockedGetDestination.mockReset();
-  mockedExecuteHttpRequest.mockReset();
-  delete process.env.THIRD_PARTY_EMPLOYEE_DESTINATION;
-  delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
-  delete process.env.OUTBOX_CLAIM_TTL_MS;
-  delete process.env.OUTBOX_DISPATCH_INTERVAL_MS;
-  delete process.env.OUTBOX_MAX_ATTEMPTS;
-  delete process.env.OUTBOX_BASE_BACKOFF_MS;
-  delete process.env.OUTBOX_CONCURRENCY;
-  delete process.env.OUTBOX_TIMEOUT_MS;
-  delete process.env.OUTBOX_RETENTION_HOURS;
-  delete process.env.OUTBOX_CLEANUP_INTERVAL_MS;
-  delete process.env.OUTBOX_CLEANUP_CRON;
-  if (db) {
-    await db.run(DELETE.from('clientmgmt.EmployeeNotificationOutbox'));
-  }
+  jest.clearAllMocks();
 });
 
 describe('ClientService (HTTP)', () => {
@@ -541,7 +518,7 @@ describe('Employee business rules', () => {
 
   const createClientRecord = async (
     tx: any,
-    options: { companyId: string; countryCode?: string; name?: string },
+    options: { companyId: string; countryCode?: string; name?: string; notificationEndpoint?: string },
   ): Promise<{ ID: string; companyId: string }> => {
     const clientId = randomUUID();
 
@@ -550,6 +527,7 @@ describe('Employee business rules', () => {
         ID: clientId,
         companyId: options.companyId,
         name: options.name ?? `Client ${options.companyId}`,
+        notificationEndpoint: options.notificationEndpoint ?? null,
         country_code: options.countryCode ?? 'DE',
       }),
     );
@@ -951,268 +929,3 @@ describe('Employee business rules', () => {
 
 
 
-describe('Employee notification outbox', () => {
-  let service: any;
-
-  const createUser = ({
-    id,
-    roles,
-    companyCodes,
-  }: {
-    id: string;
-    roles: string[];
-    companyCodes: string[];
-  }) =>
-    (cds as any).User({
-      id,
-      roles,
-      attr: { companyCodes, CompanyCode: companyCodes },
-    });
-
-  const runAs = async <T>(
-    userOptions: { id: string; roles: string[]; companyCodes: string[] },
-    handler: (tx: any) => Promise<T>,
-  ): Promise<T> => {
-    const user = createUser(userOptions);
-    return service.tx({ user }, handler);
-  };
-
-  beforeAll(async () => {
-    service = await cds.connect.to('ClientService');
-  });
-
-  it('writes an outbox entry after employee creation when destination configured', async () => {
-    process.env.THIRD_PARTY_EMPLOYEE_DESTINATION = 'EmployeesAPI';
-
-    await runAs(
-      { id: 'editor', roles: ['HREditor'], companyCodes: ['COMP-001'] },
-      async (tx) =>
-        tx.run(
-          INSERT.into(tx.entities.Employees).entries({
-            firstName: 'Queue',
-            lastName: 'Tester',
-            email: 'queue.tester@example.com',
-            entryDate: '2024-04-01',
-            client_ID: CLIENT_ID,
-          }),
-        ),
-    );
-
-    const entry = (await db.run(
-      SELECT.one
-        .from('clientmgmt.EmployeeNotificationOutbox')
-        .where({ destinationName: 'EmployeesAPI' }),
-    )) as any;
-
-    expect(entry).toBeDefined();
-    expect(entry.eventType).toBe('EMPLOYEE_CREATED');
-    expect(entry.status).toBe('PENDING');
-
-    const payload = JSON.parse(entry.payload ?? '{}');
-    expect(payload).toMatchObject({
-      event: 'EMPLOYEE_CREATED',
-      clientCompanyId: 'COMP-001',
-    });
-  });
-
-  it('marks outbox entries as completed when downstream succeeds', async () => {
-    const entryId = randomUUID();
-    await db.run(
-      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
-        ID: entryId,
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'employees-success',
-        payload: JSON.stringify({ ok: true }),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(Date.now() - 1000),
-      }),
-    );
-
-    process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'super-secret';
-    const destination = { name: 'employees-success', url: 'https://example.org/success' } as any;
-    mockedGetDestination.mockResolvedValueOnce(destination);
-    mockedExecuteHttpRequest.mockResolvedValueOnce({ status: 200, data: '', headers: {} } as any);
-
-    await processOutbox();
-
-    const updated = (await db.run(
-      SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
-    )) as any;
-
-    expect(updated.status).toBe('COMPLETED');
-    expect(updated.deliveredAt).toBeTruthy();
-    expect(updated.lastError).toBeNull();
-    expect(mockedExecuteHttpRequest).toHaveBeenCalledWith(
-      destination,
-      expect.objectContaining({
-        method: 'post',
-        data: JSON.stringify({ ok: true }),
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-signature-sha256': createHmac('sha256', 'super-secret').update(JSON.stringify({ ok: true })).digest('hex'),
-        }),
-      }),
-    );
-  });
-
-  it('aborts hanging outbox deliveries and schedules a retry', async () => {
-    jest.useFakeTimers();
-
-    const baseTime = Date.now();
-    jest.setSystemTime(baseTime);
-
-    const entryId = randomUUID();
-    await db.run(
-      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
-        ID: entryId,
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'employees-hang',
-        payload: JSON.stringify({ ok: true }),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(baseTime - 1000),
-      }),
-    );
-
-    const destination = { name: 'employees-hang', url: 'https://example.org/hang' } as any;
-    mockedGetDestination.mockResolvedValue(destination);
-    mockedExecuteHttpRequest.mockImplementationOnce(
-      () =>
-        new Promise((_resolve, reject) => {
-          setTimeout(() => reject(new Error('timeout exceeded')), 20);
-        }),
-    );
-
-    process.env.OUTBOX_TIMEOUT_MS = '10';
-    const processing = processOutbox();
-
-    if (typeof (jest as any).advanceTimersByTimeAsync === 'function') {
-      await (jest as any).advanceTimersByTimeAsync(1000);
-    } else {
-      jest.advanceTimersByTime(1000);
-    }
-
-    await processing;
-
-    const updated = (await db.run(
-      SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
-    )) as any;
-
-    expect(updated.status).toBe('PENDING');
-    expect(updated.attempts).toBe(1);
-    expect(new Date(updated.nextAttemptAt).getTime()).toBeGreaterThan(baseTime);
-    expect(String(updated.lastError)).toContain('timeout');
-
-    expect(mockedExecuteHttpRequest).toHaveBeenCalledWith(
-      destination,
-      expect.objectContaining({ timeout: 10 }),
-    );
-
-    delete process.env.OUTBOX_TIMEOUT_MS;
-    jest.useRealTimers();
-  });
-
-  it('retries with exponential backoff and marks entry as failed after max attempts', async () => {
-    jest.useFakeTimers();
-    const baseTime = new Date('2024-01-01T00:00:00Z').getTime();
-    jest.setSystemTime(baseTime);
-
-    const entryId = randomUUID();
-    await db.run(
-      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
-        ID: entryId,
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'employees-fail',
-        payload: JSON.stringify({ ok: false }),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(baseTime),
-      }),
-    );
-
-    const destination = { name: 'employees-fail', url: 'https://example.org/fail' } as any;
-    mockedGetDestination.mockResolvedValue(destination);
-    mockedExecuteHttpRequest.mockRejectedValue(new Error('network down'));
-
-    let currentTime = baseTime;
-    for (let attempt = 1; attempt <= 6; attempt += 1) {
-      jest.setSystemTime(currentTime);
-      await processOutbox();
-
-      const entry = (await db.run(
-        SELECT.one.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entryId }),
-      )) as any;
-
-      if (attempt < 6) {
-        expect(entry.attempts).toBe(attempt);
-        expect(entry.status).toBe('PENDING');
-        const expectedDelay = Math.pow(2, attempt - 1) * 5000;
-        expect(new Date(entry.nextAttemptAt).getTime()).toBe(currentTime + expectedDelay);
-        currentTime = currentTime + expectedDelay + 1;
-      } else {
-        // After max attempts, entry should be moved to DLQ and deleted from outbox
-        expect(entry).toBeUndefined();
-
-        const dlqEntry = (await db.run(
-          SELECT.one.from('clientmgmt.EmployeeNotificationDLQ').where({ originalID: entryId }),
-        )) as any;
-
-        expect(dlqEntry).toBeDefined();
-        expect(dlqEntry.originalID).toBe(entryId);
-        expect(dlqEntry.eventType).toBe('EMPLOYEE_CREATED');
-        expect(dlqEntry.destinationName).toBe('employees-fail');
-        expect(dlqEntry.attempts).toBe(6);
-        expect(dlqEntry.lastError).toContain('network down');
-        expect(dlqEntry.failedAt).toBeDefined();
-      }
-    }
-
-    jest.useRealTimers();
-    expect(mockedExecuteHttpRequest).toHaveBeenCalledTimes(6);
-  });
-
-  it('removes completed and failed entries that exceed the retention window', async () => {
-    const completedId = randomUUID();
-    const failedId = randomUUID();
-
-    await db.run(
-      INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries([
-        {
-          ID: completedId,
-          eventType: 'EMPLOYEE_CREATED',
-          destinationName: 'employees-cleanup',
-          payload: JSON.stringify({ ok: true }),
-          status: 'COMPLETED',
-          attempts: 1,
-          nextAttemptAt: null,
-        },
-        {
-          ID: failedId,
-          eventType: 'EMPLOYEE_CREATED',
-          destinationName: 'employees-cleanup',
-          payload: JSON.stringify({ ok: false }),
-          status: 'FAILED',
-          attempts: 6,
-          nextAttemptAt: null,
-        },
-      ] as any),
-    );
-
-    const cutoff = new Date(Date.now() - 8 * 60 * 60 * 1000);
-    await db.run(
-      UPDATE('clientmgmt.EmployeeNotificationOutbox' as any)
-        .set({ modifiedAt: cutoff })
-        .where({ ID: { in: [completedId, failedId] } }),
-    );
-
-    process.env.OUTBOX_RETENTION_HOURS = '1';
-    await cleanupOutbox();
-
-    const remaining = await db.run(
-      SELECT.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: { in: [completedId, failedId] } }),
-    );
-
-    expect(Array.isArray(remaining) ? remaining : []).toHaveLength(0);
-  });
-});

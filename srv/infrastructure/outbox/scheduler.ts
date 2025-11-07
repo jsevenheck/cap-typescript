@@ -1,53 +1,59 @@
-import { resolveCleanupInterval, resolveOutboxDispatchInterval } from './config';
+import cron, { type ScheduledTask } from 'node-cron';
 
-export type Logger = { error?: (...args: unknown[]) => void } & Record<string, unknown>;
+import type { OutboxConfig } from './config';
+import { ParallelDispatcher } from './dispatcher';
+import { OutboxCleanup } from './cleanup';
+import { getLogger } from '../../shared/utils/logger';
 
-export const scheduleOutboxProcessing = (
-  processor: () => Promise<void>,
-  logger: Logger,
-): NodeJS.Timeout => {
-  let running = false;
-  const dispatchInterval = resolveOutboxDispatchInterval();
+const logger = getLogger('outbox-scheduler');
 
-  return setInterval(() => {
-    if (running) {
+export class OutboxScheduler {
+  private dispatchTimer?: NodeJS.Timeout;
+  private cleanupTask?: ScheduledTask;
+  private started = false;
+
+  constructor(
+    private readonly dispatcher: ParallelDispatcher,
+    private readonly cleanup: OutboxCleanup,
+    private readonly config: OutboxConfig,
+  ) {}
+
+  start(): void {
+    if (this.started) {
       return;
     }
 
-    running = true;
-    void processor()
-      .catch((error) => {
-        logger.error?.('Outbox processing failed:', error);
-      })
-      .finally(() => {
-        running = false;
-      });
-  }, dispatchInterval);
-};
+    this.started = true;
+    this.dispatchTimer = setInterval(() => {
+      void this.dispatcher
+        .dispatchPending()
+        .catch((error) => logger.error({ err: error }, 'Failed to dispatch outbox batch'));
+    }, this.config.dispatchInterval);
 
-export const scheduleOutboxCleanup = (
-  cleanup: () => Promise<void>,
-  logger: Logger,
-): NodeJS.Timeout | undefined => {
-  const cleanupInterval = resolveCleanupInterval();
-  if (cleanupInterval <= 0) {
-    return undefined;
+    this.cleanupTask = cron.schedule(this.config.cleanupCron, () => {
+      void this.cleanup
+        .run()
+        .catch((error) => logger.error({ err: error }, 'Failed to execute outbox cleanup'));
+    });
   }
 
-  let running = false;
-
-  return setInterval(() => {
-    if (running) {
+  stop(): void {
+    if (!this.started) {
       return;
     }
 
-    running = true;
-    void cleanup()
-      .catch((error) => {
-        logger.error?.('Outbox cleanup failed:', error);
-      })
-      .finally(() => {
-        running = false;
-      });
-  }, cleanupInterval);
-};
+    if (this.dispatchTimer) {
+      clearInterval(this.dispatchTimer);
+      this.dispatchTimer = undefined;
+    }
+
+    if (this.cleanupTask) {
+      this.cleanupTask.stop();
+      this.cleanupTask = undefined;
+    }
+
+    this.started = false;
+  }
+}
+
+export default OutboxScheduler;

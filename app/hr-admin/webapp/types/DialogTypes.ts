@@ -13,6 +13,7 @@ export interface ClientDialogData {
   ID?: string;
   companyId: string;
   name: string;
+  notificationEndpoint?: string | null;
   country_code?: string | null;
 }
 

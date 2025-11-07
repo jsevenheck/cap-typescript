@@ -4,28 +4,13 @@ import type { Application, Request, Response, NextFunction } from 'express';
 import apiKeyMiddleware/*, { loadApiKey } */from './middleware/apiKey';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
-import { processOutbox } from './infrastructure/outbox/dispatcher';
-import { cleanupOutbox } from './infrastructure/outbox/cleanup';
-import { scheduleOutboxCleanup, scheduleOutboxProcessing } from './infrastructure/outbox/scheduler';
+import {
+  outboxCleanup,
+  outboxDispatcher,
+  outboxScheduler,
+} from './infrastructure/outbox';
 import { resolveAuthProviderName } from './shared/utils/authProvider';
 import { initializeLogger, getLogger, extractOrGenerateCorrelationId, setCorrelationId } from './shared/utils/logger';
-
-const outboxTimers: NodeJS.Timeout[] = [];
-
-const registerTimer = (timer?: NodeJS.Timeout): void => {
-  if (timer) {
-    outboxTimers.push(timer);
-  }
-};
-
-const clearOutboxTimers = (): void => {
-  while (outboxTimers.length) {
-    const timer = outboxTimers.pop();
-    if (timer) {
-      clearInterval(timer);
-    }
-  }
-};
 
 let shutdownHooksRegistered = false;
 const ensureShutdownHooks = (): void => {
@@ -33,8 +18,11 @@ const ensureShutdownHooks = (): void => {
     return;
   }
   shutdownHooksRegistered = true;
-  cds.on('shutdown', clearOutboxTimers);
-  process.on('exit', clearOutboxTimers);
+  const stopScheduler = (): void => {
+    outboxScheduler.stop();
+  };
+  cds.on('shutdown', stopScheduler);
+  process.on('exit', stopScheduler);
 };
 
 // Initialize structured logger
@@ -81,9 +69,7 @@ cds.on('served', async () => {
       return;
     }
 
-    const outboxLogger = getLogger('outbox');
-    registerTimer(scheduleOutboxProcessing(processOutbox, outboxLogger));
-    registerTimer(scheduleOutboxCleanup(cleanupOutbox, outboxLogger));
+    outboxScheduler.start();
     ensureShutdownHooks();
 
     logger.info('All services started successfully');
@@ -93,5 +79,6 @@ cds.on('served', async () => {
   }
 });
 
-export { processOutbox, cleanupOutbox };
+export const dispatchOutboxOnce = (): Promise<void> => outboxDispatcher.dispatchPending();
+export const cleanupOutboxOnce = (): Promise<void> => outboxCleanup.run();
 export default cds.server;

@@ -7,16 +7,14 @@ import {
   isEmployeeIdUniqueConstraintError,
 } from '../services/identifiers';
 import { buildUserContext } from '../../../shared/utils/auth';
-import { normalizeCompanyId } from '../../../shared/utils/normalization';
-import {
-  enqueueEmployeeCreatedNotification,
-  type EmployeeCreatedNotification,
-} from '../../../infrastructure/outbox/dispatcher';
+import { enqueueOutboxEntry } from '../../../infrastructure/outbox/dispatcher';
+import { EmployeeThirdPartyNotifier } from '../../../infrastructure/api/third-party/employee-notifier';
 import type { EmployeeEntity } from '../dto/employee.dto';
 import { createServiceError } from '../../../shared/utils/errors';
 import { requireRequestUser } from '../../shared/request-context';
-import { getEmployeeContext, prepareEmployeeContext } from './context';
+import { prepareEmployeeContext } from './context';
 import { getLogger } from '../../../shared/utils/logger';
+import { outboxConfig, outboxMetrics } from '../../../infrastructure/outbox';
 
 const logger = getLogger('employee-service');
 
@@ -40,28 +38,22 @@ export const onCreateEvent = async (
       );
 
       const response = await next();
-      const createdEmployee = Array.isArray(response)
-        ? ((response[0] as Record<string, unknown> | undefined) ?? undefined)
-        : (response as Record<string, unknown> | undefined);
+      const notifier = new EmployeeThirdPartyNotifier(tx);
+      const requestEntries = Array.isArray(req.data) ? (req.data as any[]) : [req.data];
+      const persistedRows = Array.isArray(response) ? (response as any[]) : [response];
 
-      const destinationName = process.env.THIRD_PARTY_EMPLOYEE_DESTINATION;
-      const context = getEmployeeContext(req);
-      if (destinationName && createdEmployee && context?.client.companyId) {
-        const clientCompanyId = normalizeCompanyId(context.client.companyId) ?? context.client.companyId;
-        const record = createdEmployee as Partial<EmployeeEntity>;
-        const requestSnapshot = (req.data ?? {}) as Partial<EmployeeEntity>;
-        const payload: EmployeeCreatedNotification['payload'] = {
-          event: 'EMPLOYEE_CREATED',
-          employeeId: record.employeeId ?? requestSnapshot.employeeId,
-          employeeUUID: record.ID ?? requestSnapshot.ID,
-          clientCompanyId,
-          client_ID: record.client_ID ?? requestSnapshot.client_ID ?? context.client.ID,
-          firstName: record.firstName ?? requestSnapshot.firstName,
-          lastName: record.lastName ?? requestSnapshot.lastName,
-          email: record.email ?? requestSnapshot.email,
-        };
-
-        await enqueueEmployeeCreatedNotification(tx, { destinationName, payload });
+      const notification = await notifier.prepareEmployeesCreated(requestEntries, persistedRows);
+      if (notification.payloadsByEndpoint.size) {
+        for (const [endpoint, envelopes] of notification.payloadsByEndpoint.entries()) {
+          for (const envelope of envelopes) {
+            await enqueueOutboxEntry(
+              tx,
+              { eventType: notification.eventType, endpoint, payload: envelope },
+              outboxConfig,
+              outboxMetrics,
+            );
+          }
+        }
       }
 
       return response;
