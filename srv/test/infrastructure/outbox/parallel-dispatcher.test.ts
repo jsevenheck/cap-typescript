@@ -73,6 +73,43 @@ describe('ParallelDispatcher', () => {
     expect(updated.claimedBy).toBeNull();
   });
 
+  it('supports legacy payloads persisted without an envelope wrapper', async () => {
+    const handler = jest.fn().mockResolvedValue(undefined);
+    const dispatcher = buildDispatcher({}, handler);
+
+    const legacyPayload = {
+      eventType: 'EMPLOYEE_CREATED',
+      employees: [{ employeeId: 'LEG-1' }],
+      secret: 'legacy-secret',
+      headers: { 'x-extra': 'value', 'x-numeric': 42 as any },
+    };
+
+    await db.run(
+      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
+        ID: 'legacy-1',
+        eventType: 'EMPLOYEE_CREATED',
+        destinationName: 'https://example.com/legacy',
+        payload: JSON.stringify(legacyPayload),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(Date.now() - 1000),
+      }),
+    );
+
+    await dispatcher.dispatchPending();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const [, , envelope] = handler.mock.calls[0];
+    expect(envelope.body).toMatchObject({
+      eventType: 'EMPLOYEE_CREATED',
+      employees: [{ employeeId: 'LEG-1' }],
+    });
+    expect(envelope.body).not.toHaveProperty('secret');
+    expect(envelope.body).not.toHaveProperty('headers');
+    expect(envelope.secret).toBe('legacy-secret');
+    expect(envelope.headers).toEqual({ 'x-extra': 'value' });
+  });
+
   it('retries failed dispatches with exponential backoff', async () => {
     const handler = jest.fn().mockRejectedValue(new Error('network failure'));
     const dispatcher = buildDispatcher({ retryDelay: 10, maxAttempts: 3 }, handler);

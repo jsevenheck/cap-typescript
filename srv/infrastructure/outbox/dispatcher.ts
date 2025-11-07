@@ -30,6 +30,21 @@ interface ParsedPayload extends NotificationEnvelope {
   body: Record<string, unknown>;
 }
 
+const normalizeHeaders = (headers: unknown): Record<string, string> | undefined => {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers as Record<string, unknown>)) {
+    if (typeof value === 'string') {
+      normalized[key] = value;
+    }
+  }
+
+  return Object.keys(normalized).length ? normalized : undefined;
+};
+
 const parsePayload = (entry: OutboxEntry): ParsedPayload => {
   try {
     const value = JSON.parse(entry.payload ?? '{}');
@@ -37,23 +52,40 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
       throw new Error('Payload must be an object.');
     }
 
-    const body = (value as Record<string, unknown>).body as Record<string, unknown> | undefined;
-    if (!body || typeof body !== 'object') {
+    const record = value as Record<string, unknown>;
+    const bodyCandidate = record['body'];
+
+    if (bodyCandidate && typeof bodyCandidate === 'object') {
+      const secretCandidate = record['secret'];
+      const headersCandidate = record['headers'];
+
+      return {
+        body: bodyCandidate as Record<string, unknown>,
+        secret: typeof secretCandidate === 'string' ? (secretCandidate as string) : undefined,
+        headers: normalizeHeaders(headersCandidate),
+      };
+    }
+
+    const legacyBody = { ...record } as Record<string, unknown>;
+    const secret = legacyBody['secret'];
+    if (typeof secret === 'string') {
+      delete legacyBody['secret'];
+    }
+
+    const headers = legacyBody['headers'];
+    if (headers && typeof headers === 'object') {
+      delete legacyBody['headers'];
+    }
+
+    if (!Object.keys(legacyBody).length) {
       throw new Error('Payload body is required.');
     }
 
-    const secret = (value as Record<string, unknown>).secret;
-    const envelope: ParsedPayload = {
-      body,
+    return {
+      body: legacyBody,
       secret: typeof secret === 'string' ? secret : undefined,
+      headers: normalizeHeaders(headers),
     };
-
-    const headers = (value as Record<string, unknown>).headers;
-    if (headers && typeof headers === 'object') {
-      envelope.headers = headers as Record<string, string>;
-    }
-
-    return envelope;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown payload parsing error';
     throw new Error(`Failed to parse outbox payload for entry ${entry.ID}: ${message}`);
