@@ -3,18 +3,22 @@ import type { Transaction } from '@sap/cds';
 
 import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
 import { circuitBreaker, handleAll, ConsecutiveBreaker } from 'cockatiel';
+import pLimit from 'p-limit';
 
 import { postEmployeeNotification } from '../api/third-party/employee.client';
 import {
   resolveOutboxBaseBackoff,
   resolveOutboxClaimTtl,
-  resolveOutboxConcurrency,
+  resolveOutboxBatchSize,
+  resolveOutboxDispatcherWorkers,
   resolveOutboxMaxAttempts,
   resolveOutboxTimeout,
 } from './config';
+import { getOutboxMetrics } from './metrics';
 import { getLogger } from '../../shared/utils/logger';
 
 const logger = getLogger('outbox-dispatcher');
+const metrics = getOutboxMetrics();
 
 const ql = cds.ql as typeof cds.ql & {
   DELETE: typeof cds.ql.SELECT;
@@ -95,10 +99,97 @@ const moveToDLQ = async (db: any, entry: OutboxEntry, attempts: number, lastErro
     // Delete from outbox
     await db.run(ql.DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entry.ID }));
 
+    metrics.recordDLQ(entry.destinationName);
     logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Moved failed entry to DLQ');
   } catch (error) {
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
     // Keep entry as FAILED in outbox if DLQ move fails
+  }
+};
+
+/**
+ * Process a single outbox entry
+ */
+const processEntry = async (
+  db: any,
+  entry: OutboxEntry,
+  timeoutMs: number,
+  maxAttempts: number,
+  baseBackoff: number,
+  secret?: string,
+): Promise<void> => {
+  const breaker = getCircuitBreaker(entry.destinationName);
+  const startTime = Date.now();
+
+  try {
+    await breaker.execute(async () => {
+      const destination = await getDestination({ destinationName: entry.destinationName });
+      if (!destination) {
+        throw new Error(`Destination ${entry.destinationName} not found`);
+      }
+
+      if ((destination as HttpDestination).url === undefined) {
+        throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
+      }
+
+      const httpDestination = destination as HttpDestination;
+
+      await postEmployeeNotification({
+        destination: httpDestination,
+        payload: entry.payload,
+        secret: secret ?? undefined,
+        timeoutMs,
+      });
+    });
+
+    const durationSeconds = (Date.now() - startTime) / 1000;
+    metrics.recordProcessingDuration(entry.destinationName, 'success', durationSeconds);
+    metrics.recordDispatched(entry.destinationName);
+
+    logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Successfully delivered notification');
+
+    await db.run(
+      ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+        .set({
+          status: 'COMPLETED',
+          deliveredAt: new Date(),
+          lastError: null,
+          nextAttemptAt: null,
+        })
+        .where({ ID: entry.ID }),
+    );
+  } catch (error: any) {
+    const attempts = (entry.attempts ?? 0) + 1;
+    const errorMessage = String(error?.message ?? error ?? 'Unknown error');
+    const durationSeconds = (Date.now() - startTime) / 1000;
+
+    metrics.recordProcessingDuration(entry.destinationName, 'failure', durationSeconds);
+    metrics.recordFailed(entry.destinationName, error?.code ?? 'unknown');
+
+    logger.warn(
+      { err: error, entryId: entry.ID, destinationName: entry.destinationName, attempts },
+      'Failed to deliver notification'
+    );
+
+    if (attempts >= maxAttempts) {
+      // Move to DLQ after exhausting all retries
+      await moveToDLQ(db, entry, attempts, errorMessage);
+    } else {
+      // Schedule retry with exponential backoff
+      const backoff = Math.pow(2, attempts - 1) * baseBackoff;
+      const nextAttemptAt = new Date(Date.now() + backoff);
+
+      await db.run(
+        ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
+          .set({
+            attempts,
+            lastError: errorMessage,
+            status: 'PENDING',
+            nextAttemptAt,
+          })
+          .where({ ID: entry.ID }),
+      );
+    }
   }
 };
 
@@ -112,8 +203,9 @@ export const processOutbox = async (): Promise<void> => {
   const nowTime = now.getTime();
   const claimTtlMs = resolveOutboxClaimTtl();
   const claimExpiryTime = nowTime - claimTtlMs;
-  const concurrency = resolveOutboxConcurrency();
-  const candidateLimit = Math.max(concurrency * 4, concurrency);
+  const workers = resolveOutboxDispatcherWorkers();
+  const batchSize = resolveOutboxBatchSize();
+  const candidateLimit = Math.max(workers * 4, batchSize);
 
   const selectCandidates = (ql.SELECT as any)
     .from('clientmgmt.EmployeeNotificationOutbox')
@@ -145,10 +237,14 @@ export const processOutbox = async (): Promise<void> => {
     return;
   }
 
+  // Update pending gauge metric
+  metrics.updatePending(claimable.length);
+
   const claimed: OutboxEntry[] = [];
 
+  // Claim entries (up to workers count for parallel processing)
   for (const entry of claimable) {
-    if (claimed.length >= concurrency) {
+    if (claimed.length >= workers) {
       break;
     }
 
@@ -196,78 +292,17 @@ export const processOutbox = async (): Promise<void> => {
     return;
   }
 
+  // Process entries in parallel with p-limit
+  const limit = pLimit(workers);
   const timeoutMs = resolveOutboxTimeout();
   const maxAttempts = resolveOutboxMaxAttempts();
   const baseBackoff = resolveOutboxBaseBackoff();
   const secret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
 
-  await Promise.all(
-    claimed.map(async (entry) => {
-      const breaker = getCircuitBreaker(entry.destinationName);
-
-      try {
-        await breaker.execute(async () => {
-          const destination = await getDestination({ destinationName: entry.destinationName });
-          if (!destination) {
-            throw new Error(`Destination ${entry.destinationName} not found`);
-          }
-
-          if ((destination as HttpDestination).url === undefined) {
-            throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
-          }
-
-          const httpDestination = destination as HttpDestination;
-
-          await postEmployeeNotification({
-            destination: httpDestination,
-            payload: entry.payload,
-            secret: secret ?? undefined,
-            timeoutMs,
-          });
-        });
-
-        logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Successfully delivered notification');
-
-        await db.run(
-          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-            .set({
-              status: 'COMPLETED',
-              deliveredAt: new Date(),
-              lastError: null,
-              nextAttemptAt: null,
-            })
-            .where({ ID: entry.ID }),
-        );
-      } catch (error: any) {
-        const attempts = (entry.attempts ?? 0) + 1;
-        const errorMessage = String(error?.message ?? error ?? 'Unknown error');
-
-        logger.warn(
-          { err: error, entryId: entry.ID, destinationName: entry.destinationName, attempts },
-          'Failed to deliver notification'
-        );
-
-        if (attempts >= maxAttempts) {
-          // Move to DLQ after exhausting all retries
-          await moveToDLQ(db, entry, attempts, errorMessage);
-        } else {
-          // Schedule retry with exponential backoff
-          const backoff = Math.pow(2, attempts - 1) * baseBackoff;
-          const nextAttemptAt = new Date(Date.now() + backoff);
-
-          await db.run(
-            ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-              .set({
-                attempts,
-                lastError: errorMessage,
-                status: 'PENDING',
-                nextAttemptAt,
-              })
-              .where({ ID: entry.ID }),
-          );
-        }
-      }
-    }),
+  await Promise.allSettled(
+    claimed.map((entry) =>
+      limit(() => processEntry(db, entry, timeoutMs, maxAttempts, baseBackoff, secret))
+    )
   );
 };
 
@@ -290,5 +325,6 @@ export const enqueueEmployeeCreatedNotification = async (
       nextAttemptAt: new Date(),
     }),
   );
-};
 
+  metrics.recordEnqueued('EMPLOYEE_CREATED');
+};

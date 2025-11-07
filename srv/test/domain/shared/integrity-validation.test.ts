@@ -36,8 +36,6 @@ const http = cap as unknown as {
   ) => Promise<{ status: number; data: T; headers: Record<string, string> }>;
 };
 
-const { SELECT } = cds.ql;
-const INSERT = (cds.ql as any).INSERT as any;
 const DELETE = (cds.ql as any).DELETE as any;
 
 const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
