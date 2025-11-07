@@ -6,8 +6,18 @@ import { ensureEmployeeIdentifier } from '../services/identifiers';
 import { buildUserContext } from '../../../shared/utils/auth';
 import { requireRequestUser } from '../../shared/request-context';
 import { prepareEmployeeContext } from './context';
+import { enforceEmployeeCompany } from '../../shared/security/company-authorization.service';
+import { enforceEmployeeRelations } from '../../shared/integrity/client-integrity.service';
 
 export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
+  const tx = cds.transaction(req);
+
+  // Enforce company authorization before processing
+  await enforceEmployeeCompany(req, [req.data as Partial<EmployeeEntity>]);
+
+  // Enforce referential integrity
+  await enforceEmployeeRelations(tx, [req.data as Partial<EmployeeEntity>]);
+
   const user = buildUserContext(requireRequestUser(req));
   const result = await prepareEmployeeContext(req, user);
   Object.assign(req.data, result.updates);
@@ -16,7 +26,7 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
   if (req.event === 'CREATE' && req.data.employeeId) {
     // User manually provided an employeeId during CREATE - validate uniqueness
     await ensureEmployeeIdentifier(
-      cds.transaction(req),
+      tx,
       req.data as Partial<EmployeeEntity>,
       result.client,
       undefined,
@@ -27,7 +37,7 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
     // Employee ID changed during UPDATE - validate uniqueness
     // Pass the employee UUID to exclude them from the uniqueness check
     await ensureEmployeeIdentifier(
-      cds.transaction(req),
+      tx,
       req.data as Partial<EmployeeEntity>,
       result.client,
       result.existingEmployee?.employeeId ?? undefined,
