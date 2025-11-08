@@ -32,3 +32,5 @@ server:
       mountPath: /odata
       configuration:
         baseUri: "http://localhost:4004/odata"
+        username: dev
+        password: dev
