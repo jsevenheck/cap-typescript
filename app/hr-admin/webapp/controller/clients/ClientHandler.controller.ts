@@ -42,6 +42,7 @@ export default class ClientHandler {
       client: {
         companyId: "",
         name: "",
+        notificationEndpoint: "",
         country_code: "",
       },
     });
@@ -56,6 +57,7 @@ export default class ClientHandler {
     const context = this.selection.getSelectedClientContext();
     const dialogModel = this.models.getClientModel();
     const currentData = context?.getObject() as (ClientDialogModelData["client"] & {
+      notificationEndpoint?: string | null;
       country_code?: string | null;
     }) | undefined;
 
@@ -67,13 +69,14 @@ export default class ClientHandler {
     dialogModel.setData({
       mode: "edit",
       title: "Edit Client",
-      client: {
-        ID: currentData.ID,
-        companyId: currentData.companyId,
-        name: currentData.name,
-        country_code: currentData.country_code ?? null,
-      },
-    });
+        client: {
+          ID: currentData.ID,
+          companyId: currentData.companyId,
+          name: currentData.name,
+          notificationEndpoint: currentData.notificationEndpoint ?? null,
+          country_code: currentData.country_code ?? null,
+        },
+      });
     this.openDialog();
   }
 
@@ -112,6 +115,7 @@ export default class ClientHandler {
     
     // Extract country code from various formats
     let countryCode = data.client.country_code?.trim() ?? "";
+    const notificationEndpoint = data.client.notificationEndpoint?.trim() ?? "";
     
     // If format is "Country Name (XX)", extract the code
     const codeMatch = countryCode.match(/\(([A-Z]{2})\)$/i);
@@ -122,6 +126,7 @@ export default class ClientHandler {
     const payload = {
       companyId: data.client.companyId?.trim() ?? "",
       name: data.client.name?.trim() ?? "",
+      notificationEndpoint: notificationEndpoint || null,
       country_code: countryCode ? countryCode.toUpperCase() : null,
     };
 
@@ -234,6 +239,7 @@ export default class ClientHandler {
       const model = context.getModel() as ODataModel;
       context.setProperty("companyId", payload.companyId);
       context.setProperty("name", payload.name);
+      context.setProperty("notificationEndpoint", payload.notificationEndpoint);
       context.setProperty("country_code", payload.country_code ?? null);
       
       // Add timeout for update as well

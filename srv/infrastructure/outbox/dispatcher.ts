@@ -1,89 +1,103 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
-import { getDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
-import { circuitBreaker, handleAll, ConsecutiveBreaker } from 'cockatiel';
-
-import { postEmployeeNotification } from '../api/third-party/employee.client';
-import {
-  resolveOutboxBaseBackoff,
-  resolveOutboxClaimTtl,
-  resolveOutboxConcurrency,
-  resolveOutboxMaxAttempts,
-  resolveOutboxTimeout,
-} from './config';
+import type { OutboxConfig } from './config';
+import { OutboxMetrics } from './metrics';
+import { EmployeeThirdPartyNotifier, type NotificationEnvelope } from '../api/third-party/employee-notifier';
 import { getLogger } from '../../shared/utils/logger';
+
+const ql = cds.ql as any;
+
+const OUTBOX_TABLE = 'clientmgmt.EmployeeNotificationOutbox';
+const DLQ_TABLE = 'clientmgmt.EmployeeNotificationDLQ';
 
 const logger = getLogger('outbox-dispatcher');
 
-const ql = cds.ql as typeof cds.ql & {
-  DELETE: typeof cds.ql.SELECT;
-  INSERT: typeof cds.ql.INSERT;
-};
-
-interface OutboxEntry {
+export interface OutboxEntry {
   ID: string;
+  eventType: string;
   destinationName: string;
   payload: string;
   status?: string;
   attempts?: number;
   nextAttemptAt?: Date | null;
-  eventType?: string;
+  claimedAt?: Date | null;
+  claimedBy?: string | null;
+  lastError?: string | null;
 }
 
-// Circuit breaker cache: one breaker per destination with LRU cleanup
-const MAX_CIRCUIT_BREAKERS = 100;
-const circuitBreakers = new Map<string, { breaker: ReturnType<typeof createCircuitBreaker>; lastUsed: number }>();
+interface ParsedPayload extends NotificationEnvelope {
+  body: Record<string, unknown>;
+}
 
-/**
- * Create a circuit breaker for a specific destination.
- * Opens after 5 consecutive failures, resets after 10 seconds.
- */
-const createCircuitBreaker = () => {
-  return circuitBreaker(handleAll, {
-    halfOpenAfter: 10_000,
-    breaker: new ConsecutiveBreaker(5),
-  });
-};
-
-/**
- * Get or create a circuit breaker for a destination.
- * Implements LRU eviction to prevent unbounded memory growth.
- */
-const getCircuitBreaker = (destinationName: string) => {
-  const existing = circuitBreakers.get(destinationName);
-  if (existing) {
-    existing.lastUsed = Date.now();
-    return existing.breaker;
+const normalizeHeaders = (headers: unknown): Record<string, string> | undefined => {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
   }
 
-  // Cleanup old entries if we've hit the limit
-  if (circuitBreakers.size >= MAX_CIRCUIT_BREAKERS) {
-    const sortedEntries = Array.from(circuitBreakers.entries())
-      .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
-
-    // Remove oldest 20%
-    const toRemove = Math.floor(MAX_CIRCUIT_BREAKERS * 0.2);
-    for (let i = 0; i < toRemove; i++) {
-      circuitBreakers.delete(sortedEntries[i][0]);
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers as Record<string, unknown>)) {
+    if (typeof value === 'string') {
+      normalized[key] = value;
     }
   }
 
-  const newBreaker = createCircuitBreaker();
-  circuitBreakers.set(destinationName, { breaker: newBreaker, lastUsed: Date.now() });
-  return newBreaker;
+  return Object.keys(normalized).length ? normalized : undefined;
 };
 
-/**
- * Move a failed outbox entry to the Dead Letter Queue.
- */
-const moveToDLQ = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
+const parsePayload = (entry: OutboxEntry): ParsedPayload => {
   try {
-    // Insert into DLQ
+    const value = JSON.parse(entry.payload ?? '{}');
+    if (!value || typeof value !== 'object') {
+      throw new Error('Payload must be an object.');
+    }
+
+    const record = value as Record<string, unknown>;
+    const bodyCandidate = record['body'];
+
+    if (bodyCandidate && typeof bodyCandidate === 'object') {
+      const secretCandidate = record['secret'];
+      const headersCandidate = record['headers'];
+
+      return {
+        body: bodyCandidate as Record<string, unknown>,
+        secret: typeof secretCandidate === 'string' ? (secretCandidate as string) : undefined,
+        headers: normalizeHeaders(headersCandidate),
+      };
+    }
+
+    const legacyBody = { ...record } as Record<string, unknown>;
+    const secret = legacyBody['secret'];
+    if (typeof secret === 'string') {
+      delete legacyBody['secret'];
+    }
+
+    const headers = legacyBody['headers'];
+    if (headers && typeof headers === 'object') {
+      delete legacyBody['headers'];
+    }
+
+    if (!Object.keys(legacyBody).length) {
+      throw new Error('Payload body is required.');
+    }
+
+    return {
+      body: legacyBody,
+      secret: typeof secret === 'string' ? secret : undefined,
+      headers: normalizeHeaders(headers),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown payload parsing error';
+    throw new Error(`Failed to parse outbox payload for entry ${entry.ID}: ${message}`);
+  }
+};
+
+const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
+  try {
     await db.run(
-      ql.INSERT.into('clientmgmt.EmployeeNotificationDLQ').entries({
+      ql.INSERT.into(DLQ_TABLE).entries({
         originalID: entry.ID,
-        eventType: entry.eventType ?? 'EMPLOYEE_CREATED',
+        eventType: entry.eventType,
         destinationName: entry.destinationName,
         payload: entry.payload,
         attempts,
@@ -92,203 +106,290 @@ const moveToDLQ = async (db: any, entry: OutboxEntry, attempts: number, lastErro
       }),
     );
 
-    // Delete from outbox
-    await db.run(ql.DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({ ID: entry.ID }));
-
-    logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Moved failed entry to DLQ');
+    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID }));
   } catch (error) {
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
-    // Keep entry as FAILED in outbox if DLQ move fails
   }
 };
 
-export const processOutbox = async (): Promise<void> => {
-  const db = (cds as any).db ?? (await cds.connect.to('db'));
-  if (!db) {
-    return;
+export class ParallelDispatcher {
+  private readonly workerId: string;
+  private readonly notifier: EmployeeThirdPartyNotifier;
+
+  constructor(
+    private readonly config: OutboxConfig,
+    private readonly metrics: OutboxMetrics,
+    notifier?: EmployeeThirdPartyNotifier,
+  ) {
+    this.workerId = `worker-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    this.notifier = notifier ?? new EmployeeThirdPartyNotifier();
   }
 
-  const now = new Date();
-  const nowTime = now.getTime();
-  const claimTtlMs = resolveOutboxClaimTtl();
-  const claimExpiryTime = nowTime - claimTtlMs;
-  const concurrency = resolveOutboxConcurrency();
-  const candidateLimit = Math.max(concurrency * 4, concurrency);
-
-  const selectCandidates = (ql.SELECT as any)
-    .from('clientmgmt.EmployeeNotificationOutbox')
-    .columns('ID', 'destinationName', 'payload', 'status', 'attempts', 'nextAttemptAt', 'eventType')
-    .where({ status: { in: ['PENDING', 'PROCESSING'] } })
-    .orderBy('nextAttemptAt')
-    .limit(candidateLimit);
-
-  const rawEntries = (await db.run(selectCandidates)) as OutboxEntry[];
-
-  const claimable = rawEntries.filter((entry) => {
-    const status = entry.status ?? 'PENDING';
-    const nextAttemptAt = entry.nextAttemptAt
-      ? new Date(entry.nextAttemptAt as unknown as string).getTime()
-      : undefined;
-
-    if (status === 'PENDING') {
-      return !nextAttemptAt || nextAttemptAt <= nowTime;
+  async dispatchPending(): Promise<void> {
+    const db = (cds as any).db ?? (await cds.connect.to('db'));
+    if (!db) {
+      return;
     }
 
-    if (status === 'PROCESSING') {
-      return nextAttemptAt !== undefined && nextAttemptAt <= claimExpiryTime;
+    const now = new Date();
+    await this.releaseExpiredClaims(db, now);
+
+    const candidates = (await db.run(
+      ql.SELECT.from(OUTBOX_TABLE)
+        .columns(
+          'ID',
+          'eventType',
+          'destinationName',
+          'payload',
+          'status',
+          'attempts',
+          'nextAttemptAt',
+          'claimedAt',
+          'claimedBy',
+          'lastError',
+        )
+        .where({ status: 'PENDING' })
+        .orderBy('nextAttemptAt')
+        .limit(this.config.batchSize),
+    )) as OutboxEntry[];
+
+    if (!candidates.length) {
+      await this.updatePendingGauge(db);
+      return;
     }
 
-    return false;
-  });
+    const nowTime = now.getTime();
+    const claimable = candidates.filter((entry) => {
+      const status = entry.status ?? 'PENDING';
+      const nextAttemptAt = entry.nextAttemptAt ? new Date(entry.nextAttemptAt).getTime() : undefined;
 
-  if (!claimable.length) {
-    return;
+      if (status === 'PENDING') {
+        return !nextAttemptAt || nextAttemptAt <= nowTime;
+      }
+
+      if (status === 'PROCESSING') {
+        return entry.claimedAt && new Date(entry.claimedAt).getTime() + this.config.claimTtl <= nowTime;
+      }
+
+      return false;
+    });
+
+    if (!claimable.length) {
+      await this.updatePendingGauge(db);
+      return;
+    }
+
+    const claimed: OutboxEntry[] = [];
+
+    for (const entry of claimable) {
+      const where: Record<string, unknown> = {
+        ID: entry.ID,
+      };
+
+      const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
+      where.status = expectedStatus;
+
+      if (entry.claimedAt) {
+        where.claimedAt = entry.claimedAt;
+      } else {
+        where.claimedAt = null;
+      }
+
+      if (entry.claimedBy) {
+        where.claimedBy = entry.claimedBy;
+      } else {
+        where.claimedBy = null;
+      }
+
+      if (entry.nextAttemptAt) {
+        where.nextAttemptAt = entry.nextAttemptAt;
+      } else {
+        where.nextAttemptAt = null;
+      }
+
+      const result = await db.run(
+        ql.UPDATE(OUTBOX_TABLE)
+          .set({
+            status: 'PROCESSING',
+            claimedAt: now,
+            claimedBy: this.workerId,
+            nextAttemptAt: now,
+          })
+          .where(where),
+      );
+
+      const affectedRows = Array.isArray(result) ? Number(result[0]) : Number(result ?? 0);
+      if (!affectedRows) {
+        continue;
+      }
+
+      claimed.push({
+        ...entry,
+        status: 'PROCESSING',
+        claimedAt: now,
+        claimedBy: this.workerId,
+      });
+    }
+
+    if (!claimed.length) {
+      await this.updatePendingGauge(db);
+      return;
+    }
+
+    await this.dispatchBatch(db, claimed);
+    await this.updatePendingGauge(db);
   }
 
-  const claimed: OutboxEntry[] = [];
+  private async dispatchBatch(db: any, entries: OutboxEntry[]): Promise<void> {
+    const queue = [...entries];
+    const workers = Math.max(1, Math.min(this.config.dispatcherWorkers, queue.length));
+    const tasks = Array.from({ length: workers }, () => this.runWorker(db, queue));
+    await Promise.allSettled(tasks);
+  }
 
-  for (const entry of claimable) {
-    if (claimed.length >= concurrency) {
-      break;
+  private async runWorker(db: any, queue: OutboxEntry[]): Promise<void> {
+    while (queue.length) {
+      const entry = queue.shift();
+      if (!entry) {
+        return;
+      }
+      await this.dispatchOne(db, entry);
+    }
+  }
+
+  private async dispatchOne(db: any, entry: OutboxEntry): Promise<void> {
+    let parsed: ParsedPayload;
+    try {
+      parsed = parsePayload(entry);
+    } catch (error) {
+      logger.error({ err: error, entryId: entry.ID }, 'Invalid outbox payload');
+      await this.handleFailure(db, entry, error instanceof Error ? error : new Error(String(error)));
+      return;
     }
 
-    const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
-    const originalNextAttemptAt =
-      entry.nextAttemptAt === null || entry.nextAttemptAt === undefined ? null : entry.nextAttemptAt;
+    try {
+      await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
-    const where: Record<string, unknown> = {
-      ID: entry.ID,
-      status: expectedStatus,
-    };
+      await db.run(
+        ql.UPDATE(OUTBOX_TABLE)
+          .set({
+            status: 'COMPLETED',
+            deliveredAt: new Date(),
+            claimedAt: null,
+            claimedBy: null,
+            nextAttemptAt: null,
+            lastError: null,
+          })
+          .where({ ID: entry.ID }),
+      );
 
-    if (originalNextAttemptAt === null) {
-      where.nextAttemptAt = null;
-    } else {
-      where.nextAttemptAt = originalNextAttemptAt;
+      this.metrics.recordDispatched();
+    } catch (error: any) {
+      await this.handleFailure(db, entry, error);
     }
+  }
 
-    const claimResult = await db.run(
-      ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-        .set({ status: 'PROCESSING', nextAttemptAt: now })
-        .where(where),
+  private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
+    const attempts = (entry.attempts ?? 0) + 1;
+    const errorMessage = error?.message ?? 'Unknown error';
+
+    logger.warn(
+      { err: error, entryId: entry.ID, destination: entry.destinationName, attempts },
+      'Failed to dispatch outbox entry',
     );
 
-    const claimedCount =
-      typeof claimResult === 'number'
-        ? claimResult
-        : Array.isArray(claimResult)
-        ? claimResult[0]
-        : 0;
-
-    if (!claimedCount) {
-      continue;
+    if (attempts >= this.config.maxAttempts) {
+      await moveToDlq(db, entry, attempts, errorMessage);
+      this.metrics.recordFailed();
+      return;
     }
 
-    claimed.push({
-      ...entry,
-      status: 'PROCESSING',
-      attempts: entry.attempts ?? 0,
-      nextAttemptAt: now,
-    });
+    const delay = Math.pow(2, attempts - 1) * this.config.retryDelay;
+    const nextAttemptAt = new Date(Date.now() + delay);
+
+    await db.run(
+      ql.UPDATE(OUTBOX_TABLE)
+        .set({
+          attempts,
+          status: 'PENDING',
+          nextAttemptAt,
+          claimedAt: null,
+          claimedBy: null,
+          lastError: errorMessage,
+        })
+        .where({ ID: entry.ID }),
+    );
+
+    this.metrics.recordFailed();
   }
 
-  if (!claimed.length) {
-    return;
+  private async releaseExpiredClaims(db: any, now: Date): Promise<void> {
+    const expiry = new Date(now.getTime() - this.config.claimTtl);
+
+    await db.run(
+      ql.UPDATE(OUTBOX_TABLE)
+        .set({ status: 'PENDING', claimedAt: null, claimedBy: null })
+        .where({ status: 'PROCESSING', claimedAt: { '<': expiry } }),
+    );
   }
 
-  const timeoutMs = resolveOutboxTimeout();
-  const maxAttempts = resolveOutboxMaxAttempts();
-  const baseBackoff = resolveOutboxBaseBackoff();
-  const secret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+  private async updatePendingGauge(db: any): Promise<void> {
+    const result = await db.run(
+      ql.SELECT.from(OUTBOX_TABLE)
+        .columns('count(1) as pendingCount')
+        .where({ status: { in: ['PENDING', 'PROCESSING'] } }),
+    );
 
-  await Promise.all(
-    claimed.map(async (entry) => {
-      const breaker = getCircuitBreaker(entry.destinationName);
-
-      try {
-        await breaker.execute(async () => {
-          const destination = await getDestination({ destinationName: entry.destinationName });
-          if (!destination) {
-            throw new Error(`Destination ${entry.destinationName} not found`);
-          }
-
-          if ((destination as HttpDestination).url === undefined) {
-            throw new Error(`Destination ${entry.destinationName} is not an HTTP destination`);
-          }
-
-          const httpDestination = destination as HttpDestination;
-
-          await postEmployeeNotification({
-            destination: httpDestination,
-            payload: entry.payload,
-            secret: secret ?? undefined,
-            timeoutMs,
-          });
-        });
-
-        logger.info({ entryId: entry.ID, destinationName: entry.destinationName }, 'Successfully delivered notification');
-
-        await db.run(
-          ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-            .set({
-              status: 'COMPLETED',
-              deliveredAt: new Date(),
-              lastError: null,
-              nextAttemptAt: null,
-            })
-            .where({ ID: entry.ID }),
-        );
-      } catch (error: any) {
-        const attempts = (entry.attempts ?? 0) + 1;
-        const errorMessage = String(error?.message ?? error ?? 'Unknown error');
-
-        logger.warn(
-          { err: error, entryId: entry.ID, destinationName: entry.destinationName, attempts },
-          'Failed to deliver notification'
-        );
-
-        if (attempts >= maxAttempts) {
-          // Move to DLQ after exhausting all retries
-          await moveToDLQ(db, entry, attempts, errorMessage);
-        } else {
-          // Schedule retry with exponential backoff
-          const backoff = Math.pow(2, attempts - 1) * baseBackoff;
-          const nextAttemptAt = new Date(Date.now() + backoff);
-
-          await db.run(
-            ql.UPDATE('clientmgmt.EmployeeNotificationOutbox')
-              .set({
-                attempts,
-                lastError: errorMessage,
-                status: 'PENDING',
-                nextAttemptAt,
-              })
-              .where({ ID: entry.ID }),
-          );
-        }
-      }
-    }),
-  );
-};
-
-export interface EmployeeCreatedNotification {
-  destinationName: string;
-  payload: Record<string, unknown>;
+    const rows = Array.isArray(result) ? result : [result];
+    const countValue = rows[0]?.pendingCount ?? rows[0]?.COUNT ?? rows[0]?.count ?? 0;
+    const parsed = Number(countValue) || 0;
+    this.metrics.updatePending(parsed);
+  }
 }
 
-export const enqueueEmployeeCreatedNotification = async (
-  tx: Transaction,
-  notification: EmployeeCreatedNotification,
-): Promise<void> => {
-  await tx.run(
-    ql.INSERT.into('clientmgmt.EmployeeNotificationOutbox').entries({
-      eventType: 'EMPLOYEE_CREATED',
-      destinationName: notification.destinationName,
-      payload: JSON.stringify(notification.payload),
-      status: 'PENDING',
-      attempts: 0,
-      nextAttemptAt: new Date(),
-    }),
-  );
-};
+export interface OutboxEnqueueInput {
+  eventType: string;
+  endpoint: string;
+  payload: NotificationEnvelope;
+}
 
+const serializePayload = (payload: NotificationEnvelope): string =>
+  JSON.stringify({
+    body: payload.body,
+    secret: payload.secret,
+    headers: payload.headers,
+  });
+
+export const enqueueOutboxEntry = async (
+  tx: Transaction,
+  input: OutboxEnqueueInput,
+  config: OutboxConfig,
+  metrics: OutboxMetrics,
+): Promise<void> => {
+  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
+
+  let attempt = 1;
+  while (attempt <= maxAttempts) {
+    try {
+      await tx.run(
+        ql.INSERT.into(OUTBOX_TABLE).entries({
+          eventType: input.eventType,
+          destinationName: input.endpoint,
+          payload: serializePayload(input.payload),
+          status: 'PENDING',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        }),
+      );
+
+      metrics.recordEnqueued(1);
+      return;
+    } catch (error) {
+      if (attempt >= maxAttempts) {
+        throw error;
+      }
+
+      attempt += 1;
+    }
+  }
+};

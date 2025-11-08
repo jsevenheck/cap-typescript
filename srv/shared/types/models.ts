@@ -2,6 +2,7 @@ export interface ClientEntity {
   ID: string;
   companyId: string;
   name?: string;
+  notificationEndpoint?: string;
   country_code: string;
 }
 
@@ -17,6 +18,8 @@ export interface EmployeeEntity {
   exitDate?: string;
   status?: string;
   employmentType?: string;
+  isManager?: boolean;
+  anonymizedAt?: string;
   client_ID: string;
   manager_ID?: string;
   costCenter_ID?: string;

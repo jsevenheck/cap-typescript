@@ -1,5 +1,9 @@
 // db/schema.cds
-using { cuid, managed, sap.common.Countries as CommonCountries } from '@sap/cds/common';
+using {
+  cuid,
+  managed,
+  sap.common.Countries as CommonCountries,
+} from '@sap/cds/common';
 
 namespace clientmgmt;
 
@@ -19,14 +23,16 @@ type EmploymentType : String enum {
 ]
 entity Clients : managed, cuid {
   @assert.unique: { name: 'Clients_companyId_unique' }
-  companyId    : String(40) not null;
-  name         : String(120);
-  country_code : String(2)  not null;
-  employees    : Composition of many Employees on employees.client = $self;
-  costCenters  : Composition of many CostCenters on costCenters.client = $self;
+  companyId            : String(40) not null;
+  name                 : String(120);
+  notificationEndpoint : String(500);
+  country              : Association to CommonCountries not null;
+  employees            : Composition of many Employees on employees.client = $self;
+  costCenters          : Composition of many CostCenters on costCenters.client = $self;
 }
 
 @odata.etag: 'modifiedAt'
+@personalData: { dataSubject: 'Employee' }
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
@@ -39,6 +45,9 @@ entity Employees : managed, cuid {
   exitDate      : Date;
   status        : EmployeeStatus default 'active';
   employmentType: EmploymentType default 'internal';
+  isManager     : Boolean default false;
+  @sap.common.PersonalData.IsPotentiallyPersonal
+  anonymizedAt  : Timestamp;
   client        : Association to Clients not null;
   manager       : Association to Employees;
   costCenter    : Association to CostCenters;
@@ -73,6 +82,8 @@ entity EmployeeNotificationOutbox : managed, cuid {
   status        : String(20)  default 'PENDING';
   attempts      : Integer     default 0;
   nextAttemptAt : Timestamp;
+  claimedAt     : Timestamp;
+  claimedBy     : String(60);
   deliveredAt   : Timestamp;
   lastError     : LargeString;
 }

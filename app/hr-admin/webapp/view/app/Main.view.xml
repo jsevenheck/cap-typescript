@@ -197,6 +197,12 @@
                             key="{countryOptions>key}"
                             text="{= ${countryOptions>text} + ' (' + ${countryOptions>key} + ')' }"/>
                 </Select>
+                <Label text="Notification Endpoint" labelFor="clientNotificationInput"/>
+                <Input
+                        id="clientNotificationInput"
+                        value="{dialog>/client/notificationEndpoint}"
+                        placeholder="https://example.com/webhook"
+                        type="Url"/>
             </VBox>
         </content>
         <beginButton>
