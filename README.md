@@ -1,180 +1,132 @@
 # CAP TypeScript Monorepo
 
-This repository contains a full SAP Cloud Application Programming Model (CAP) stack that has been migrated from the Java runtime to the TypeScript/Node.js runtime. Both the backend services and the HR Admin UI are contained in the same repository and can be developed, tested, and deployed together.
+This repository hosts a full SAP Cloud Application Programming Model (CAP) solution that runs entirely on the TypeScript/Node.js runtime. It contains the CAP backend, an SAPUI5 HR administration UI, end-to-end tests, and deployment descriptors so that the complete stack can be developed, tested, and delivered from one place.
 
 ## Repository structure
 
 ```
-/db                 # CDS data model and seed data
-/srv                # CAP TypeScript service implementation (domain-driven structure)
-/app/hr-admin       # SAPUI5 HR administration frontend (TypeScript)
+/db                 # CDS data model, CSV seed data, and HDI artefacts
+/srv                # CAP TypeScript service (domain logic, infrastructure, tests)
+/app/hr-admin       # SAPUI5 frontend written in TypeScript
 /approuter          # Application router configuration for BTP
-/tests              # Cross-cutting integration and e2e tests
+/tests              # Cross-cutting Playwright e2e tests and utilities
+/types              # Additional TypeScript typings (e.g. CAP declarations)
 ```
 
 ## Getting started
 
 ### Prerequisites
 
-- Node.js 20 LTS or newer (the workspace scripts depend on tooling that requires Node 20+)
+- Node.js 22 or newer (the root `package.json` enforces `>=22.0.0`).
+- npm 10 (ships with Node 22).
+
+### Install and run locally
 
 ```bash
-npm install
-npm run dev
+npm install          # installs root and workspace dependencies
+npm run deploy       # creates/updates the local SQLite database in ./db
+npm run dev          # runs cds watch (TypeScript aware) + UI5 dev server concurrently
 ```
 
-The command above starts `cds watch` (with TypeScript support) and the UI5 dev server side-by-side via `concurrently`. The UI development server proxies `/odata` calls to the CAP service that runs on port **4004**.
+`npm run dev` launches `cds watch` through the service workspace (`srv`) and the UI5 tooling dev server for the HR admin UI (`app/hr-admin`). During development the UI5 server proxies `/odata` requests to `http://localhost:4004/odata`, so CAP and the UI run side-by-side. Use `npm run dev:fresh` to drop the SQLite database (`db/*.db`) before starting the dev servers when you need a clean environment.
 
 ### Available scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Starts CAP (`cds watch`) and the UI5 dev server concurrently. |
-| `npm run build` | Builds the CAP TypeScript sources (`tsc`) and the UI5 application (`ui5 build`). |
-| `npm run start` | Builds the full stack and starts CAP in production mode (serving the static UI from `app/hr-admin/dist`). |
-| `npm test` | Runs Jest based service tests and Playwright e2e tests against an in-memory SQLite database. |
-| `npm run lint` | Runs ESLint with TypeScript rules for the CAP service. |
+| `npm run dev` | Runs the CAP watcher (`npm run watch --workspace srv`) and the UI5 dev server in parallel. |
+| `npm run dev:fresh` | Recreates the SQLite database (`npm run deploy:clean`) and then starts the dev servers. |
+| `npm run build` | Builds the CAP service (`tsc` via `srv` workspace) and bundles the UI (`ui5 build`). |
+| `npm run start` | Builds the stack and starts CAP in production mode serving the built UI from `app/hr-admin/dist`. |
+| `npm run start:runtime` | Starts only the CAP runtime from the service workspace (expects compiled JavaScript). |
+| `npm run deploy` | Executes `cds deploy --to sqlite:db/sqlite.db` to create/update the local database. |
+| `npm run deploy:clean` | Removes existing SQLite database files in `db/` and redeploys CDS artefacts. |
+| `npm test` | Runs backend Jest tests (`npm run test --workspace srv`) followed by Playwright e2e tests. |
+| `npm run test:backend` | Executes Jest with ts-node against the CAP service (runs in `srv`). |
+| `npm run test:frontend` | Runs the Playwright suite from `tests/e2e`. |
+| `npm run lint` | Lints all TypeScript sources in the service workspace with ESLint. |
 
-### Backend specifics
+## Backend specifics
 
-* **Runtime:** `@sap/cds` 9 with TypeScript handlers loaded through `ts-node`.
-* **Database:** Local development uses SQLite (`sqlite.db`). Tests run entirely in-memory.
-* **Security:** Authentication relies on SAP Cloud Identity Services (IAS) and authorization decisions are delegated to the Authorization Management Service (AMS). Local development still uses mocked users so existing tests continue to run unchanged.
-* **Business logic:** Feature-specific handlers live under `srv/domain/<feature>/{handlers,services,repository}` and are wired through `srv/handlers.ts`. The handlers continue to perform validation, enforce cross-entity consistency, and generate sequential employee identifiers. The service enforces optimistic concurrency on writes and accepts either `If-Match` headers or a `modifiedAt` timestamp in the payload when the UI cannot send headers (e.g. during background jobs).
-* **Health endpoint:** `/health` responds with `{ status: 'ok' }` for platform readiness probes.
+- **Runtime:** CAP 9 running on Node.js/TypeScript. `srv/watch` compiles TypeScript with `tsc --watch` and runs `cds watch` through `ts-node/register` so you can change `.ts` handlers without manual builds.【F:srv/package.json†L6-L16】【F:srv/package.json†L42-L55】
+- **Data model:** `db/schema.cds` defines Clients, Employees, CostCenters, and outbox entities. Clients own employees and cost centres, employee records include optimistic concurrency metadata (`@odata.etag: 'modifiedAt'`), and there is a DLQ (`EmployeeNotificationDLQ`) alongside the outbox table used for third-party notifications.【F:db/schema.cds†L9-L90】
+- **Domain-driven layout:** Business logic lives in `srv/domain/<feature>` packages. Each feature exposes DTOs, repositories, services, and handler registration via `srv/handlers.ts` so cross-cutting middleware (like company authorization) is centralised.【F:srv/handlers.ts†L1-L21】【F:srv/domain/employee/handlers/on-create.ts†L1-L40】
+- **Optimistic concurrency:** Utility helpers enforce ETag or `modifiedAt` checks. If a client does not send `If-Match` headers, the payload must include the latest `modifiedAt` value; otherwise requests fail with `428 Precondition Required` or `412 Precondition Failed`.【F:srv/shared/utils/concurrency.ts†L1-L200】【F:srv/service.cds†L15-L45】
+- **Business rules:**
+  - Employee lifecycle services normalise identifiers, ensure entry/exit date consistency, and generate deterministic employee IDs per client with retry-on-unique-constraint logic.【F:srv/domain/employee/services/lifecycle.service.ts†L1-L120】【F:srv/domain/employee/services/lifecycle.service.ts†L360-L429】
+  - The `anonymizeFormerEmployees` action batches anonymisation of exited staff. The batch size can be tuned through `ANONYMIZATION_BATCH_SIZE` with defensive bounds enforced in code.【F:srv/domain/employee/services/retention.service.ts†L1-L90】
+  - Third-party notifications are prepared in `srv/infrastructure/api/third-party/employee-notifier.ts`, which groups employees per client endpoint and signs payloads using HMAC if a secret is configured.【F:srv/infrastructure/api/third-party/employee-notifier.ts†L1-L120】【F:srv/infrastructure/api/third-party/employee-notifier.ts†L164-L213】
+- **Security & authorisation:**
+  - Local development uses CAP’s mocked authentication provider with three roles (`HRAdmin`, `HREditor`, `HRViewer`) and company code attributes defined in `package.json`. Production profiles switch to IAS and AMS bindings automatically.【F:package.json†L28-L94】
+  - CDS service annotations (`@restrict`) enforce role-based access and attribute filters. Additional runtime checks in `srv/middleware/company-authorization.ts` validate that write operations stay within the caller’s allowed company codes.【F:srv/service.cds†L5-L45】【F:srv/middleware/company-authorization.ts†L1-L120】
+- **API surface:**
+  - `/health` responds with `{ status: 'ok' }` for platform readiness probes.【F:srv/server.ts†L33-L40】
+  - `/api/employees/active` exposes an API-key protected export. Keys are loaded from the BTP Credential Store when bound, or fall back to the `EMPLOYEE_EXPORT_API_KEY` environment variable. The middleware compares keys using `crypto.timingSafeEqual`.【F:srv/server.ts†L42-L53】【F:srv/middleware/apiKey.ts†L1-L65】
+- **Outbox & integration resilience:**
+  - Employee create events enqueue payloads into `EmployeeNotificationOutbox`. A scheduler dispatches them with configurable retry/backoff, moves permanently failing messages to `EmployeeNotificationDLQ`, and exposes Prometheus metrics (enqueued, dispatched, failed, pending).【F:db/schema.cds†L56-L90】【F:srv/infrastructure/outbox/index.ts†L1-L18】【F:srv/infrastructure/outbox/metrics.ts†L1-L40】
+  - The dispatcher honours `OUTBOX_*` environment variables for retry delay, batch size, worker count, claim TTL, enqueue retries, cleanup retention, dispatch interval, and cleanup cron expression.【F:srv/infrastructure/outbox/config.ts†L1-L89】
+  - Background jobs start when services are served (unless `NODE_ENV=test`) and shut down gracefully on process exit.【F:srv/server.ts†L6-L78】
+- **Observability & logging:** Correlation IDs are generated for every request, propagated to responses, and forwarded to the structured logger. If `@sap/logging` is unavailable the code falls back to console logging while preserving component prefixes.【F:srv/server.ts†L14-L37】【F:srv/shared/utils/logger.ts†L1-L62】
+- **Secrets management:** Helper utilities attempt to read secrets from the BTP Credential Store and fall back to environment variables (`EMPLOYEE_EXPORT_API_KEY`, `THIRD_PARTY_EMPLOYEE_SECRET`). Missing secrets are logged with context to aid troubleshooting.【F:srv/shared/utils/secrets.ts†L1-L120】【F:srv/shared/utils/secrets.ts†L122-L147】
 
-### Frontend specifics
+## Frontend specifics
 
-* The UI5 app continues to consume the `/odata/v4/clients` service as before.
-* `ui5-middleware-simpleproxy` proxies OData calls to the CAP server during development.
-* Production builds (served by CAP or the approuter) live in `app/hr-admin/dist`.
+- The HR admin UI is a TypeScript-based UI5 application located in `app/hr-admin`. UI5 tooling transpiles TypeScript sources via custom middleware/tasks and serves the app on port 8081 during development.【F:app/hr-admin/ui5.yaml†L1-L28】
+- `ui5-middleware-simpleproxy` forwards `/odata` calls to the local CAP server so that the UI can consume live OData during development without additional configuration.【F:app/hr-admin/ui5.yaml†L23-L28】
+- Production builds are emitted to `app/hr-admin/dist` and are served either directly by CAP (via `cds.serve.static`) or through the approuter + HTML5 repo modules defined in `mta.yaml`.【F:package.json†L112-L120】【F:mta.yaml†L14-L120】
 
 ## Testing
 
-The test suite is split into three layers:
+The test suite is split into layers:
 
-1. **Service tests (Jest + Supertest)** – Validates business logic like automatic employee ID creation and authorisation checks via HTTP calls to the CAP service (`srv/test`).
-2. **End-to-end tests (Playwright)** – Uses the Playwright request API to interact with the running CAP service and verify that the published OData API is reachable (`tests/e2e`).
-3. **UI unit tests** – UI5 unit tests can be added under `app/hr-admin/webapp/test` (unchanged from the original Java project).
+1. **Service tests (Jest + Supertest)** – Located in `srv/test`. Tests cover domain logic, outbox dispatchers, company-code authorisation, and API key behaviour using the mocked authentication provider.【F:srv/package.json†L6-L16】【F:srv/test/domain/employee/active-employees.test.ts†L1-L40】
+2. **End-to-end tests (Playwright)** – `tests/e2e` starts a throwaway CAP process (via `tests/utils/cap-server.ts`) and exercises the published OData API using Playwright’s request API.【F:tests/utils/cap-server.ts†L1-L80】【F:tests/e2e/client-service.spec.ts†L1-L28】
+3. **UI unit tests** – The UI5 project keeps the standard `webapp/test` location; add QUnit/OPA5 tests there as needed.
 
-Run all tests with `npm test`.
+Run all tests with `npm test`. To collect backend coverage execute `npm run test --workspace srv -- --coverage`.
 
-To collect coverage for the backend run `npm run test --workspace srv -- --coverage`.
+## Authentication & authorisation
 
-## Authentication & Authorization
-
-* Local profiles keep mocked users (including the HR roles and company attributes) so day-to-day development does not require cloud credentials.
-* The CAP runtime is configured for **IAS (Identity Authentication Service)** and **AMS (Authorization Management Service)** in production:
-  - **IAS** (`cds.security.identity`): Handles user authentication and identity federation
-  - **AMS** (`cds.requires.auth.ams`): Provides attribute-based access control with CompanyCode filtering
-* **Role Configuration:** Three roles are enforced via `@restrict` annotations in CDS models:
-  - `HRAdmin`: Full access to all HR data and operations
-  - `HREditor`: Read/write access to assigned company codes (via CompanyCode attributes)
-  - `HRViewer`: Read-only access to assigned company codes
-* **AMS DCL Generation:** Authorization policies are defined in `srv/ams/schema.dcl` and deployed via AMS DCL deployer. Run `npm run ams:generate --workspace srv` whenever CDS annotations change.
-* During deployment, bind both IAS (`identity` service, `application` plan) and AMS (`authorization` service, `application` plan) instances to the CAP service and approuter. The MTA project ships a dedicated AMS policy deployer module that uploads the generated DCL bundle from `srv/ams`.
-
-## Observability & Logging
-
-* **Structured Logging:** The application uses `@sap/logging` for structured, correlation-based logging. Each request receives a unique `x-correlation-id` header for distributed tracing.
-* **Correlation IDs:** All logs include correlation IDs to trace requests across approuter → CAP → outbox → destination service flows.
-* **Log Levels:** Configure via `NODE_ENV`. In production, logs are sent to the Application Logs service bound in `mta.yaml`.
-* **Fallback:** If `@sap/logging` is unavailable, the application falls back to console-based logging with component prefixes.
-
-## Secrets Management
-
-* **BTP Credential Store:** API keys and secrets are loaded from BTP Credential Store service when bound in production.
-* **Environment Variable Fallback:** For local development, secrets can be configured via environment variables:
-  - `EMPLOYEE_EXPORT_API_KEY`: API key for the `/api/employees/active` endpoint
-  - `THIRD_PARTY_EMPLOYEE_SECRET`: Secret for HMAC signing of employee notification payloads
-* **Namespaces:** Secrets are organized by namespace in Credential Store (e.g., `employee-export/api-key`).
-* Bind the Credential Store service (`cap-ts-credstore`) in `mta.yaml` for automatic secret loading at application startup.
-
-## Outbox Pattern & Resilience
-
-* **Outbox Pattern:** Employee creation events are queued in `EmployeeNotificationOutbox` table for reliable, asynchronous delivery to third-party systems.
-* **Circuit Breaker:** HTTP calls to destination services are protected by circuit breakers (opens after 5 consecutive failures, resets after 10 seconds) to prevent cascade failures.
-* **Dead Letter Queue (DLQ):** Messages that fail after 6 retry attempts are moved to `EmployeeNotificationDLQ` for manual inspection and replay.
-* **Exponential Backoff:** Failed deliveries are retried with exponential backoff (base 5 seconds, max 6 attempts).
-* **Configuration:** Outbox behavior can be tuned via environment variables:
-  - `OUTBOX_DISPATCH_INTERVAL_MS`: Polling interval (default: 30000)
-  - `OUTBOX_CONCURRENCY`: Max concurrent deliveries (default: 1)
-  - `OUTBOX_MAX_ATTEMPTS`: Max retry attempts (default: 6)
-  - `OUTBOX_BASE_BACKOFF_MS`: Base backoff delay (default: 5000)
-  - `OUTBOX_RETENTION_HOURS`: Retention window for completed/failed entries (default: 168 hours / 7 days)
+- Mocked users (dev, hrviewer, hreditor) with preconfigured company codes are defined in the CAP configuration for local development.【F:package.json†L54-L94】
+- Production switches `auth` to IAS and `ams` to the Authorization Management Service when service bindings are available. AMS attribute propagation is wired through `srv/attributes.cds` so company codes flow into AMS policies automatically.【F:package.json†L95-L127】【F:srv/attributes.cds†L1-L4】
+- Role restrictions in `srv/service.cds` align with AMS scopes (`HRAdmin`, `HREditor`, `HRViewer`) and ensure read/write segregation across company codes.【F:srv/service.cds†L5-L45】
 
 ## Deployment
 
-* `mta.yaml` provisions the following BTP services:
-  - **IAS** (`cap-ts-ias`): Identity authentication service for user login
-  - **AMS** (`cap-ts-ams`): Authorization management with attribute-based access control
-  - **Credential Store** (`cap-ts-credstore`): Secure secret storage with rotation support
-  - **HANA** (`cap-ts-db`): HDI container for application data
-  - **Destination** (`cap-ts-destination`): Third-party HTTP endpoint configuration
-  - **Connectivity** (`cap-ts-connectivity`): On-premise system connectivity (if needed)
-  - **Application Logs** (`cap-ts-logging`): Centralized structured logging
-  - **HTML5 Application Repository** (`cap-ts-html5-repo-*`): UI5 app hosting
-* Static UI build artefacts are served by the CAP service and the approuter via the `srv-api` destination.
-* The approuter configuration forwards `/odata/v4/*` to the CAP service, enforces IAS authentication on all routes, and exposes the UI as the welcome route.
+The `mta.yaml` file describes the Cloud Foundry deployment:
 
-## Java → TypeScript mapping
-
-| Former Java artifact | TypeScript replacement |
-| --- | --- |
-| `srv/src/main/java/com/acme/hr/Application.java` | `srv/server.ts` (exports `cds.server` with health check) |
-| Spring Boot handlers & services | `srv/domain/*/handlers` registered via `srv/handlers.ts` |
-| Maven build (`pom.xml`) | `package.json` workspaces + TypeScript toolchain |
-| Spring Security roles | IAS scopes `HRViewer` / `HREditor` / `HRAdmin` |
-| JUnit tests | Jest service tests + Playwright e2e tests |
+- **cap-ts-srv** – CAP service (Node.js) bound to HANA, IAS, AMS, Destination, Connectivity, Application Logs, and Credential Store. Provides a `srv-api` destination for other modules.【F:mta.yaml†L14-L78】
+- **cap-ts-db-deployer** – HDI deployer for CDS artefacts.【F:mta.yaml†L80-L94】
+- **cap-ts-ams-deployer** – Deploys generated AMS DCL bundles with an IAS X.509 client.【F:mta.yaml†L96-L131】
+- **cap-ts-app-hr-admin** & **cap-ts-app-deployer** – Build and publish the UI5 app to the HTML5 application repository.【F:mta.yaml†L133-L178】
+- **cap-ts-approuter** – Serves the UI, protects routes via IAS, and forwards `/odata/v4/*` to the CAP service.【F:mta.yaml†L180-L214】【F:approuter/xs-app.json†L1-L18】
+- Shared resources include HANA, IAS, AMS, Destination, Connectivity, HTML5 repo host/runtime, Application Logs, and Credential Store.【F:mta.yaml†L216-L240】
 
 ## Environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `CDS_ENV` | Standard CAP profile selection (`test` profile uses in-memory SQLite). |
-| `NODE_ENV` | Influences CAP logging and caching (set to `production` for `npm run start`). |
-| `TS_NODE_TRANSPILE_ONLY` | Speeds up ts-node execution for dev/test (set by scripts). |
-| `IAS_TENANT`, `IAS_CLIENT_ID`, `IAS_CLIENT_SECRET` | Optional overrides to connect to IAS without Cloud Foundry bindings during local troubleshooting. |
-| `AMS_DCL_ROOT` | Overrides the folder in which the AMS DCL files are generated (defaults to `srv/ams`). |
-| `OUTBOX_DISPATCH_INTERVAL_MS` | Interval in milliseconds between background outbox polls (defaults to `30000`). |
-| `OUTBOX_CONCURRENCY` | Number of outbox entries processed concurrently per poll (defaults to `1`). |
-| `OUTBOX_CLAIM_TTL_MS` | Time in milliseconds after which a `PROCESSING` entry becomes claimable again (defaults to `120000`). |
-| `OUTBOX_MAX_ATTEMPTS` | Maximum retry attempts before an entry is marked as `FAILED` (defaults to `6`). |
-| `OUTBOX_BASE_BACKOFF_MS` | Base delay in milliseconds used for the exponential backoff between retries (defaults to `5000`). |
-| `OUTBOX_RETENTION_HOURS` | Number of hours delivered/failed entries are retained before cleanup (defaults to `168`). |
-| `OUTBOX_CLEANUP_INTERVAL_MS` | Interval in milliseconds for the periodic cleanup task (defaults to six hours). |
-| `OUTBOX_CLEANUP_CRON` | Optional simple cron expression (`*/N * * * *` for minutes or `0 */N * * *` for hours) that overrides the cleanup interval. |
-| `EMPLOYEE_EXPORT_API_KEY` | API key required to call `GET /api/employees/active` without IAS authentication. |
+| `EMPLOYEE_EXPORT_API_KEY` | Fallback API key for `/api/employees/active` when Credential Store is unavailable.【F:srv/middleware/apiKey.ts†L17-L47】【F:srv/shared/utils/secrets.ts†L122-L147】 |
+| `THIRD_PARTY_EMPLOYEE_SECRET` | Optional shared secret used to sign third-party employee notifications (HMAC SHA-256).【F:srv/infrastructure/api/third-party/employee-notifier.ts†L121-L213】 |
+| `ANONYMIZATION_BATCH_SIZE` | Overrides the batch size for the `anonymizeFormerEmployees` action (capped at 10,000).【F:srv/domain/employee/services/retention.service.ts†L1-L90】 |
+| `OUTBOX_RETRY_DELAY_MS` | Delay (ms) between retry attempts when dispatching outbox entries.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_MAX_ATTEMPTS` | Maximum dispatch attempts before moving an entry to the DLQ.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_BATCH_SIZE` | Maximum number of entries fetched per polling cycle.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_CLAIM_TTL_MS` | Time (ms) after which a claimed entry becomes available again if not processed.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_DISPATCHER_WORKERS` | Number of parallel dispatcher workers processing batches.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_ENQUEUE_MAX_ATTEMPTS` | Retry limit for enqueue operations encountering transient failures.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_CLEANUP_RETENTION_MS` | Retention window (ms) before completed/failed entries are purged by the cleanup task.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_DISPATCH_INTERVAL_MS` | Interval (ms) at which the scheduler wakes up to dispatch pending outbox entries.【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
+| `OUTBOX_CLEANUP_CRON` | Cron expression controlling the periodic cleanup job (supports minute/hour shortcuts).【F:srv/infrastructure/outbox/config.ts†L1-L89】 |
 
-### Employee export API
+For local-only scenarios you can also set `NODE_ENV`, `CDS_ENV`, and `CDS_PROFILES` to `test` when running tests outside of npm scripts (the Playwright utilities do this automatically).【F:tests/utils/cap-server.ts†L1-L40】
 
-External systems can obtain the list of active employees through a dedicated, API-key-protected REST endpoint:
+## Employee export API
+
+External systems can request the list of active employees via the dedicated REST endpoint:
 
 ```
 GET /api/employees/active
 ```
 
-Set a strong API key via the `EMPLOYEE_EXPORT_API_KEY` environment variable. When running locally you can add the following snippet to your `.env` file:
-
-```
-EMPLOYEE_EXPORT_API_KEY=replace-with-a-strong-secret
-```
-
-Example requests:
-
-```bash
-# Successful call
-curl -H "x-api-key: $EMPLOYEE_EXPORT_API_KEY" https://<host>/api/employees/active
-
-# Unauthorized (missing key)
-curl https://<host>/api/employees/active
-```
-
-The endpoint returns a JSON array containing active employees (including their cost centers and managers). Invalid or missing API keys result in `401 { "error": "invalid_api_key" }`.
-
-## Notes
-
-* Remove `sqlite.db` if you want a fresh local database.
-* The repository intentionally keeps generated employee IDs deterministic within a tenant to guarantee backward compatibility with existing UI behavior.
-* Playwright uses the APIRequest client so no headless browser is required during CI, but you can enable browser-based UI flows if desired.
-
+Provide the API key through the `x-api-key` header or the `Authorization: ApiKey <key>` scheme. If no key is configured, the middleware rejects requests with `401 { "error": "invalid_api_key" }`. Use the Credential Store binding in production and `EMPLOYEE_EXPORT_API_KEY` for local testing.【F:srv/middleware/apiKey.ts†L1-L65】【F:srv/middleware/apiKey.ts†L67-L90】
