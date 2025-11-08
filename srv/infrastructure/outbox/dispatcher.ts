@@ -148,7 +148,7 @@ export class ParallelDispatcher {
           'claimedBy',
           'lastError',
         )
-        .where({ status: { in: ['PENDING', 'PROCESSING'] } })
+        .where({ status: 'PENDING' })
         .orderBy('nextAttemptAt')
         .limit(this.config.batchSize),
     )) as OutboxEntry[];
