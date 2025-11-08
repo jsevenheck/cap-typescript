@@ -207,6 +207,8 @@ export default class ClientHandler {
             return;
           }
 
+          const submitPromise = model.submitBatch("$auto");
+
           // Add timeout protection (30 seconds)
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
@@ -215,9 +217,8 @@ export default class ClientHandler {
           });
 
           // Race between the actual operation and timeout
-          // Note: created() already triggers the submit internally, so we don't need to call submitBatch separately
           Promise.race([
-            creationPromise,
+            Promise.all([creationPromise, submitPromise]),
             timeoutPromise
           ])
             .then(() => {
