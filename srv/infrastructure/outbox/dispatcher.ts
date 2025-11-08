@@ -371,8 +371,7 @@ export const enqueueOutboxEntry = async (
   config: OutboxConfig,
   metrics: OutboxMetrics,
 ): Promise<void> => {
-  const maxAttempts =
-    config.enqueueMaxAttempts === 0 ? Number.POSITIVE_INFINITY : config.enqueueMaxAttempts;
+  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
 
   let attempt = 1;
   while (attempt <= maxAttempts) {

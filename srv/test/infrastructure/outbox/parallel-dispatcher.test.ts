@@ -215,6 +215,32 @@ describe('ParallelDispatcher', () => {
     expect(tx.run).toHaveBeenCalledTimes(2);
   });
 
+  it('surfaces enqueue failure after bounded retries when max attempts is unset', async () => {
+    const config = { ...defaultOutboxConfig(), retryDelay: 1, maxAttempts: 4, enqueueMaxAttempts: 0 };
+    const registry = new prom.Registry();
+    const metrics = new OutboxMetrics(registry);
+
+    const error = new Error('locked');
+    const tx = {
+      run: jest.fn().mockRejectedValue(error),
+    } as any;
+
+    await expect(
+      enqueueOutboxEntry(
+        tx,
+        {
+          eventType: 'EMPLOYEE_CREATED',
+          endpoint: 'https://example.com/enqueue',
+          payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
+        },
+        config,
+        metrics,
+      ),
+    ).rejects.toBe(error);
+
+    expect(tx.run).toHaveBeenCalledTimes(config.maxAttempts);
+  });
+
   it('cleans up processed entries after retention period', async () => {
     const cleanup = new OutboxCleanup({ ...defaultOutboxConfig(), cleanupRetention: 10 });
 
