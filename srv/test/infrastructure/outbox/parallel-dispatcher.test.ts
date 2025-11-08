@@ -194,10 +194,12 @@ describe('ParallelDispatcher', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('retries enqueueing with exponential backoff', async () => {
+  it('retries enqueueing without introducing blocking delays', async () => {
     const config = { ...defaultOutboxConfig(), retryDelay: 5, enqueueMaxAttempts: 3 };
     const registry = new prom.Registry();
     const metrics = new OutboxMetrics(registry);
+
+    const timeoutSpy = jest.spyOn(global, 'setTimeout');
 
     const tx = {
       run: jest
@@ -206,11 +208,17 @@ describe('ParallelDispatcher', () => {
         .mockResolvedValueOnce(undefined),
     } as any;
 
-    await enqueueOutboxEntry(tx, {
-      eventType: 'EMPLOYEE_CREATED',
-      endpoint: 'https://example.com/enqueue',
-      payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
-    }, config, metrics);
+    try {
+      await enqueueOutboxEntry(tx, {
+        eventType: 'EMPLOYEE_CREATED',
+        endpoint: 'https://example.com/enqueue',
+        payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
+      }, config, metrics);
+
+      expect(timeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      timeoutSpy.mockRestore();
+    }
 
     expect(tx.run).toHaveBeenCalledTimes(2);
   });

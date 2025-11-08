@@ -360,11 +360,6 @@ const serializePayload = (payload: NotificationEnvelope): string =>
     headers: payload.headers,
   });
 
-const wait = (duration: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, duration);
-  });
-
 export const enqueueOutboxEntry = async (
   tx: Transaction,
   input: OutboxEnqueueInput,
@@ -394,8 +389,6 @@ export const enqueueOutboxEntry = async (
         throw error;
       }
 
-      const delay = Math.pow(2, attempt - 1) * config.retryDelay;
-      await wait(delay);
       attempt += 1;
     }
   }
