@@ -82,7 +82,7 @@ export function createAbortableRequest<T>(
     onAbort,
   } = options;
 
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let isResolved = false;
 
   // Create timeout promise
