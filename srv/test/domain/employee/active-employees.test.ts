@@ -82,7 +82,7 @@ describe('GET /api/employees/active', () => {
         },
       },
     ]);
-    cdsAny.tx = jest.fn().mockReturnValue({ run: runSpy });
+    cdsAny.transaction = jest.fn().mockReturnValue({ run: runSpy });
 
     await request(app)
       .get('/api/employees/active')
@@ -112,6 +112,6 @@ describe('GET /api/employees/active', () => {
         },
       ]);
     expect(runSpy).toHaveBeenCalledTimes(1);
-    expect(cdsAny.tx).toHaveBeenCalledTimes(1);
+    expect(cdsAny.transaction).toHaveBeenCalledTimes(1);
   });
 });

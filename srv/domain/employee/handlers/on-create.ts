@@ -6,8 +6,13 @@ import { ensureEmployeeIdentifier } from '../services/identifiers';
 import { buildUserContext } from '../../../shared/utils/auth';
 import { requireRequestUser } from '../../shared/request-context';
 import { prepareEmployeeContext } from './context';
+import { createServiceError } from '../../../shared/utils/errors';
 
 export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
+  if (!req.data || typeof req.data !== 'object') {
+    throw createServiceError(400, 'Request data is required.');
+  }
+
   const user = buildUserContext(requireRequestUser(req));
   const result = await prepareEmployeeContext(req, user);
   Object.assign(req.data, result.updates);

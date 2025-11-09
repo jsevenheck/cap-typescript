@@ -24,7 +24,6 @@ export const onCreateEvent = async (
 ): Promise<unknown> => {
   const user = buildUserContext(requireRequestUser(req));
   const tx = cds.transaction(req);
-  let lastError: unknown;
 
   for (let attempt = 0; attempt < EMPLOYEE_ID_RETRIES; attempt += 1) {
     let generatedEmployeeId = false;
@@ -58,16 +57,17 @@ export const onCreateEvent = async (
 
       return response;
     } catch (error) {
-      lastError = error;
       if (generatedEmployeeId && isEmployeeIdUniqueConstraintError(error) && attempt < EMPLOYEE_ID_RETRIES - 1) {
+        logger.warn({ attempt, error }, 'Employee ID conflict detected, retrying with new ID');
         delete (req.data as Partial<EmployeeEntity>).employeeId;
         continue;
       }
+      logger.error({ err: error, attempt }, 'Failed to create employee');
       throw error;
     }
   }
 
-  logger.error({ err: lastError }, 'Failed to create employee after multiple attempts.');
+  // This line should be unreachable, but kept as a safety net
   throw createServiceError(500, 'Failed to create employee after multiple attempts.');
 };
 
