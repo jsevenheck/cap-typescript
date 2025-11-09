@@ -5,8 +5,13 @@ import type { ClientEntity } from '../dto/client.dto';
 import { prepareClientUpsert } from '../services/lifecycle.service';
 import { buildUserContext } from '../../../shared/utils/auth';
 import { buildConcurrencyContext, deriveTargetId, requireRequestUser } from '../../shared/request-context';
+import { createServiceError } from '../../../shared/utils/errors';
 
 const handleClientUpsert = async (req: Request): Promise<void> => {
+  if (!req.data || typeof req.data !== 'object') {
+    throw createServiceError(400, 'Request data is required.');
+  }
+
   const user = buildUserContext(requireRequestUser(req));
   const concurrency = buildConcurrencyContext(req, 'clientmgmt.Clients');
   const { updates } = await prepareClientUpsert({

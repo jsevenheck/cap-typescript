@@ -24,6 +24,14 @@ type CreationContext = {
   delete(groupId?: string): Promise<void>;
 };
 
+/**
+ * Validates email format using a simple regex pattern
+ */
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 export default class EmployeeHandler {
   private currentManagerLookupToken: number = 0;
 
@@ -224,6 +232,12 @@ export default class EmployeeHandler {
       !payload.employmentType
     ) {
       MessageBox.error("First name, last name, email, entry date, status, and employment type are required.");
+      return;
+    }
+
+    // Validate email format
+    if (typeof payload.email === 'string' && !isValidEmail(payload.email)) {
+      MessageBox.error("Please enter a valid email address (e.g., user@example.com).");
       return;
     }
 

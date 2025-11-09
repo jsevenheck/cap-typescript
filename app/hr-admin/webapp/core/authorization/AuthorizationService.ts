@@ -51,16 +51,16 @@ export class AuthorizationService {
     // 2. Parse user attributes from OData model security token
     // 3. Use SAPUI5 UserInfo API if available
 
-    // For now, return permissive defaults (all operations allowed)
+    // For now, return least-privileged defaults (viewer-only)
     // This ensures the frontend doesn't break while backend enforces security
-    console.warn("AuthorizationService: Using default permissions. Implement fetchUserInfo() for role-based UI controls.");
+    console.warn("AuthorizationService: Using default read-only permissions. Implement fetchUserInfo() for role-based UI controls.");
 
     userInfoCache = {
-      roles: [UserRole.HRAdmin], // Default to admin for development
+      roles: [UserRole.HRViewer], // Default to least-privileged (viewer) for security
       attributes: {},
-      isAdmin: true,
+      isAdmin: false,
       isViewer: true,
-      isEditor: true,
+      isEditor: false,
     };
 
     return userInfoCache;

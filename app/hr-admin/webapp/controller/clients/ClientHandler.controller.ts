@@ -23,6 +23,18 @@ type CreationContext = {
   delete(groupId?: string): Promise<void>;
 };
 
+/**
+ * Validates URL format and ensures it uses http/https protocol
+ */
+function isValidHttpUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default class ClientHandler {
   constructor(
     private readonly controller: Controller,
@@ -155,6 +167,14 @@ export default class ClientHandler {
       MessageBox.error(
         "Country code must be exactly 2 letters (e.g., 'BH' for Bahrain, 'US' for United States).\n\n" +
         `You entered: '${payload.country_code}'`
+      );
+      return;
+    }
+
+    // Validate notification endpoint URL if provided
+    if (payload.notificationEndpoint && !isValidHttpUrl(payload.notificationEndpoint)) {
+      MessageBox.error(
+        "Notification endpoint must be a valid HTTP or HTTPS URL (e.g., https://example.com/webhook)."
       );
       return;
     }

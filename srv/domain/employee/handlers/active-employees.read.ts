@@ -1,5 +1,6 @@
 import cds from '@sap/cds';
 import type { NextFunction, Request, Response, RequestHandler } from 'express';
+import { createServiceError } from '../../../shared/utils/errors';
 
 type EmployeeEntityDefinition = {
   elements?: Record<string, unknown>;
@@ -76,10 +77,22 @@ const parseSelect = (value: unknown): Set<string> | undefined => {
     return undefined;
   }
 
-  return new Set(fields);
+  // Validate selected fields against allowed fields
+  const validFields = new Set(DEFAULT_SELECT_FIELDS);
+  const requestedFields = new Set(fields);
+
+  for (const field of requestedFields) {
+    if (!validFields.has(field)) {
+      throw createServiceError(400, `Invalid field in $select: ${field}`);
+    }
+  }
+
+  return requestedFields;
 };
 
-const parseNonNegativeInteger = (value: unknown): number | undefined => {
+const MAX_TOP_LIMIT = 10000;
+
+const parseNonNegativeInteger = (value: unknown, max?: number): number | undefined => {
   if (value === undefined) {
     return undefined;
   }
@@ -87,6 +100,10 @@ const parseNonNegativeInteger = (value: unknown): number | undefined => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) {
     return undefined;
+  }
+
+  if (max !== undefined && parsed > max) {
+    throw createServiceError(400, `Value exceeds maximum allowed limit of ${max}`);
   }
 
   return parsed;
@@ -182,7 +199,7 @@ const executeActiveEmployeesQuery = async (
 ): Promise<ActiveEmployee[]> => {
   const entityInfo = resolveEmployeeEntity();
   if (!entityInfo) {
-    throw new Error('Employees entity definition not found.');
+    throw createServiceError(500, 'Employees entity definition not found.');
   }
 
   const query = cds.ql.SELECT.from(entityInfo.name).columns(
@@ -221,9 +238,9 @@ const executeActiveEmployeesQuery = async (
     (query as any).limit(top, skip ?? 0);
   }
 
-  const transaction = (cds as any).tx(req);
+  const transaction = cds.transaction(req);
   if (!transaction || typeof transaction.run !== 'function') {
-    throw new Error('Failed to acquire transaction for request.');
+    throw createServiceError(500, 'Failed to acquire transaction for request.');
   }
 
   const rows = (await transaction.run(query)) as EmployeeRow[];
@@ -233,7 +250,7 @@ const executeActiveEmployeesQuery = async (
 
 const handleActiveEmployees = async (req: Request, res: Response): Promise<void> => {
   const selectFields = parseSelect(req.query.$select);
-  const top = parseNonNegativeInteger(req.query.$top);
+  const top = parseNonNegativeInteger(req.query.$top, MAX_TOP_LIMIT);
   const skip = parseNonNegativeInteger(req.query.$skip);
 
   if (skip !== undefined && top === undefined) {
