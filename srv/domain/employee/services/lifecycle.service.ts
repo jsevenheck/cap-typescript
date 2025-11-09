@@ -62,7 +62,7 @@ const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string):
   const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
   const sanitizedClientId = sanitizeIdentifier(clientId);
   // Always hash sanitized input for consistency
-  const hashSource = sanitizedClientId || sanitizeIdentifier(clientId) || clientId;
+  const hashSource = sanitizedClientId || clientId;
   const hashed = createHash('sha256').update(hashSource).digest('hex').toUpperCase();
 
   if (normalizedCompany) {
