@@ -71,7 +71,11 @@ export default class EmployeeHandler {
       return;
     }
 
-    const context = this.selection.getSelectedEmployeeContext() as Context;
+    const context = this.selection.getSelectedEmployeeContext();
+    if (!context) {
+      MessageBox.error("No employee selected");
+      return;
+    }
     const view = this.controller.getView();
     if (!view) {
       return;
@@ -167,6 +171,10 @@ export default class EmployeeHandler {
 
   public save(): void {
     const dialog = this.byId("employeeDialog") as Dialog;
+    if (!dialog) {
+      MessageBox.error("Dialog not found");
+      return;
+    }
     const dialogModel = this.models.getEmployeeModel();
     const managerLookupPending = Boolean(
       dialogModel.getProperty("/managerLookupPending")

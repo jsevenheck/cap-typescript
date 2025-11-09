@@ -85,7 +85,11 @@ export default class ClientHandler {
       return;
     }
 
-    const context = this.selection.getSelectedClientContext() as Context;
+    const context = this.selection.getSelectedClientContext();
+    if (!context) {
+      MessageBox.error("No client selected");
+      return;
+    }
     const client = context.getObject() as { name?: string };
     MessageBox.confirm(`Delete client ${client.name ?? ""}?`, {
       title: "Confirm Deletion",
@@ -110,6 +114,10 @@ export default class ClientHandler {
 
   public save(): void {
     const dialog = this.byId("clientDialog") as Dialog;
+    if (!dialog) {
+      MessageBox.error("Dialog not found");
+      return;
+    }
     const dialogModel = this.models.getClientModel();
     const data = dialogModel.getData();
     
@@ -210,8 +218,9 @@ export default class ClientHandler {
           const submitPromise = model.submitBatch("$auto");
 
           // Add timeout protection (30 seconds)
+          let timeoutId: NodeJS.Timeout;
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
               reject(new Error("Operation timed out after 30 seconds. Please check your network connection and try again."));
             }, 30000);
           });
@@ -222,11 +231,15 @@ export default class ClientHandler {
             timeoutPromise
           ])
             .then(() => {
+              clearTimeout(timeoutId);
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
             })
-            .catch(handleError);
+            .catch((error) => {
+              clearTimeout(timeoutId);
+              handleError(error);
+            });
         }
       );
     } else if (data.mode === "edit") {
@@ -295,6 +308,10 @@ export default class ClientHandler {
 
     const context = listItem.getBindingContext() as Context;
     const list = this.byId("clientsList") as List;
+    if (!list) {
+      console.error("Client list not found");
+      return;
+    }
     list.setSelectedItem(listItem, true);
     this.selection.setClient(context);
     this.navigation.showEmployeesPage(context);

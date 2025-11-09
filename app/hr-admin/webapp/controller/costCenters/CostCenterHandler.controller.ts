@@ -54,7 +54,11 @@ export default class CostCenterHandler {
       return;
     }
 
-    const context = this.selection.getSelectedCostCenterContext() as Context;
+    const context = this.selection.getSelectedCostCenterContext();
+    if (!context) {
+      MessageBox.error("No cost center selected");
+      return;
+    }
     const view = this.controller.getView();
     if (!view) {
       return;
@@ -102,7 +106,11 @@ export default class CostCenterHandler {
       return;
     }
 
-    const context = this.selection.getSelectedCostCenterContext() as Context;
+    const context = this.selection.getSelectedCostCenterContext();
+    if (!context) {
+      MessageBox.error("No cost center selected");
+      return;
+    }
     const costCenter = context.getObject() as { code?: string; name?: string };
     const title = costCenter.code
       ? `${costCenter.code}${costCenter.name ? " - " + costCenter.name : ""}`
@@ -129,6 +137,10 @@ export default class CostCenterHandler {
 
   public save(): void {
     const dialog = this.byId("costCenterDialog") as Dialog;
+    if (!dialog) {
+      MessageBox.error("Dialog not found");
+      return;
+    }
     const dialogModel = this.models.getCostCenterModel();
     const data = dialogModel.getData();
     const clientId = this.selection.getSelectedClientId();
