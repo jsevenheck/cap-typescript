@@ -288,7 +288,9 @@ export default class EmployeeHandler {
                 ? error.message
                 : "Failed to create employee";
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch(() => undefined);
+            void readyContext.delete("$auto").catch((cleanupError) => {
+              console.error("Failed to clean up failed creation context:", cleanupError);
+            });
           };
 
           let creationPromise: Promise<unknown>;

@@ -15,6 +15,7 @@ import { ClientDialogModelData } from "../../types/DialogTypes";
 import { getRequiredListBinding } from "../../core/services/odata";
 import NavigationService from "../../core/navigation/NavigationService";
 import { getEventParameter } from "../../core/utils/EventParam";
+import { createAbortableRequest } from "../../core/utils/AbortableRequest";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -203,7 +204,9 @@ export default class ClientHandler {
             }
             
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch(() => undefined);
+            void readyContext.delete("$auto").catch((cleanupError) => {
+              console.error("Failed to clean up failed creation context:", cleanupError);
+            });
           };
 
           let creationPromise: Promise<unknown>;
@@ -217,29 +220,25 @@ export default class ClientHandler {
 
           const submitPromise = model.submitBatch("$auto");
 
-          // Add timeout protection (30 seconds)
-          let timeoutId: NodeJS.Timeout;
-          const timeoutPromise = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-              reject(new Error("Operation timed out after 30 seconds. Please check your network connection and try again."));
-            }, 30000);
-          });
-
-          // Race between the actual operation and timeout
-          Promise.race([
+          // Use AbortableRequest utility for timeout and cancellation support
+          const { promise, cleanup } = createAbortableRequest(
             Promise.all([creationPromise, submitPromise]),
-            timeoutPromise
-          ])
+            {
+              timeout: 30000,
+              onTimeout: () => {
+                console.warn("Client creation timed out");
+              },
+            }
+          );
+
+          promise
             .then(() => {
-              clearTimeout(timeoutId);
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
             })
-            .catch((error) => {
-              clearTimeout(timeoutId);
-              handleError(error);
-            });
+            .catch(handleError)
+            .finally(() => cleanup());
         }
       );
     } else if (data.mode === "edit") {
