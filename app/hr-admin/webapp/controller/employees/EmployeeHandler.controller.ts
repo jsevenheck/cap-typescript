@@ -71,7 +71,11 @@ export default class EmployeeHandler {
       return;
     }
 
-    const context = this.selection.getSelectedEmployeeContext() as Context;
+    const context = this.selection.getSelectedEmployeeContext();
+    if (!context) {
+      MessageBox.error("No employee selected");
+      return;
+    }
     const view = this.controller.getView();
     if (!view) {
       return;
@@ -167,6 +171,10 @@ export default class EmployeeHandler {
 
   public save(): void {
     const dialog = this.byId("employeeDialog") as Dialog;
+    if (!dialog) {
+      MessageBox.error("Dialog not found");
+      return;
+    }
     const dialogModel = this.models.getEmployeeModel();
     const managerLookupPending = Boolean(
       dialogModel.getProperty("/managerLookupPending")
@@ -280,7 +288,9 @@ export default class EmployeeHandler {
                 ? error.message
                 : "Failed to create employee";
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch(() => undefined);
+            void readyContext.delete("$auto").catch((cleanupError) => {
+              console.error("Failed to clean up failed creation context:", cleanupError);
+            });
           };
 
           let creationPromise: Promise<unknown>;

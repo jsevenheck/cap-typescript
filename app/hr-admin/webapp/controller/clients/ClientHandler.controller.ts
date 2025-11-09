@@ -15,6 +15,7 @@ import { ClientDialogModelData } from "../../types/DialogTypes";
 import { getRequiredListBinding } from "../../core/services/odata";
 import NavigationService from "../../core/navigation/NavigationService";
 import { getEventParameter } from "../../core/utils/EventParam";
+import { createAbortableRequest } from "../../core/utils/AbortableRequest";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -85,7 +86,11 @@ export default class ClientHandler {
       return;
     }
 
-    const context = this.selection.getSelectedClientContext() as Context;
+    const context = this.selection.getSelectedClientContext();
+    if (!context) {
+      MessageBox.error("No client selected");
+      return;
+    }
     const client = context.getObject() as { name?: string };
     MessageBox.confirm(`Delete client ${client.name ?? ""}?`, {
       title: "Confirm Deletion",
@@ -110,6 +115,10 @@ export default class ClientHandler {
 
   public save(): void {
     const dialog = this.byId("clientDialog") as Dialog;
+    if (!dialog) {
+      MessageBox.error("Dialog not found");
+      return;
+    }
     const dialogModel = this.models.getClientModel();
     const data = dialogModel.getData();
     
@@ -195,7 +204,9 @@ export default class ClientHandler {
             }
             
             MessageBox.error(message);
-            void readyContext.delete("$auto").catch(() => undefined);
+            void readyContext.delete("$auto").catch((cleanupError) => {
+              console.error("Failed to clean up failed creation context:", cleanupError);
+            });
           };
 
           let creationPromise: Promise<unknown>;
@@ -209,24 +220,25 @@ export default class ClientHandler {
 
           const submitPromise = model.submitBatch("$auto");
 
-          // Add timeout protection (30 seconds)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error("Operation timed out after 30 seconds. Please check your network connection and try again."));
-            }, 30000);
-          });
-
-          // Race between the actual operation and timeout
-          Promise.race([
+          // Use AbortableRequest utility for timeout and cancellation support
+          const { promise, cleanup } = createAbortableRequest(
             Promise.all([creationPromise, submitPromise]),
-            timeoutPromise
-          ])
+            {
+              timeout: 30000,
+              onTimeout: () => {
+                console.warn("Client creation timed out");
+              },
+            }
+          );
+
+          promise
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
               MessageToast.show("Client created");
             })
-            .catch(handleError);
+            .catch(handleError)
+            .finally(() => cleanup());
         }
       );
     } else if (data.mode === "edit") {
@@ -295,6 +307,10 @@ export default class ClientHandler {
 
     const context = listItem.getBindingContext() as Context;
     const list = this.byId("clientsList") as List;
+    if (!list) {
+      console.error("Client list not found");
+      return;
+    }
     list.setSelectedItem(listItem, true);
     this.selection.setClient(context);
     this.navigation.showEmployeesPage(context);

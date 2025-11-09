@@ -10,9 +10,11 @@ import {
 } from './middleware/company-authorization';
 
 const registerHandlers = (srv: Service): void => {
-  srv.before(['CREATE', 'UPDATE'], 'Clients', authorizeClients);
-  srv.before(['CREATE', 'UPDATE'], 'Employees', authorizeEmployees);
-  srv.before(['CREATE', 'UPDATE'], 'CostCenters', authorizeCostCenters);
+  // Register company authorization middleware for all write operations
+  // Note: Individual handlers also perform authorization checks for additional validation
+  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Clients', authorizeClients);
+  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Employees', authorizeEmployees);
+  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'CostCenters', authorizeCostCenters);
 
   registerClientHandlers(srv);
   registerEmployeeHandlers(srv);

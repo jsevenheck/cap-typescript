@@ -82,23 +82,51 @@ export const getSecret = async (
   // Try Credential Store first
   const credStore = getCredentialStoreCredentials();
 
-  if (credStore) {
+  if (credStore?.url) {
     try {
-      // In a real implementation, you would use @sap/xssec or make an HTTP request to Credential Store API
-      // For now, we'll document the integration point and use the fallback
+      logger.debug({ namespace, name }, 'Fetching secret from Credential Store');
 
-      logger.info({ namespace, name }, 'Credential Store binding detected but API integration not yet implemented');
+      // Build the Credential Store API URL
+      const apiUrl = new URL('/api/v1/credentials', credStore.url);
+      apiUrl.searchParams.set('namespace', namespace);
+      apiUrl.searchParams.set('name', name);
 
-      // TODO: Implement actual Credential Store API call:
-      // const response = await fetch(`${credStore.url}/api/v1/credentials?namespace=${namespace}&name=${name}`, {
-      //   headers: {
-      //     'Authorization': `Basic ${Buffer.from(`${credStore.username}:${credStore.password}`).toString('base64')}`,
-      //   },
-      // });
-      // const data = await response.json();
-      // return data.value;
+      // Prepare headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authentication
+      if (credStore.username && credStore.password) {
+        // Basic authentication
+        const authString = Buffer.from(`${credStore.username}:${credStore.password}`).toString('base64');
+        headers['Authorization'] = `Basic ${authString}`;
+      }
+
+      // Make the HTTP request to Credential Store
+      const response = await fetch(apiUrl.toString(), {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          logger.debug({ namespace, name }, 'Secret not found in Credential Store');
+        } else {
+          logger.warn(
+            { namespace, name, status: response.status, statusText: response.statusText },
+            'Failed to fetch secret from Credential Store'
+          );
+        }
+      } else {
+        const data = await response.json() as { value?: string };
+        if (data.value) {
+          logger.debug({ namespace, name }, 'Successfully retrieved secret from Credential Store');
+          return data.value;
+        }
+      }
     } catch (error) {
-      logger.warn({ err: error, namespace, name }, 'Failed to fetch secret from Credential Store, using fallback');
+      logger.warn({ err: error, namespace, name }, 'Error fetching secret from Credential Store, using fallback');
     }
   }
 
