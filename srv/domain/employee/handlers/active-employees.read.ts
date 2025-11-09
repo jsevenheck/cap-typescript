@@ -238,7 +238,9 @@ const executeActiveEmployeesQuery = async (
     (query as any).limit(top, skip ?? 0);
   }
 
-  const transaction = cds.transaction(req);
+  // Cast to any since this is an Express handler that uses CAP transaction API
+  // At runtime, the Express request is augmented by CAP middleware with necessary properties
+  const transaction = cds.transaction(req as any);
   if (!transaction || typeof transaction.run !== 'function') {
     throw createServiceError(500, 'Failed to acquire transaction for request.');
   }
