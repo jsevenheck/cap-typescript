@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
 
-import apiKeyMiddleware/*, { loadApiKey } */from './middleware/apiKey';
+import apiKeyMiddleware /* , { loadApiKey } */ from './middleware/apiKey';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import {
