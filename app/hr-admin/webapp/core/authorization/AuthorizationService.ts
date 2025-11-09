@@ -1,5 +1,3 @@
-import { getODataService } from "../../services/odata";
-
 /**
  * User roles for the HR Admin application
  */
@@ -24,58 +22,48 @@ let userInfoCache: UserInfo | null = null;
 
 /**
  * Authorization Service for frontend permission checks
+ *
+ * NOTE: This is a stub implementation. Frontend authorization checks are optional
+ * UX enhancements - all actual security is enforced by the backend.
+ *
+ * To implement user role detection, you would typically:
+ * 1. Call a custom backend endpoint that returns user info
+ * 2. Parse the JWT token from the OData model's security context
+ * 3. Use the SAPUI5 UserInfo API (if available in your environment)
+ *
+ * See FRONTEND_AUTHORIZATION.md for complete implementation guide.
  */
 export class AuthorizationService {
   /**
    * Fetch user information from the backend
+   *
+   * This is a stub implementation that defaults to allowing all operations.
+   * Replace this with actual user info retrieval based on your setup.
    */
   private static async fetchUserInfo(): Promise<UserInfo> {
     if (userInfoCache) {
       return userInfoCache;
     }
 
-    try {
-      const odataService = getODataService();
-      const model = odataService.getModel();
+    // TODO: Implement actual user role detection
+    // Options:
+    // 1. Call a backend endpoint: GET /user-info
+    // 2. Parse user attributes from OData model security token
+    // 3. Use SAPUI5 UserInfo API if available
 
-      // Get user context from OData model security settings
-      // In CAP, user info is typically available through the model's SecurityToken
-      const securityData = (model as any).getSecurityToken?.() || null;
+    // For now, return permissive defaults (all operations allowed)
+    // This ensures the frontend doesn't break while backend enforces security
+    console.warn("AuthorizationService: Using default permissions. Implement fetchUserInfo() for role-based UI controls.");
 
-      // For mocked auth, we can parse from headers or metadata
-      // In production with IAS, this comes from the JWT token
+    userInfoCache = {
+      roles: [UserRole.HRAdmin], // Default to admin for development
+      attributes: {},
+      isAdmin: true,
+      isViewer: true,
+      isEditor: true,
+    };
 
-      // Default to viewer-only permissions if we can't determine
-      const roles: string[] = [];
-      const attributes: Record<string, string[]> = {};
-
-      // Try to get user info from a custom function import or metadata
-      // Note: In a real implementation, you might call a custom action or
-      // parse the user context from the OData metadata
-
-      // For now, assume we can access some user endpoint or parse from headers
-      // This would typically be configured based on your CAP service setup
-
-      userInfoCache = {
-        roles,
-        attributes,
-        isAdmin: roles.includes(UserRole.HRAdmin),
-        isViewer: roles.includes(UserRole.HRViewer),
-        isEditor: roles.includes(UserRole.HREditor),
-      };
-
-      return userInfoCache;
-    } catch (error) {
-      console.error("Failed to fetch user info:", error);
-      // Return minimal permissions on error
-      return {
-        roles: [UserRole.HRViewer],
-        attributes: {},
-        isAdmin: false,
-        isViewer: true,
-        isEditor: false,
-      };
-    }
+    return userInfoCache;
   }
 
   /**
