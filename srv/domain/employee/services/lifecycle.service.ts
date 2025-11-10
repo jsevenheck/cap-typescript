@@ -390,10 +390,11 @@ export const prepareEmployeeWrite = async ({
     }
 
     // Check for employeeId immutability on UPDATE
-    if (data.employeeId !== undefined && data.employeeId !== null) {
+    if ('employeeId' in data) {
       const normalizedNew = normalizeIdentifier(data.employeeId);
       const normalizedExisting = normalizeIdentifier(existingEmployee.employeeId);
-      if (normalizedNew && normalizedExisting && normalizedNew !== normalizedExisting) {
+      // Reject attempts to clear (null/undefined/empty/whitespace) or change the employeeId
+      if (!normalizedNew || normalizedNew !== normalizedExisting) {
         throw createServiceError(400, 'Employee ID cannot be modified.');
       }
     }

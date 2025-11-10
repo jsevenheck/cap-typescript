@@ -1236,6 +1236,54 @@ describe('Employee business rules', () => {
     ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
   });
 
+  it('rejects clearing employeeId with null on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: null, modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects clearing employeeId with empty string on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: '', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects clearing employeeId with whitespace on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: '   ', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
   it('allows updating employee without changing employeeId', async () => {
     await runAsAdmin(async (tx) => {
       const employee = await createEmployeeRecord(tx, {
