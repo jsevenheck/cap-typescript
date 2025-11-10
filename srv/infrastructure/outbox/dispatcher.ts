@@ -258,6 +258,8 @@ export class ParallelDispatcher {
   }
 
   private async dispatchOne(db: any, entry: OutboxEntry): Promise<void> {
+    const startTime = Date.now();
+
     let parsed: ParsedPayload;
     try {
       parsed = parsePayload(entry);
@@ -283,8 +285,12 @@ export class ParallelDispatcher {
           .where({ ID: entry.ID }),
       );
 
+      const duration = Date.now() - startTime;
       this.metrics.recordDispatched();
+      this.metrics.recordDispatchDuration(duration);
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordDispatchDuration(duration);
       await this.handleFailure(db, entry, error);
     }
   }
@@ -366,7 +372,7 @@ export const enqueueOutboxEntry = async (
   config: OutboxConfig,
   metrics: OutboxMetrics,
 ): Promise<void> => {
-  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
+  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : 1;
 
   let attempt = 1;
   while (attempt <= maxAttempts) {
@@ -383,11 +389,39 @@ export const enqueueOutboxEntry = async (
       );
 
       metrics.recordEnqueued(1);
+
+      if (attempt > 1) {
+        logger.info(
+          { eventType: input.eventType, endpoint: input.endpoint, attempt },
+          `Successfully enqueued after ${attempt} attempt(s)`,
+        );
+        metrics.recordEnqueueRetrySuccess();
+      }
+
       return;
     } catch (error) {
       if (attempt >= maxAttempts) {
+        logger.error(
+          { err: error, eventType: input.eventType, endpoint: input.endpoint, attempts: attempt },
+          `Failed to enqueue after ${attempt} attempts`,
+        );
+        metrics.recordEnqueueFailure();
         throw error;
       }
+
+      // Calculate exponential backoff: baseDelay * 2^(attempt-1)
+      // Cap the exponent at 5 to prevent excessively long delays (max 32x base delay)
+      const exponent = Math.min(attempt - 1, 5);
+      const delay = config.enqueueRetryDelay * Math.pow(2, exponent);
+
+      logger.warn(
+        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt, retryDelayMs: delay },
+        `Enqueue attempt ${attempt} failed, retrying in ${delay}ms`,
+      );
+      metrics.recordEnqueueRetry();
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, delay));
 
       attempt += 1;
     }
