@@ -194,7 +194,7 @@ describe('ParallelDispatcher', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('retries enqueueing without introducing blocking delays', async () => {
+  it('retries enqueueing with exponential backoff delay', async () => {
     const config = { ...defaultOutboxConfig(), retryDelay: 5, enqueueMaxAttempts: 3 };
     const registry = new prom.Registry();
     const metrics = new OutboxMetrics(registry);
@@ -215,7 +215,8 @@ describe('ParallelDispatcher', () => {
         payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
       }, config, metrics);
 
-      expect(timeoutSpy).not.toHaveBeenCalled();
+      // With exponential backoff, first retry has base delay (5000ms)
+      expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
     } finally {
       timeoutSpy.mockRestore();
     }
