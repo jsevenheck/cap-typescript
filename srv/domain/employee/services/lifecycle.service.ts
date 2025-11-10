@@ -16,6 +16,7 @@ import {
   sanitizeIdentifier,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
+import { isAssociationProvided } from '../../../shared/utils/associations';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
 import type { ClientEntity, EmployeeEntity } from '../dto/employee.dto';
 import {
@@ -170,7 +171,7 @@ const applyCostCenterInheritance = async (
   existing: Partial<EmployeeEntity> | undefined,
 ): Promise<void> => {
   // Only inherit if no explicit cost center is provided
-  const costCenterExplicit = data.costCenter_ID !== undefined;
+  const costCenterExplicit = isAssociationProvided(data, 'costCenter');
   if (costCenterExplicit) {
     // User explicitly set or cleared the cost center, don't inherit
     return;
