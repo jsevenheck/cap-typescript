@@ -242,7 +242,10 @@ export class ParallelDispatcher {
 
   private async dispatchBatch(db: any, entries: OutboxEntry[]): Promise<void> {
     const queue = [...entries];
-    const workers = Math.max(1, Math.min(this.config.dispatcherWorkers, queue.length));
+    const workerCount = this.config.parallelDispatchEnabled
+      ? this.config.dispatcherWorkers
+      : 1;
+    const workers = Math.max(1, Math.min(workerCount, queue.length));
     const tasks = Array.from({ length: workers }, () => this.runWorker(db, queue));
     await Promise.allSettled(tasks);
   }

@@ -194,6 +194,51 @@ describe('ParallelDispatcher', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it('honors the parallel dispatch flag to disable concurrency', async () => {
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    const handler = jest.fn().mockImplementation(async () => {
+      inFlight += 1;
+      maxConcurrent = Math.max(maxConcurrent, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight -= 1;
+    });
+
+    const dispatcher = buildDispatcher(
+      { dispatcherWorkers: 4, parallelDispatchEnabled: false },
+      handler,
+    );
+
+    const now = Date.now();
+    await db.run(
+      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries([
+        {
+          ID: 'sequential-1',
+          eventType: 'EMPLOYEE_CREATED',
+          destinationName: 'https://example.com/sequential-1',
+          payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+          status: 'PENDING',
+          attempts: 0,
+          nextAttemptAt: new Date(now - 1000),
+        },
+        {
+          ID: 'sequential-2',
+          eventType: 'EMPLOYEE_CREATED',
+          destinationName: 'https://example.com/sequential-2',
+          payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+          status: 'PENDING',
+          attempts: 0,
+          nextAttemptAt: new Date(now - 1000),
+        },
+      ]),
+    );
+
+    await dispatcher.dispatchPending();
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(maxConcurrent).toBe(1);
+  });
+
   it('retries enqueueing with exponential backoff delay', async () => {
     const config = { ...defaultOutboxConfig(), retryDelay: 5, enqueueMaxAttempts: 3 };
     const registry = new prom.Registry();
