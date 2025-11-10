@@ -16,7 +16,7 @@ import {
   sanitizeIdentifier,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
-import { isAssociationProvided } from '../../../shared/utils/associations';
+import { extractAssociationId, isAssociationProvided } from '../../../shared/utils/associations';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
 import type { ClientEntity, EmployeeEntity } from '../dto/employee.dto';
 import {
@@ -185,11 +185,25 @@ const applyCostCenterInheritance = async (
   }
 
   // Check if employee has a manager to inherit from
-  const managerExplicit = data.manager_ID !== undefined;
-  const managerId = managerExplicit ? data.manager_ID : existing?.manager_ID;
+  const managerProvided = isAssociationProvided(data, 'manager');
+  const resolvedManagerId = managerProvided ? extractAssociationId(data, 'manager') : undefined;
+
+  let managerId: string | undefined;
+  if (managerProvided) {
+    if (resolvedManagerId === null) {
+      // Manager explicitly cleared
+      return;
+    }
+
+    if (typeof resolvedManagerId === 'string' && resolvedManagerId) {
+      managerId = resolvedManagerId;
+    }
+  } else {
+    managerId = existing?.manager_ID ?? undefined;
+  }
 
   if (!managerId) {
-    // No manager to inherit from
+    // No manager to inherit from or could not resolve manager ID
     return;
   }
 
