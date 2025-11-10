@@ -372,7 +372,7 @@ export const enqueueOutboxEntry = async (
   config: OutboxConfig,
   metrics: OutboxMetrics,
 ): Promise<void> => {
-  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : 1;
+  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
 
   let attempt = 1;
   while (attempt <= maxAttempts) {
@@ -420,8 +420,10 @@ export const enqueueOutboxEntry = async (
       );
       metrics.recordEnqueueRetry();
 
-      // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      // Wait before retrying (only on retry, not first attempt)
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
 
       attempt += 1;
     }

@@ -156,9 +156,12 @@ const sanitizeEmployeeStrings = (data: Partial<EmployeeEntity>): void => {
 };
 
 /**
- * Applies cost center inheritance rules.
+ * Applies cost center inheritance rules for CREATE operations.
  * If an employee has no explicit cost center but has a manager,
  * inherit the cost center from the manager.
+ *
+ * IMPORTANT: Only called for CREATE operations to avoid unexpected
+ * manager reassignment during UPDATE operations.
  */
 const applyCostCenterInheritance = async (
   tx: Transaction,
@@ -455,8 +458,11 @@ export const prepareEmployeeWrite = async ({
 
   validateTimeline(event, data, existingEmployee);
 
-  // Apply cost center inheritance from manager if applicable
-  await applyCostCenterInheritance(tx, event, data, existingEmployee);
+  // Apply cost center inheritance from manager only on CREATE
+  // UPDATE operations should not auto-inherit to avoid unexpected manager reassignment
+  if (event === 'CREATE') {
+    await applyCostCenterInheritance(tx, event, data, existingEmployee);
+  }
 
   const managerUpdates = await validateManagerAndCostCenter({ event, data, targetId, tx, user }, client, existingEmployee);
 

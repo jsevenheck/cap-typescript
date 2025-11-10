@@ -21,7 +21,7 @@ const DEFAULT_OUTBOX_CONFIG: OutboxConfig = {
   claimTtl: 120_000,
   dispatcherWorkers: 4,
   parallelDispatchEnabled: true,
-  enqueueMaxAttempts: 3,
+  enqueueMaxAttempts: 0,
   enqueueRetryDelay: 5000,
   cleanupRetention: 7 * 24 * 60 * 60 * 1000,
   dispatchInterval: 30_000,
