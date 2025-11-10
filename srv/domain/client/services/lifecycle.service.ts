@@ -139,6 +139,22 @@ export const prepareClientUpsert = async ({
     throw createServiceError(400, 'Country code is required.');
   }
 
+  // Validate client name
+  if (event === 'CREATE' || 'name' in data) {
+    if (data.name === undefined || data.name === null) {
+      // name is explicitly set to undefined or null
+      if (event === 'CREATE') {
+        throw createServiceError(400, 'Client name must not be empty.');
+      }
+    } else {
+      const trimmedName = typeof data.name === 'string' ? data.name.trim() : String(data.name).trim();
+      if (!trimmedName) {
+        throw createServiceError(400, 'Client name must not be empty.');
+      }
+      updates.name = trimmedName;
+    }
+  }
+
   if (updates.companyId) {
     const existing = await findClientByCompanyId(tx, updates.companyId, event === 'UPDATE' ? targetId : undefined);
 
