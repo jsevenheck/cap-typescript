@@ -142,17 +142,14 @@ export const prepareClientUpsert = async ({
   // Validate client name
   if (event === 'CREATE' || 'name' in data) {
     if (data.name === undefined || data.name === null) {
-      // name is explicitly set to undefined or null
-      if (event === 'CREATE') {
-        throw createServiceError(400, 'Client name must not be empty.');
-      }
-    } else {
-      const trimmedName = typeof data.name === 'string' ? data.name.trim() : String(data.name).trim();
-      if (!trimmedName) {
-        throw createServiceError(400, 'Client name must not be empty.');
-      }
-      updates.name = trimmedName;
+      // name is explicitly set to undefined or null - reject for both CREATE and UPDATE
+      throw createServiceError(400, 'Client name must not be empty.');
     }
+    const trimmedName = typeof data.name === 'string' ? data.name.trim() : String(data.name).trim();
+    if (!trimmedName) {
+      throw createServiceError(400, 'Client name must not be empty.');
+    }
+    updates.name = trimmedName;
   }
 
   if (updates.companyId) {

@@ -606,6 +606,36 @@ describe('Client name validation', () => {
     }
   });
 
+  it('rejects updating a client with null name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-007B',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt').where({ ID: clientId }),
+        );
+
+        await expect(
+          tx.run(
+            UPDATE(tx.entities.Clients)
+              .set({ name: null, modifiedAt: created.modifiedAt })
+              .where({ ID: clientId }),
+          ),
+        ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
   it('allows updating a client without changing name', async () => {
     const clientId = randomUUID();
     try {
