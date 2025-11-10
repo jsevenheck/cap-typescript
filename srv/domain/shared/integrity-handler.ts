@@ -3,7 +3,6 @@ import type { Request } from '@sap/cds';
 
 import { createServiceError } from '../../shared/utils/errors';
 import {
-  extractAssociationId,
   extractEntityId,
   resolveAssociationId,
 } from '../../shared/utils/associations';
