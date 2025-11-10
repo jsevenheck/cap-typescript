@@ -428,6 +428,284 @@ describe('ClientService authorization', () => {
 });
 
 
+describe('Client name validation', () => {
+  let service: any;
+
+  const createUser = ({
+    id,
+    roles,
+    companyCodes,
+  }: {
+    id: string;
+    roles: string[];
+    companyCodes: string[];
+  }) =>
+    (cds as any).User({
+      id,
+      roles,
+      attr: { companyCodes, CompanyCode: companyCodes },
+    });
+
+  const adminContext = { id: 'client-admin', roles: ['HRAdmin'], companyCodes: [] as string[] };
+
+  const runAsAdmin = async <T>(handler: (tx: any) => Promise<T>): Promise<T> => {
+    const user = createUser(adminContext);
+    return service.tx({ user }, handler);
+  };
+
+  beforeAll(async () => {
+    service = await cds.connect.to('ClientService');
+  });
+
+  it('rejects creating a client with empty name', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            companyId: 'TEST-001',
+            name: '',
+            country_code: 'US',
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+  });
+
+  it('rejects creating a client with whitespace-only name', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            companyId: 'TEST-002',
+            name: '   ',
+            country_code: 'US',
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+  });
+
+  it('rejects creating a client without name', async () => {
+    await expect(
+      runAsAdmin((tx) =>
+        tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            companyId: 'TEST-003',
+            country_code: 'US',
+          }),
+        ),
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+  });
+
+  it('accepts creating a client with valid name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-004',
+            name: 'Valid Client Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('name').where({ ID: clientId }),
+        );
+
+        expect(created.name).toBe('Valid Client Name');
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('trims whitespace from client name on create', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-005',
+            name: '  Trimmed Name  ',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('name').where({ ID: clientId }),
+        );
+
+        expect(created.name).toBe('Trimmed Name');
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('rejects updating a client with empty name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-006',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt').where({ ID: clientId }),
+        );
+
+        await expect(
+          tx.run(
+            UPDATE(tx.entities.Clients)
+              .set({ name: '', modifiedAt: created.modifiedAt })
+              .where({ ID: clientId }),
+          ),
+        ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('rejects updating a client with whitespace-only name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-007',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt').where({ ID: clientId }),
+        );
+
+        await expect(
+          tx.run(
+            UPDATE(tx.entities.Clients)
+              .set({ name: '   ', modifiedAt: created.modifiedAt })
+              .where({ ID: clientId }),
+          ),
+        ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('rejects updating a client with null name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-007B',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt').where({ ID: clientId }),
+        );
+
+        await expect(
+          tx.run(
+            UPDATE(tx.entities.Clients)
+              .set({ name: null, modifiedAt: created.modifiedAt })
+              .where({ ID: clientId }),
+          ),
+        ).rejects.toMatchObject({ message: expect.stringContaining('Client name must not be empty') });
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('allows updating a client without changing name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-008',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt', 'name').where({ ID: clientId }),
+        );
+
+        await tx.run(
+          UPDATE(tx.entities.Clients)
+            .set({ notificationEndpoint: 'https://example.com', modifiedAt: created.modifiedAt })
+            .where({ ID: clientId }),
+        );
+
+        const updated = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('name').where({ ID: clientId }),
+        );
+
+        expect(updated.name).toBe('Original Name');
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+
+  it('allows updating a client with valid new name', async () => {
+    const clientId = randomUUID();
+    try {
+      await runAsAdmin(async (tx) => {
+        await tx.run(
+          INSERT.into(tx.entities.Clients).entries({
+            ID: clientId,
+            companyId: 'TEST-009',
+            name: 'Original Name',
+            country_code: 'US',
+          }),
+        );
+
+        const created = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('modifiedAt').where({ ID: clientId }),
+        );
+
+        await tx.run(
+          UPDATE(tx.entities.Clients)
+            .set({ name: 'Updated Name', modifiedAt: created.modifiedAt })
+            .where({ ID: clientId }),
+        );
+
+        const updated = await tx.run(
+          SELECT.one.from(tx.entities.Clients).columns('name').where({ ID: clientId }),
+        );
+
+        expect(updated.name).toBe('Updated Name');
+      });
+    } finally {
+      await db.run(DELETE.from('clientmgmt.Clients').where({ ID: clientId }));
+    }
+  });
+});
+
+
 describe('Employee business rules', () => {
   let service: any;
 
@@ -924,6 +1202,139 @@ describe('Employee business rules', () => {
 
     expect(response.status).toBe(200);
     expect(response.data).toEqual({ value: 0 });
+  });
+
+  it('rejects modifying employeeId on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: 'DIFFERENT456', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects modifying employeeId with different case on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: 'custom123457', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects clearing employeeId with null on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: null, modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects clearing employeeId with empty string on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: '', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('rejects clearing employeeId with whitespace on update', async () => {
+    await expect(
+      runAsAdmin(async (tx) => {
+        const employee = await createEmployeeRecord(tx, {
+          employeeId: 'CUSTOM123456',
+        });
+
+        await tx.run(
+          UPDATE(tx.entities.Employees)
+            .set({ employeeId: '   ', modifiedAt: employee.modifiedAt })
+            .where({ ID: employee.ID }),
+        );
+      }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('Employee ID cannot be modified') });
+  });
+
+  it('allows updating employee without changing employeeId', async () => {
+    await runAsAdmin(async (tx) => {
+      const employee = await createEmployeeRecord(tx, {
+        employeeId: 'CUSTOM123456',
+      });
+
+      await tx.run(
+        UPDATE(tx.entities.Employees)
+          .set({ firstName: 'Updated', modifiedAt: employee.modifiedAt })
+          .where({ ID: employee.ID }),
+      );
+
+      const updated = await tx.run(
+        SELECT.one.from(tx.entities.Employees).columns('firstName', 'employeeId').where({ ID: employee.ID }),
+      );
+
+      expect(updated.firstName).toBe('Updated');
+      expect(updated.employeeId).toBe('CUSTOM123456');
+    });
+  });
+
+  it('allows updating employee with same employeeId (case-insensitive)', async () => {
+    await runAsAdmin(async (tx) => {
+      const employee = await createEmployeeRecord(tx, {
+        employeeId: 'CUSTOM123456',
+      });
+
+      await tx.run(
+        UPDATE(tx.entities.Employees)
+          .set({ employeeId: 'CUSTOM123456', firstName: 'Updated', modifiedAt: employee.modifiedAt })
+          .where({ ID: employee.ID }),
+      );
+
+      const updated = await tx.run(
+        SELECT.one.from(tx.entities.Employees).columns('firstName', 'employeeId').where({ ID: employee.ID }),
+      );
+
+      expect(updated.firstName).toBe('Updated');
+      expect(updated.employeeId).toBe('CUSTOM123456');
+    });
+  });
+
+  it('allows specifying employeeId on create', async () => {
+    await runAsAdmin(async (tx) => {
+      const employee = await createEmployeeRecord(tx, {
+        employeeId: 'CREATE123456',
+        email: `validation+${randomUUID()}@example.com`,
+      });
+
+      expect(employee.employeeId).toBe('CREATE123456');
+    });
   });
 });
 

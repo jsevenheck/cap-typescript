@@ -51,6 +51,7 @@ const loadExistingEmployee = async (tx: Transaction, employeeId: string): Promis
   findEmployeeById(tx, employeeId, [
     'ID',
     'client_ID',
+    'employeeId',
     'entryDate',
     'exitDate',
     'status',
@@ -386,6 +387,16 @@ export const prepareEmployeeWrite = async ({
     existingEmployee = await loadExistingEmployee(tx, targetId);
     if (!existingEmployee) {
       throw createServiceError(404, `Employee ${targetId} not found.`);
+    }
+
+    // Check for employeeId immutability on UPDATE
+    if ('employeeId' in data) {
+      const normalizedNew = normalizeIdentifier(data.employeeId);
+      const normalizedExisting = normalizeIdentifier(existingEmployee.employeeId);
+      // Reject attempts to clear (null/undefined/empty/whitespace) or change the employeeId
+      if (!normalizedNew || normalizedNew !== normalizedExisting) {
+        throw createServiceError(400, 'Employee ID cannot be modified.');
+      }
     }
   }
 
