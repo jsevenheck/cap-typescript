@@ -6,7 +6,9 @@ export interface OutboxConfig {
   batchSize: number;
   claimTtl: number;
   dispatcherWorkers: number;
+  parallelDispatchEnabled: boolean;
   enqueueMaxAttempts: number;
+  enqueueRetryDelay: number;
   cleanupRetention: number;
   dispatchInterval: number;
   cleanupCron: string;
@@ -18,7 +20,9 @@ const DEFAULT_OUTBOX_CONFIG: OutboxConfig = {
   batchSize: 20,
   claimTtl: 120_000,
   dispatcherWorkers: 4,
+  parallelDispatchEnabled: true,
   enqueueMaxAttempts: 0,
+  enqueueRetryDelay: 5000,
   cleanupRetention: 7 * 24 * 60 * 60 * 1000,
   dispatchInterval: 30_000,
   cleanupCron: '0 * * * *',
@@ -56,6 +60,22 @@ const resolveCleanupCron = (value: string | undefined, fallback: string): string
   return fallback;
 };
 
+const resolveBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+    return true;
+  }
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+    return false;
+  }
+
+  return fallback;
+};
+
 export const loadOutboxConfig = (overrides: Partial<OutboxConfig> = {}): OutboxConfig => {
   const config: OutboxConfig = {
     retryDelay: resolvePositiveInt(process.env.OUTBOX_RETRY_DELAY_MS, DEFAULT_OUTBOX_CONFIG.retryDelay, 1000),
@@ -67,9 +87,18 @@ export const loadOutboxConfig = (overrides: Partial<OutboxConfig> = {}): OutboxC
       DEFAULT_OUTBOX_CONFIG.dispatcherWorkers,
       1,
     ),
+    parallelDispatchEnabled: resolveBooleanFlag(
+      process.env.OUTBOX_PARALLEL_DISPATCH_ENABLED,
+      DEFAULT_OUTBOX_CONFIG.parallelDispatchEnabled,
+    ),
     enqueueMaxAttempts: resolveNonNegativeInt(
       process.env.OUTBOX_ENQUEUE_MAX_ATTEMPTS,
       DEFAULT_OUTBOX_CONFIG.enqueueMaxAttempts,
+    ),
+    enqueueRetryDelay: resolvePositiveInt(
+      process.env.OUTBOX_ENQUEUE_RETRY_DELAY_MS,
+      DEFAULT_OUTBOX_CONFIG.enqueueRetryDelay,
+      1000,
     ),
     cleanupRetention: resolveNonNegativeInt(
       process.env.OUTBOX_CLEANUP_RETENTION_MS,

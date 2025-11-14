@@ -16,6 +16,7 @@ import {
   sanitizeIdentifier,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
+import { extractAssociationId, isAssociationProvided } from '../../../shared/utils/associations';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
 import type { ClientEntity, EmployeeEntity } from '../dto/employee.dto';
 import {
@@ -153,6 +154,71 @@ const sanitizeEmployeeStrings = (data: Partial<EmployeeEntity>): void => {
   if (data.email) data.email = data.email.trim().toLowerCase();
   if (data.location) data.location = data.location.trim();
   if (data.positionLevel) data.positionLevel = data.positionLevel.trim();
+};
+
+/**
+ * Applies cost center inheritance rules for CREATE operations.
+ * If an employee has no explicit cost center but has a manager,
+ * inherit the cost center from the manager.
+ *
+ * IMPORTANT: Only called for CREATE operations to avoid unexpected
+ * manager reassignment during UPDATE operations.
+ */
+const applyCostCenterInheritance = async (
+  tx: Transaction,
+  event: 'CREATE' | 'UPDATE',
+  data: Partial<EmployeeEntity>,
+  existing: Partial<EmployeeEntity> | undefined,
+): Promise<void> => {
+  // Only inherit if no explicit cost center is provided
+  const costCenterExplicit = isAssociationProvided(data, 'costCenter');
+  if (costCenterExplicit) {
+    // User explicitly set or cleared the cost center, don't inherit
+    return;
+  }
+
+  // Check if employee already has a cost center from existing record
+  const existingCostCenter = existing?.costCenter_ID;
+  if (existingCostCenter && event === 'UPDATE') {
+    // Employee already has a cost center, don't override
+    return;
+  }
+
+  // Check if employee has a manager to inherit from
+  const managerProvided = isAssociationProvided(data, 'manager');
+  const resolvedManagerId = managerProvided ? extractAssociationId(data, 'manager') : undefined;
+
+  let managerId: string | undefined;
+  if (managerProvided) {
+    if (resolvedManagerId === null) {
+      // Manager explicitly cleared
+      return;
+    }
+
+    if (typeof resolvedManagerId === 'string' && resolvedManagerId) {
+      managerId = resolvedManagerId;
+    }
+  } else {
+    managerId = existing?.manager_ID ?? undefined;
+  }
+
+  if (!managerId) {
+    // No manager to inherit from or could not resolve manager ID
+    return;
+  }
+
+  // Fetch manager's cost center
+  const manager = await findEmployeeById(tx, managerId, ['ID', 'costCenter_ID']);
+  if (!manager || !manager.costCenter_ID) {
+    // Manager not found or has no cost center
+    return;
+  }
+
+  // Inherit cost center from manager
+  data.costCenter_ID = manager.costCenter_ID;
+
+  // Note: We don't log here to avoid logging in every call
+  // The calling code can log if needed
 };
 
 const validateTimeline = (
@@ -406,6 +472,13 @@ export const prepareEmployeeWrite = async ({
   data.client_ID = client.ID;
 
   validateTimeline(event, data, existingEmployee);
+
+  // Apply cost center inheritance from manager only on CREATE
+  // UPDATE operations should not auto-inherit to avoid unexpected manager reassignment
+  if (event === 'CREATE') {
+    await applyCostCenterInheritance(tx, event, data, existingEmployee);
+  }
+
   const managerUpdates = await validateManagerAndCostCenter({ event, data, targetId, tx, user }, client, existingEmployee);
 
   return {

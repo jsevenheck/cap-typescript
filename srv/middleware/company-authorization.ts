@@ -4,6 +4,10 @@ import type { Request } from '@sap/cds';
 import { buildUserContext, collectAttributeValues, userHasRole } from '../shared/utils/auth';
 import { normalizeCompanyId } from '../shared/utils/normalization';
 import { createServiceError } from '../shared/utils/errors';
+import {
+  extractEntityId,
+  resolveAssociationId,
+} from '../shared/utils/associations';
 
 type ClientRow = {
   ID: string;
@@ -64,7 +68,7 @@ export class CompanyAuthorization {
     const existingClients = await this.loadExistingClients(clients);
 
     for (const client of clients) {
-      const clientId = this.extractId(client);
+      const clientId = extractEntityId(client);
       const existing = clientId ? existingClients.get(clientId) : undefined;
 
       if (existing) {
@@ -91,9 +95,9 @@ export class CompanyAuthorization {
     const targetClientIds = new Set<string>();
 
     for (const employee of employees) {
-      const employeeId = this.extractId(employee);
+      const employeeId = extractEntityId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
-      const clientId = this.resolveAssociationId(employee, 'client', existing?.client_ID);
+      const clientId = resolveAssociationId(employee, 'client', existing?.client_ID);
 
       if (existing?.client_ID) {
         targetClientIds.add(existing.client_ID);
@@ -106,12 +110,12 @@ export class CompanyAuthorization {
     await this.ensureClientsLoaded(targetClientIds);
 
     for (const employee of employees) {
-      const employeeId = this.extractId(employee);
+      const employeeId = extractEntityId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
       if (existing?.client_ID) {
         this.ensureClientAccess(existing.client_ID, `employee ${employeeId ?? '(new)'}`);
       }
-      const clientId = this.resolveAssociationId(employee, 'client', existing?.client_ID);
+      const clientId = resolveAssociationId(employee, 'client', existing?.client_ID);
 
       if (!clientId) {
         throw createServiceError(400, 'Employee must reference a client.');
@@ -130,9 +134,9 @@ export class CompanyAuthorization {
     const targetClientIds = new Set<string>();
 
     for (const costCenter of costCenters) {
-      const costCenterId = this.extractId(costCenter);
+      const costCenterId = extractEntityId(costCenter);
       const existing = costCenterId ? existingCostCenters.get(costCenterId) : undefined;
-      const clientId = this.resolveAssociationId(costCenter, 'client', existing?.client_ID);
+      const clientId = resolveAssociationId(costCenter, 'client', existing?.client_ID);
 
       if (existing?.client_ID) {
         targetClientIds.add(existing.client_ID);
@@ -145,12 +149,12 @@ export class CompanyAuthorization {
     await this.ensureClientsLoaded(targetClientIds);
 
     for (const costCenter of costCenters) {
-      const costCenterId = this.extractId(costCenter);
+      const costCenterId = extractEntityId(costCenter);
       const existing = costCenterId ? existingCostCenters.get(costCenterId) : undefined;
       if (existing?.client_ID) {
         this.ensureClientAccess(existing.client_ID, `cost center ${costCenterId ?? '(new)'}`);
       }
-      const clientId = this.resolveAssociationId(costCenter, 'client', existing?.client_ID);
+      const clientId = resolveAssociationId(costCenter, 'client', existing?.client_ID);
 
       if (!clientId) {
         throw createServiceError(400, 'Cost center must reference a client.');
@@ -182,9 +186,18 @@ export class CompanyAuthorization {
     }
   }
 
+  private ensureClientAccess(clientId: string, context: string): void {
+    const companyId = this.clientCompanyCache.get(clientId);
+    if (companyId == null) {
+      throw createServiceError(404, `Client ${clientId} not found.`);
+    }
+
+    this.ensureCompanyAllowed(companyId, context);
+  }
+
   private async loadExistingClients(clients: any[]): Promise<Map<string, ClientRow>> {
     const ids = clients
-      .map((client) => this.extractId(client))
+      .map((client) => extractEntityId(client))
       .filter((id): id is string => Boolean(id));
 
     if (!ids.length) {
@@ -206,7 +219,7 @@ export class CompanyAuthorization {
 
   private async loadExistingEmployees(employees: any[]): Promise<Map<string, EmployeeRow>> {
     const ids = employees
-      .map((employee) => this.extractId(employee))
+      .map((employee) => extractEntityId(employee))
       .filter((id): id is string => Boolean(id));
 
     if (!ids.length) {
@@ -226,7 +239,7 @@ export class CompanyAuthorization {
 
   private async loadExistingCostCenters(costCenters: any[]): Promise<Map<string, CostCenterRow>> {
     const ids = costCenters
-      .map((costCenter) => this.extractId(costCenter))
+      .map((costCenter) => extractEntityId(costCenter))
       .filter((id): id is string => Boolean(id));
 
     if (!ids.length) {
@@ -264,62 +277,6 @@ export class CompanyAuthorization {
         this.clientCompanyCache.set(id, null);
       }
     }
-  }
-
-  private ensureClientAccess(clientId: string, context: string): void {
-    const companyId = this.clientCompanyCache.get(clientId);
-    if (companyId == null) {
-      throw createServiceError(404, `Client ${clientId} not found.`);
-    }
-
-    this.ensureCompanyAllowed(companyId, context);
-  }
-
-  private resolveAssociationId(data: any, relation: string, fallback?: string | null): string | null {
-    const explicit = this.extractAssociationId(data, relation);
-    if (explicit !== undefined) {
-      return explicit;
-    }
-    return fallback ?? null;
-  }
-
-  private extractAssociationId(data: any, relation: string): string | null | undefined {
-    if (!data || typeof data !== 'object') {
-      return undefined;
-    }
-
-    const foreignKey = `${relation}_ID`;
-    if (Object.prototype.hasOwnProperty.call(data, foreignKey)) {
-      const value = data[foreignKey];
-      if (value === null || value === undefined) {
-        return value;
-      }
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
-      }
-      return null;
-    }
-
-    const association = data[relation];
-    if (association === null) {
-      return null;
-    }
-    if (association && typeof association === 'object') {
-      const value = association.ID ?? association.id ?? association.Id;
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
-      }
-      if (value === null) {
-        return null;
-      }
-    }
-
-    return undefined;
-  }
-
-  private extractId(data: any): string | undefined {
-    const id = data?.ID ?? data?.id ?? data?.Id;
-    return typeof id === 'string' && id.trim() ? id.trim() : undefined;
   }
 }
 
