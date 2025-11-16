@@ -412,23 +412,13 @@ export const enqueueOutboxEntry = async (
         throw error;
       }
 
-      // Calculate exponential backoff: baseDelay * 2^(attempt-1)
-      // Cap the exponent at 5 to prevent excessively long delays (max 32x base delay)
-      const exponent = Math.min(attempt - 1, 5);
-      const delay = config.enqueueRetryDelay * Math.pow(2, exponent);
-
       logger.warn(
-        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt, retryDelayMs: delay },
-        `Enqueue attempt ${attempt} failed, retrying in ${delay}ms`,
+        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt },
+        'Enqueue attempt failed inside transaction, aborting so caller can retry later',
       );
       metrics.recordEnqueueRetry();
 
-      // Wait before retrying (only on retry, not first attempt)
-      if (delay > 0) {
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-
-      attempt += 1;
+      throw error;
     }
   }
 };
