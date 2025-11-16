@@ -57,10 +57,16 @@ export class EmployeeThirdPartyNotifier {
       timeout: 10_000,
       headers: { 'Content-Type': 'application/json' },
     });
-    this.defaultSecretPromise = getThirdPartyEmployeeSecret();
   }
 
-  private readonly defaultSecretPromise: Promise<string | undefined>;
+  private defaultSecretPromise: Promise<string | undefined> | null = null;
+
+  private async getDefaultSecret(): Promise<string | undefined> {
+    if (!this.defaultSecretPromise) {
+      this.defaultSecretPromise = getThirdPartyEmployeeSecret();
+    }
+    return this.defaultSecretPromise;
+  }
 
   async prepareEmployeesCreated(
     requestEntries: any[],
@@ -111,7 +117,7 @@ export class EmployeeThirdPartyNotifier {
       clientsById.set(client.ID, client);
     }
 
-    const defaultSecret = await this.defaultSecretPromise;
+    const defaultSecret = await this.getDefaultSecret();
     const timestamp = new Date().toISOString();
 
     for (const [clientId, employees] of byClient.entries()) {
@@ -211,7 +217,7 @@ export class EmployeeThirdPartyNotifier {
     attempt: number = 1,
   ): Promise<void> {
     const maxAttempts = DEFAULT_RETRY_ATTEMPTS;
-    const signingSecret = secret ?? (await this.defaultSecretPromise);
+    const signingSecret = secret ?? (await this.getDefaultSecret());
 
     const finalHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
