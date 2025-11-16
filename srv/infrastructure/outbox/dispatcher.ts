@@ -412,13 +412,20 @@ export const enqueueOutboxEntry = async (
         throw error;
       }
 
+      const exponent = Math.max(0, attempt - 1);
+      const delay = config.enqueueRetryDelay * Math.pow(2, exponent);
+
       logger.warn(
-        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt },
-        'Enqueue attempt failed inside transaction, aborting so caller can retry later',
+        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt, retryDelayMs: delay },
+        `Enqueue attempt ${attempt} failed, retrying in ${delay}ms`,
       );
       metrics.recordEnqueueRetry();
 
-      throw error;
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      attempt += 1;
     }
   }
 };
