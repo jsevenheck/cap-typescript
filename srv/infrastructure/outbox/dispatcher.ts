@@ -412,9 +412,7 @@ export const enqueueOutboxEntry = async (
         throw error;
       }
 
-      // Calculate exponential backoff: baseDelay * 2^(attempt-1)
-      // Cap the exponent at 5 to prevent excessively long delays (max 32x base delay)
-      const exponent = Math.min(attempt - 1, 5);
+      const exponent = Math.max(0, attempt - 1);
       const delay = config.enqueueRetryDelay * Math.pow(2, exponent);
 
       logger.warn(
@@ -423,7 +421,6 @@ export const enqueueOutboxEntry = async (
       );
       metrics.recordEnqueueRetry();
 
-      // Wait before retrying (only on retry, not first attempt)
       if (delay > 0) {
         await new Promise((resolve) => setTimeout(resolve, delay));
       }

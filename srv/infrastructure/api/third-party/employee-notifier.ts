@@ -3,6 +3,8 @@ import type { Transaction } from '@sap/cds';
 import crypto from 'crypto';
 import axios, { type AxiosInstance } from 'axios';
 
+import { getThirdPartyEmployeeSecret } from '../../../shared/utils/secrets';
+
 const ql = cds.ql as typeof cds.ql & { SELECT: typeof cds.ql.SELECT };
 
 export interface NotificationEnvelope {
@@ -57,6 +59,15 @@ export class EmployeeThirdPartyNotifier {
     });
   }
 
+  private defaultSecretPromise: Promise<string | undefined> | null = null;
+
+  private async getDefaultSecret(): Promise<string | undefined> {
+    if (!this.defaultSecretPromise) {
+      this.defaultSecretPromise = getThirdPartyEmployeeSecret();
+    }
+    return this.defaultSecretPromise;
+  }
+
   async prepareEmployeesCreated(
     requestEntries: any[],
     persistedRows: any[],
@@ -106,7 +117,7 @@ export class EmployeeThirdPartyNotifier {
       clientsById.set(client.ID, client);
     }
 
-    const defaultSecret = process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+    const defaultSecret = await this.getDefaultSecret();
     const timestamp = new Date().toISOString();
 
     for (const [clientId, employees] of byClient.entries()) {
@@ -206,7 +217,7 @@ export class EmployeeThirdPartyNotifier {
     attempt: number = 1,
   ): Promise<void> {
     const maxAttempts = DEFAULT_RETRY_ATTEMPTS;
-    const signingSecret = secret ?? process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+    const signingSecret = secret ?? (await this.getDefaultSecret());
 
     const finalHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
