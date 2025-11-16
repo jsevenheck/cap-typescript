@@ -58,7 +58,13 @@ const getCredentialStoreCredentials = (): CredentialStoreCredentials | null | un
 
     credStoreCache = credStore.credentials as unknown as CredentialStoreCredentials;
     return credStoreCache;
-  } catch (error) {
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ERR_ASSERTION') {
+      logger.debug({ err: error }, 'Credential Store service not bound; using fallbacks');
+      credStoreCache = null;
+      return null;
+    }
+
     logger.warn({ err: error }, 'Failed to get Credential Store credentials');
     credStoreCache = undefined;
     return undefined;
