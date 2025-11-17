@@ -11,9 +11,9 @@ export interface LocationEntity {
   country_code: string;
   zipCode: string;
   street: string;
-  addressSupplement?: string;
+  addressSupplement?: string | null;
   validFrom: string;
-  validTo?: string;
+  validTo?: string | null;
   client_ID: string;
 }
 

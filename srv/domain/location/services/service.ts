@@ -141,9 +141,11 @@ export const prepareLocationUpsert = async ({
   // Normalize address supplement (optional)
   if (data.addressSupplement !== undefined) {
     if (data.addressSupplement && typeof data.addressSupplement === 'string') {
-      updates.addressSupplement = data.addressSupplement.trim() || undefined;
+      const trimmed = data.addressSupplement.trim();
+      updates.addressSupplement = trimmed || null;
     } else {
-      updates.addressSupplement = undefined;
+      // Explicitly clear when null or empty is sent
+      updates.addressSupplement = null;
     }
   }
 
