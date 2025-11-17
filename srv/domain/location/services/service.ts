@@ -173,6 +173,22 @@ export const prepareLocationUpsert = async ({
   const client = await ensureClientExists(tx, clientId);
   ensureUserAuthorizedForCompany(user, client.companyId);
 
+  // Prevent changing client_ID if employees are assigned to this location
+  if (
+    event === 'UPDATE' &&
+    existingLocation &&
+    data.client_ID !== undefined &&
+    data.client_ID !== existingLocation.client_ID
+  ) {
+    const assignedCount = await findEmployeesByLocation(tx, targetId!);
+    if (assignedCount > 0) {
+      throw createServiceError(
+        409,
+        `Cannot change location's client: ${assignedCount} employee(s) are still assigned to it.`
+      );
+    }
+  }
+
   updates.client_ID = client.ID;
 
   return { updates, client };
