@@ -213,11 +213,7 @@ export const validateAssignment = async (
  * Validate that an assignment can be deleted
  * Returns the assignment if it exists and can be deleted
  */
-export const validateAssignmentDeletion = async (
-  _tx: Transaction,
-  _assignmentId: string,
-  _req: Request,
-): Promise<void> => {
+export const validateAssignmentDeletion = async (): Promise<void> => {
   // Note: We might want to add business rules here, such as:
   // - Preventing deletion of historical assignments
   // - Requiring a reason for deletion
