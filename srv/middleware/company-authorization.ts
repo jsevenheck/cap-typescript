@@ -24,9 +24,15 @@ type CostCenterRow = {
   client_ID: string;
 };
 
+type LocationRow = {
+  ID: string;
+  client_ID: string;
+};
+
 const CLIENTS_ENTITY = 'clientmgmt.Clients';
 const EMPLOYEES_ENTITY = 'clientmgmt.Employees';
 const COST_CENTERS_ENTITY = 'clientmgmt.CostCenters';
+const LOCATIONS_ENTITY = 'clientmgmt.Locations';
 const { SELECT } = cds.ql;
 
 const collectPayloads = (req: Request): any[] => {
@@ -164,6 +170,45 @@ export class CompanyAuthorization {
     }
   }
 
+  async validateLocationAccess(locations: any[]): Promise<void> {
+    if (!locations.length || this.shouldSkip()) {
+      return;
+    }
+
+    const existingLocations = await this.loadExistingLocations(locations);
+    const targetClientIds = new Set<string>();
+
+    for (const location of locations) {
+      const locationId = extractEntityId(location);
+      const existing = locationId ? existingLocations.get(locationId) : undefined;
+      const clientId = resolveAssociationId(location, 'client', existing?.client_ID);
+
+      if (existing?.client_ID) {
+        targetClientIds.add(existing.client_ID);
+      }
+      if (clientId) {
+        targetClientIds.add(clientId);
+      }
+    }
+
+    await this.ensureClientsLoaded(targetClientIds);
+
+    for (const location of locations) {
+      const locationId = extractEntityId(location);
+      const existing = locationId ? existingLocations.get(locationId) : undefined;
+      if (existing?.client_ID) {
+        this.ensureClientAccess(existing.client_ID, `location ${locationId ?? '(new)'}`);
+      }
+      const clientId = resolveAssociationId(location, 'client', existing?.client_ID);
+
+      if (!clientId) {
+        throw createServiceError(400, 'Location must reference a client.');
+      }
+
+      this.ensureClientAccess(clientId, `location ${locationId ?? '(new)'}`);
+    }
+  }
+
   private resolveAllowedCompanies(): Set<string> {
     const allowed = new Set<string>();
     const attributeNames = ['CompanyCode', 'companyCodes'];
@@ -257,6 +302,26 @@ export class CompanyAuthorization {
     return map;
   }
 
+  private async loadExistingLocations(locations: any[]): Promise<Map<string, LocationRow>> {
+    const ids = locations
+      .map((location) => extractEntityId(location))
+      .filter((id): id is string => Boolean(id));
+
+    if (!ids.length) {
+      return new Map();
+    }
+
+    const rows = (await this.runner.run(
+      SELECT.from(LOCATIONS_ENTITY).columns('ID', 'client_ID').where({ ID: { in: ids } }),
+    )) as LocationRow[];
+
+    const map = new Map<string, LocationRow>();
+    for (const row of rows) {
+      map.set(row.ID, row);
+    }
+    return map;
+  }
+
   private async ensureClientsLoaded(clientIds: Set<string>): Promise<void> {
     const pending = Array.from(clientIds).filter((id) => !this.clientCompanyCache.has(id));
     if (!pending.length) {
@@ -296,6 +361,12 @@ export const authorizeCostCenters = async (req: Request): Promise<void> => {
   const entries = collectPayloads(req);
   const authorization = new CompanyAuthorization(req);
   await authorization.validateCostCenterAccess(entries);
+};
+
+export const authorizeLocations = async (req: Request): Promise<void> => {
+  const entries = collectPayloads(req);
+  const authorization = new CompanyAuthorization(req);
+  await authorization.validateLocationAccess(entries);
 };
 
 export default CompanyAuthorization;

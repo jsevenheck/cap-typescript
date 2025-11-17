@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
-import type { CostCenterEntity, EmployeeEntity } from '../dto/employee.dto';
+import type { CostCenterEntity, EmployeeEntity, LocationEntity } from '../dto/employee.dto';
 import {
   hasRequiredFields,
   isRecord,
@@ -128,6 +128,33 @@ export const findCostCenterById = async <K extends keyof CostCenterEntity = 'res
   return projectEntity<Pick<CostCenterEntity, K | CostCenterRequiredFields>>(row, selection);
 };
 
+type LocationRequiredFields = Extract<keyof LocationEntity, 'ID' | 'client_ID'>;
+
+export const findLocationById = async <K extends keyof LocationEntity = 'ID' | 'client_ID'>(
+  tx: Transaction,
+  locationId: string,
+  columns?: K[],
+): Promise<Pick<LocationEntity, K | LocationRequiredFields> | undefined> => {
+  const required: LocationRequiredFields[] = ['ID', 'client_ID'];
+  const requested = columns ?? (['ID', 'client_ID'] as K[]);
+  const selection = selectColumns<LocationEntity>(requested, required) as Array<
+    K | LocationRequiredFields
+  >;
+
+  const row = await tx.run(
+    ql.SELECT.one
+      .from('clientmgmt.Locations')
+      .columns(...(selection as string[]))
+      .where({ ID: locationId }),
+  );
+
+  if (!isRecord(row) || !hasRequiredFields<LocationEntity>(row, required)) {
+    return undefined;
+  }
+
+  return projectEntity<Pick<LocationEntity, K | LocationRequiredFields>>(row, selection);
+};
+
 export const withForUpdate = <T extends object>(query: T): T => {
   const forUpdate = (query as T & { forUpdate?: () => T }).forUpdate;
   if (typeof forUpdate === 'function') {
@@ -158,7 +185,6 @@ export const anonymizeEmployeeRecord = async (
         firstName: placeholder,
         lastName: placeholder,
         email,
-        location: null,
         positionLevel: null,
         status: 'inactive',
       })

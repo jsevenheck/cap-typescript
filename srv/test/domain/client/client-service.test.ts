@@ -42,6 +42,8 @@ const UPDATE = (cds.ql as any).UPDATE as any;
 
 const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
 const BETA_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
+const ALPHA_LOCATION_ID = 'aaaa1111-1111-1111-1111-111111111111';
+const BETA_LOCATION_ID = 'aaaa2222-2222-2222-2222-222222222222';
 
 let db: any;
 
@@ -103,6 +105,7 @@ describe('ClientService (HTTP)', () => {
       email: 'jane.doe@example.com',
       entryDate: '2024-01-01',
       client_ID: CLIENT_ID,
+      location_ID: ALPHA_LOCATION_ID,
     };
 
     const created = await http.post<{ employeeId: string }>(
@@ -137,6 +140,7 @@ describe('ClientService (HTTP)', () => {
         email: 'lara.croft@example.com',
         entryDate: '2024-02-01',
         client_ID: CLIENT_ID,
+        location_ID: ALPHA_LOCATION_ID,
       },
       authConfig,
     );
@@ -167,6 +171,7 @@ describe('ClientService (HTTP)', () => {
         email: 'erica.miller@example.com',
         entryDate: '2024-05-01',
         client_ID: CLIENT_ID,
+        location_ID: ALPHA_LOCATION_ID,
       },
       authConfig,
     );
@@ -188,7 +193,7 @@ describe('ClientService (HTTP)', () => {
 
     const firstUpdate = await http.patch(
       `/odata/v4/clients/Employees(${employeeId})`,
-      { location: 'Berlin' },
+      { positionLevel: 'L1' },
       {
         ...authConfig,
         headers: {
@@ -225,6 +230,7 @@ describe('ClientService (HTTP)', () => {
         email: 'payload.concurrency@example.com',
         entryDate: '2024-07-01',
         client_ID: CLIENT_ID,
+        location_ID: ALPHA_LOCATION_ID,
       },
       authConfig,
     );
@@ -244,7 +250,7 @@ describe('ClientService (HTTP)', () => {
 
     const updateResponse = await http.patch<Record<string, any>>(
       `/odata/v4/clients/Employees(${employeeId})`,
-      { location: 'Paris', modifiedAt: initialModifiedAt },
+      { positionLevel: 'L2', modifiedAt: initialModifiedAt },
       authConfig,
     );
 
@@ -334,6 +340,7 @@ describe('ClientService authorization', () => {
             email: 'ias.function@example.com',
             entryDate: '2024-05-01',
             client_ID: BETA_CLIENT_ID,
+            location_ID: BETA_LOCATION_ID,
           }),
         ),
       ),
@@ -348,6 +355,7 @@ describe('ClientService authorization', () => {
             email: 'ias.blocked.fn@example.com',
             entryDate: '2024-05-02',
             client_ID: CLIENT_ID,
+            location_ID: ALPHA_LOCATION_ID,
           }),
         ),
       ),
@@ -370,6 +378,7 @@ describe('ClientService authorization', () => {
             email: 'ias.array@example.com',
             entryDate: '2024-06-01',
             client_ID: CLIENT_ID,
+            location_ID: ALPHA_LOCATION_ID,
           }),
         ),
       ),
@@ -384,6 +393,7 @@ describe('ClientService authorization', () => {
             email: 'ias.blocked.array@example.com',
             entryDate: '2024-06-02',
             client_ID: BETA_CLIENT_ID,
+            location_ID: BETA_LOCATION_ID,
           }),
         ),
       ),
@@ -401,6 +411,7 @@ describe('ClientService authorization', () => {
             email: 'unauth@example.com',
             entryDate: '2024-03-01',
             client_ID: BETA_CLIENT_ID,
+            location_ID: BETA_LOCATION_ID,
           }),
         ),
     ).then(
@@ -464,7 +475,6 @@ describe('Client name validation', () => {
           INSERT.into(tx.entities.Clients).entries({
             companyId: 'TEST-001',
             name: '',
-            country_code: 'US',
           }),
         ),
       ),
@@ -478,7 +488,6 @@ describe('Client name validation', () => {
           INSERT.into(tx.entities.Clients).entries({
             companyId: 'TEST-002',
             name: '   ',
-            country_code: 'US',
           }),
         ),
       ),
@@ -491,7 +500,6 @@ describe('Client name validation', () => {
         tx.run(
           INSERT.into(tx.entities.Clients).entries({
             companyId: 'TEST-003',
-            country_code: 'US',
           }),
         ),
       ),
@@ -507,7 +515,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-004',
             name: 'Valid Client Name',
-            country_code: 'US',
           }),
         );
 
@@ -531,7 +538,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-005',
             name: '  Trimmed Name  ',
-            country_code: 'US',
           }),
         );
 
@@ -555,7 +561,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-006',
             name: 'Original Name',
-            country_code: 'US',
           }),
         );
 
@@ -585,7 +590,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-007',
             name: 'Original Name',
-            country_code: 'US',
           }),
         );
 
@@ -615,7 +619,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-007B',
             name: 'Original Name',
-            country_code: 'US',
           }),
         );
 
@@ -645,7 +648,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-008',
             name: 'Original Name',
-            country_code: 'US',
           }),
         );
 
@@ -679,7 +681,6 @@ describe('Client name validation', () => {
             ID: clientId,
             companyId: 'TEST-009',
             name: 'Original Name',
-            country_code: 'US',
           }),
         );
 
@@ -748,12 +749,15 @@ describe('Employee business rules', () => {
   }> => {
     const email =
       typeof overrides.email === 'string' ? (overrides.email as string) : `validation+${randomUUID()}@example.com`;
+    const clientId = overrides.client_ID ?? CLIENT_ID;
+    const locationId = overrides.location_ID ?? (clientId === BETA_CLIENT_ID ? BETA_LOCATION_ID : ALPHA_LOCATION_ID);
     const entry = {
       firstName: 'Test',
       lastName: 'Employee',
       email,
       entryDate: '2024-01-01',
-      client_ID: overrides.client_ID ?? CLIENT_ID,
+      client_ID: clientId,
+      location_ID: locationId,
       ...overrides,
     };
 
@@ -796,7 +800,7 @@ describe('Employee business rules', () => {
 
   const createClientRecord = async (
     tx: any,
-    options: { companyId: string; countryCode?: string; name?: string; notificationEndpoint?: string },
+    options: { companyId: string; name?: string; notificationEndpoint?: string },
   ): Promise<{ ID: string; companyId: string }> => {
     const clientId = randomUUID();
 
@@ -806,13 +810,33 @@ describe('Employee business rules', () => {
         companyId: options.companyId,
         name: options.name ?? `Client ${options.companyId}`,
         notificationEndpoint: options.notificationEndpoint ?? null,
-        country_code: options.countryCode ?? 'DE',
       }),
     );
 
     createdClientIds.push(clientId);
 
     return { ID: clientId, companyId: options.companyId };
+  };
+
+  const createLocationRecord = async (
+    tx: any,
+    options: { clientId: string; city?: string; countryCode?: string },
+  ): Promise<{ ID: string }> => {
+    const locationId = randomUUID();
+
+    await tx.run(
+      INSERT.into(tx.entities.Locations).entries({
+        ID: locationId,
+        city: options.city ?? 'Test City',
+        country_code: options.countryCode ?? 'DE',
+        zipCode: '12345',
+        street: '123 Test Street',
+        validFrom: '2024-01-01',
+        client_ID: options.clientId,
+      }),
+    );
+
+    return { ID: locationId };
   };
 
   beforeAll(async () => {
@@ -1067,8 +1091,10 @@ describe('Employee business rules', () => {
   it('generates sanitized employee identifiers for company codes with symbols', async () => {
     await runAsAdmin(async (tx) => {
       const client = await createClientRecord(tx, { companyId: 'ac-me 123' });
+      const location = await createLocationRecord(tx, { clientId: client.ID });
       const employee = await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
       });
 
@@ -1080,8 +1106,10 @@ describe('Employee business rules', () => {
   it('truncates long company identifiers when building employee IDs', async () => {
     await runAsAdmin(async (tx) => {
       const client = await createClientRecord(tx, { companyId: 'VeryLongCompanyCode' });
+      const location = await createLocationRecord(tx, { clientId: client.ID });
       const employee = await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
       });
 
@@ -1093,11 +1121,13 @@ describe('Employee business rules', () => {
   it('respects existing counter values when generating new employee IDs', async () => {
     await runAsAdmin(async (tx) => {
       const client = await createClientRecord(tx, { companyId: 'CounterCo' });
+      const location = await createLocationRecord(tx, { clientId: client.ID });
 
       await db.run(INSERT.into('clientmgmt.EmployeeIdCounters').entries({ client_ID: client.ID, lastCounter: 5 }));
 
       const employee = await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
       });
 
@@ -1108,9 +1138,11 @@ describe('Employee business rules', () => {
   it('skips existing employee identifiers to preserve uniqueness', async () => {
     await runAsAdmin(async (tx) => {
       const client = await createClientRecord(tx, { companyId: 'SkipCo' });
+      const location = await createLocationRecord(tx, { clientId: client.ID });
 
       const first = await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
       });
 
@@ -1118,12 +1150,14 @@ describe('Employee business rules', () => {
 
       await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
         employeeId: `${prefix}000002`,
       });
 
       const third = await createEmployeeRecord(tx, {
         client_ID: client.ID,
+        location_ID: location.ID,
         email: `validation+${randomUUID()}@example.com`,
       });
 
@@ -1141,7 +1175,7 @@ describe('Employee business rules', () => {
         entryDate: '2020-01-01',
         exitDate: '2023-01-15',
         status: 'inactive',
-        location: 'Paris',
+        location_ID: ALPHA_LOCATION_ID,
         positionLevel: 'L3',
         client_ID: CLIENT_ID,
       },
@@ -1171,7 +1205,6 @@ describe('Employee business rules', () => {
       expect(fetched.data.firstName).toBe('ANONYMIZED');
       expect(fetched.data.lastName).toBe('ANONYMIZED');
       expect(fetched.data.email).toMatch(/^anonymized-/);
-      expect(fetched.data.location).toBeNull();
       expect(fetched.data.positionLevel).toBeNull();
       expect(fetched.data.status).toBe('inactive');
     } finally {

@@ -6,8 +6,6 @@ import type { Transaction } from '@sap/cds';
 import { ensureOptimisticConcurrency } from '../../../shared/utils/concurrency';
 import { createServiceError } from '../../../shared/utils/errors';
 import {
-  deriveCountryCodeFromCompanyId,
-  isValidCountryCode,
   normalizeCompanyId,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
@@ -100,18 +98,6 @@ export const prepareClientUpsert = async ({
     updates.companyId = normalized ?? undefined;
   }
 
-  if (data.country_code !== undefined) {
-    if (typeof data.country_code !== 'string') {
-      throw createServiceError(400, 'Country code must be a string.');
-    }
-
-    const normalizedCountry = data.country_code.trim().toUpperCase();
-    if (!isValidCountryCode(normalizedCountry)) {
-      throw createServiceError(400, 'Country code must be a valid two-letter ISO 3166-1 alpha-2 code.');
-    }
-    updates.country_code = normalizedCountry;
-  }
-
   const targetCompanyId =
     updates.companyId ??
     (event === 'UPDATE'
@@ -119,25 +105,6 @@ export const prepareClientUpsert = async ({
       : normalizeCompanyId(data.companyId ?? undefined) ?? data.companyId);
 
   ensureUserAuthorizedForCompany(user, targetCompanyId);
-
-  if (data.country_code === undefined && updates.country_code === undefined) {
-    const companyChanged =
-      event === 'CREATE' ||
-      (event === 'UPDATE' &&
-        data.companyId !== undefined &&
-        (!existingClient || normalizeCompanyId(data.companyId) !== normalizeCompanyId(existingClient.companyId)));
-
-    if (companyChanged) {
-      const derivedCode = deriveCountryCodeFromCompanyId(targetCompanyId);
-      if (derivedCode) {
-        updates.country_code = derivedCode;
-      }
-    }
-  }
-
-  if (event === 'CREATE' && !updates.country_code) {
-    throw createServiceError(400, 'Country code is required.');
-  }
 
   // Validate client name
   if (event === 'CREATE' || 'name' in data) {

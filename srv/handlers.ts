@@ -3,10 +3,12 @@ import type { Service } from '@sap/cds';
 import { registerClientHandlers } from './domain/client';
 import { registerEmployeeHandlers } from './domain/employee';
 import { registerCostCenterHandlers } from './domain/cost-center';
+import { registerLocationHandlers } from './domain/location';
 import {
   authorizeClients,
   authorizeCostCenters,
   authorizeEmployees,
+  authorizeLocations,
 } from './middleware/company-authorization';
 
 const registerHandlers = (srv: Service): void => {
@@ -15,10 +17,12 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Clients', authorizeClients);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Employees', authorizeEmployees);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'CostCenters', authorizeCostCenters);
+  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Locations', authorizeLocations);
 
   registerClientHandlers(srv);
   registerEmployeeHandlers(srv);
   registerCostCenterHandlers(srv);
+  registerLocationHandlers(srv);
 };
 
 export default registerHandlers;

@@ -16,8 +16,25 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
   entity Clients as projection on db.Clients {
     *,
     employees: redirected to Employees,
-    costCenters: redirected to CostCenters
+    costCenters: redirected to CostCenters,
+    locations: redirected to Locations
   };
+
+  @restrict: [
+    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
+    {
+      grant: 'READ',
+      to: 'HRViewer',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
+    {
+      grant: ['READ','CREATE','UPDATE','DELETE'],
+      to: 'HREditor',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    }
+  ]
+  @description: 'Updating or deleting a location requires optimistic concurrency control: supply an If-Match header when the service exposes ETags or include the latest modifiedAt timestamp in the payload.'
+  entity Locations as projection on db.Locations;
 
   @restrict: [
     { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },

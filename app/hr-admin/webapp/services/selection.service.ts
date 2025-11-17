@@ -9,6 +9,7 @@ export default class SelectionState {
   private clientContext?: Context;
   private employeeContext?: Context;
   private costCenterContext?: Context;
+  private locationContext?: Context;
   private readonly clearingSelections = new Set<string>();
 
   constructor(
@@ -27,6 +28,7 @@ export default class SelectionState {
     viewModel.setProperty("/selectedClientId", context.getProperty("ID"));
     this.clearEmployee();
     this.clearCostCenter();
+    this.clearLocation();
   }
 
   public clearClient(): void {
@@ -36,6 +38,7 @@ export default class SelectionState {
     viewModel.setProperty("/selectedClientId", undefined);
     this.clearEmployee();
     this.clearCostCenter();
+    this.clearLocation();
   }
 
   public getSelectedClientContext(): Context | undefined {
@@ -109,6 +112,36 @@ export default class SelectionState {
   public ensureCostCenterSelected(): boolean {
     if (!this.costCenterContext) {
       MessageBox.error("Select a cost center first.");
+      return false;
+    }
+    return true;
+  }
+
+  public setLocation(context?: Context): void {
+    if (!context) {
+      this.clearLocation();
+      return;
+    }
+
+    this.locationContext = context;
+    const viewModel = this.models.getViewStateModel();
+    viewModel.setProperty("/selectedLocationId", context.getProperty("ID"));
+  }
+
+  public clearLocation(): void {
+    this.locationContext = undefined;
+    this.clearListSelection("locationsList");
+    const viewModel = this.models.getViewStateModel();
+    viewModel.setProperty("/selectedLocationId", undefined);
+  }
+
+  public getSelectedLocationContext(): Context | undefined {
+    return this.locationContext;
+  }
+
+  public ensureLocationSelected(): boolean {
+    if (!this.locationContext) {
+      MessageBox.error("Select a location first.");
       return false;
     }
     return true;

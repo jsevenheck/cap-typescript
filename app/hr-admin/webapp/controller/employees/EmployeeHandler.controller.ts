@@ -62,7 +62,7 @@ export default class EmployeeHandler {
         costCenter_ID: undefined,
         manager_ID: undefined,
         managerName: "",
-        location: "",
+        location_ID: undefined,
         positionLevel: "",
         entryDate: "",
         exitDate: "",
@@ -102,7 +102,8 @@ export default class EmployeeHandler {
         costCenter?: { ID?: string };
         manager_ID?: string;
         manager?: { ID?: string; firstName?: string; lastName?: string };
-        location?: string;
+        location_ID?: string;
+        location?: { ID?: string };
         positionLevel?: string;
         entryDate?: string;
         exitDate?: string | null;
@@ -131,7 +132,7 @@ export default class EmployeeHandler {
           costCenter_ID: currentData.costCenter_ID ?? currentData.costCenter?.ID,
           manager_ID: currentData.manager_ID ?? currentData.manager?.ID,
           managerName,
-          location: currentData.location ?? "",
+          location_ID: currentData.location_ID ?? currentData.location?.ID,
           positionLevel: currentData.positionLevel ?? "",
           entryDate: currentData.entryDate ?? "",
           exitDate: currentData.exitDate ?? "",
@@ -195,6 +196,7 @@ export default class EmployeeHandler {
     const clientId = this.selection.getSelectedClientId();
     const costCenterId = data.employee.costCenter_ID || undefined;
     const managerId = data.employee.manager_ID || undefined;
+    const locationId = data.employee.location_ID || undefined;
     const employeeIdValue = data.employee.employeeId?.trim();
 
     const entryDateValue = data.employee.entryDate?.trim() ?? "";
@@ -204,7 +206,7 @@ export default class EmployeeHandler {
       firstName: data.employee.firstName?.trim() ?? "",
       lastName: data.employee.lastName?.trim() ?? "",
       email: data.employee.email?.trim() ?? "",
-      location: data.employee.location?.trim() ?? "",
+      location_ID: locationId ?? null,
       positionLevel: data.employee.positionLevel?.trim() ?? "",
       costCenter_ID: costCenterId ?? null,
       manager_ID: managerId ?? null,
@@ -227,11 +229,12 @@ export default class EmployeeHandler {
       !payload.firstName ||
       !payload.lastName ||
       !payload.email ||
+      !payload.location_ID ||
       !payload.entryDate ||
       !payload.status ||
       !payload.employmentType
     ) {
-      MessageBox.error("First name, last name, email, entry date, status, and employment type are required.");
+      MessageBox.error("First name, last name, email, location, entry date, status, and employment type are required.");
       return;
     }
 
@@ -348,7 +351,7 @@ export default class EmployeeHandler {
       context.setProperty("firstName", payload.firstName);
       context.setProperty("lastName", payload.lastName);
       context.setProperty("email", payload.email);
-      context.setProperty("location", payload.location);
+      context.setProperty("location_ID", payload.location_ID);
       context.setProperty("positionLevel", payload.positionLevel);
       context.setProperty("costCenter_ID", payload.costCenter_ID ?? null);
       context.setProperty("manager_ID", payload.manager_ID ?? null);

@@ -56,7 +56,6 @@ export default class ClientHandler {
         companyId: "",
         name: "",
         notificationEndpoint: "",
-        country_code: "",
       },
     });
     this.openDialog();
@@ -71,7 +70,6 @@ export default class ClientHandler {
     const dialogModel = this.models.getClientModel();
     const currentData = context?.getObject() as (ClientDialogModelData["client"] & {
       notificationEndpoint?: string | null;
-      country_code?: string | null;
     }) | undefined;
 
     if (!currentData) {
@@ -87,7 +85,6 @@ export default class ClientHandler {
           companyId: currentData.companyId,
           name: currentData.name,
           notificationEndpoint: currentData.notificationEndpoint ?? null,
-          country_code: currentData.country_code ?? null,
         },
       });
     this.openDialog();
@@ -133,41 +130,18 @@ export default class ClientHandler {
     }
     const dialogModel = this.models.getClientModel();
     const data = dialogModel.getData();
-    
-    // Extract country code from various formats
-    let countryCode = data.client.country_code?.trim() ?? "";
+
     const notificationEndpoint = data.client.notificationEndpoint?.trim() ?? "";
-    
-    // If format is "Country Name (XX)", extract the code
-    const codeMatch = countryCode.match(/\(([A-Z]{2})\)$/i);
-    if (codeMatch) {
-      countryCode = codeMatch[1];
-    }
-    
+
     const payload = {
       companyId: data.client.companyId?.trim() ?? "",
       name: data.client.name?.trim() ?? "",
       notificationEndpoint: notificationEndpoint || null,
-      country_code: countryCode ? countryCode.toUpperCase() : null,
     };
 
     // Enhanced validation
     if (!payload.companyId || !payload.name) {
       MessageBox.error("Company ID and Name are required.");
-      return;
-    }
-
-    if (!payload.country_code) {
-      MessageBox.error("Country code is required.");
-      return;
-    }
-
-    // Validate country code format (must be exactly 2 letters)
-    if (!/^[A-Z]{2}$/i.test(payload.country_code)) {
-      MessageBox.error(
-        "Country code must be exactly 2 letters (e.g., 'BH' for Bahrain, 'US' for United States).\n\n" +
-        `You entered: '${payload.country_code}'`
-      );
       return;
     }
 
@@ -273,15 +247,14 @@ export default class ClientHandler {
       context.setProperty("companyId", payload.companyId);
       context.setProperty("name", payload.name);
       context.setProperty("notificationEndpoint", payload.notificationEndpoint);
-      context.setProperty("country_code", payload.country_code ?? null);
-      
+
       // Add timeout for update as well
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error("Update operation timed out after 30 seconds."));
         }, 30000);
       });
-      
+
       Promise.race([
         model.submitBatch("$auto"),
         timeoutPromise

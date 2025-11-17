@@ -3,7 +3,18 @@ export interface ClientEntity {
   companyId: string;
   name?: string;
   notificationEndpoint?: string;
+}
+
+export interface LocationEntity {
+  ID: string;
+  city: string;
   country_code: string;
+  zipCode: string;
+  street: string;
+  addressSupplement?: string | null;
+  validFrom: string;
+  validTo?: string | null;
+  client_ID: string;
 }
 
 export interface EmployeeEntity {
@@ -12,7 +23,7 @@ export interface EmployeeEntity {
   firstName: string;
   lastName: string;
   email: string;
-  location?: string;
+  location_ID: string;
   positionLevel?: string;
   entryDate: string;
   exitDate?: string;
