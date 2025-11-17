@@ -1,6 +1,4 @@
-import type { Request } from '@sap/cds';
-
-export const onRead = async (_: Request): Promise<void> => {
+export const onRead = async (): Promise<void> => {
   // No custom logic needed for READ; framework handles it
 };
 
