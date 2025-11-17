@@ -4,8 +4,7 @@ import type { Request } from '@sap/cds';
 import type { EmployeeCostCenterAssignmentEntity } from '../dto/employee-cost-center-assignment.dto';
 import { validateAssignment } from '../services/validation.service';
 import { findAssignmentById } from '../repository/employee-cost-center-assignment.repo';
-import { buildUserContext } from '../../../shared/utils/auth';
-import { buildConcurrencyContext, deriveTargetId, requireRequestUser } from '../../shared/request-context';
+import { deriveTargetId } from '../../shared/request-context';
 import { createServiceError } from '../../../shared/utils/errors';
 
 export const onUpsert = async (req: Request): Promise<void> => {

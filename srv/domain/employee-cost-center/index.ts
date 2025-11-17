@@ -1,4 +1,4 @@
-import type { Request, Service } from '@sap/cds';
+import type { Service } from '@sap/cds';
 
 import { onUpsert } from './handlers/on-upsert';
 import { onDelete } from './handlers/on-delete';
