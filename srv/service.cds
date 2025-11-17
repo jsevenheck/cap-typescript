@@ -69,6 +69,22 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
   entity CostCenters as projection on db.CostCenters;
 
   @restrict: [
+    { grant: ['READ','CREATE','UPDATE','DELETE'], to: 'HRAdmin' },
+    {
+      grant: 'READ',
+      to: 'HRViewer',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    },
+    {
+      grant: ['READ','CREATE','UPDATE','DELETE'],
+      to: 'HREditor',
+      where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
+    }
+  ]
+  @description: 'Employee cost center assignments with date ranges for tracking historical and future cost center allocations.'
+  entity EmployeeCostCenterAssignments as projection on db.EmployeeCostCenterAssignments;
+
+  @restrict: [
     { grant: 'READ', to: 'HRAdmin' },
     { grant: 'READ', to: 'HRViewer' },
     { grant: 'READ', to: 'HREditor' }

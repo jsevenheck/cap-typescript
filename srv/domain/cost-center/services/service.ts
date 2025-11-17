@@ -80,7 +80,7 @@ export const prepareCostCenterUpsert = async ({
       payloadValue: concurrency?.payloadValue,
     });
 
-    existingCostCenter = await findCostCenterById(tx, targetId, ['ID', 'client_ID', 'responsible_ID']);
+    existingCostCenter = await findCostCenterById(tx, targetId, ['ID', 'client_ID', 'responsible_ID', 'validFrom', 'validTo']);
 
     if (!existingCostCenter) {
       throw createServiceError(404, `Cost center ${targetId} not found.`);
@@ -131,6 +131,31 @@ export const prepareCostCenterUpsert = async ({
 
   if (normalizedResponsibleId !== undefined) {
     updates.responsible_ID = normalizedResponsibleId;
+  }
+
+  // Validate date range
+  const validFrom = data.validFrom ?? (event === 'UPDATE' ? existingCostCenter?.validFrom : undefined);
+  const validTo = data.validTo !== undefined ? data.validTo : (event === 'UPDATE' ? existingCostCenter?.validTo : undefined);
+
+  if (!validFrom) {
+    throw createServiceError(400, 'validFrom is required.');
+  }
+
+  if (validTo) {
+    const fromDate = new Date(validFrom);
+    const toDate = new Date(validTo);
+
+    if (fromDate > toDate) {
+      throw createServiceError(400, 'validFrom must be less than or equal to validTo.');
+    }
+  }
+
+  if (data.validFrom !== undefined) {
+    updates.validFrom = validFrom;
+  }
+
+  if (data.validTo !== undefined) {
+    updates.validTo = validTo;
   }
 
   updates.client_ID = client.ID;

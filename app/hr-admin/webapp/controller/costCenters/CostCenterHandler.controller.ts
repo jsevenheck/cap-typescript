@@ -43,6 +43,8 @@ export default class CostCenterHandler {
         code: "",
         name: "",
         description: "",
+        validFrom: "",
+        validTo: "",
         responsible_ID: undefined,
       },
     });
@@ -72,6 +74,8 @@ export default class CostCenterHandler {
         code?: string;
         name?: string;
         description?: string;
+        validFrom?: string;
+        validTo?: string;
         responsible_ID?: string;
         responsible?: { ID?: string };
       } | undefined;
@@ -89,6 +93,8 @@ export default class CostCenterHandler {
           code: currentData.code ?? "",
           name: currentData.name ?? "",
           description: currentData.description ?? "",
+          validFrom: currentData.validFrom ?? "",
+          validTo: currentData.validTo ?? "",
           responsible_ID: currentData.responsible_ID ?? currentData.responsible?.ID,
         },
       });
@@ -149,11 +155,13 @@ export default class CostCenterHandler {
       code: data.costCenter.code?.trim() ?? "",
       name: data.costCenter.name?.trim() ?? "",
       description: data.costCenter.description?.trim() ?? "",
+      validFrom: data.costCenter.validFrom,
+      validTo: data.costCenter.validTo || null,
       responsible_ID: data.costCenter.responsible_ID,
     };
 
-    if (!payload.code || !payload.name || !payload.responsible_ID) {
-      MessageBox.error("Code, Name, and Responsible are required.");
+    if (!payload.code || !payload.name || !payload.responsible_ID || !payload.validFrom) {
+      MessageBox.error("Code, Name, Valid From, and Responsible are required.");
       return;
     }
 
@@ -228,6 +236,8 @@ export default class CostCenterHandler {
       context.setProperty("code", payload.code);
       context.setProperty("name", payload.name);
       context.setProperty("description", payload.description);
+      context.setProperty("validFrom", payload.validFrom);
+      context.setProperty("validTo", payload.validTo);
       context.setProperty("responsible_ID", payload.responsible_ID);
       model
         .submitBatch("$auto")
