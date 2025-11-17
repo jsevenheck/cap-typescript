@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
-import type { ClientEntity, LocationEntity, EmployeeEntity } from '../dto/location.dto';
+import type { ClientEntity, LocationEntity } from '../dto/location.dto';
 
 const ql = cds.ql as typeof cds.ql;
 
