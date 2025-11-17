@@ -14,7 +14,6 @@ export interface ClientDialogData {
   companyId: string;
   name: string;
   notificationEndpoint?: string | null;
-  country_code?: string | null;
 }
 
 export interface ClientDialogModelData {
@@ -32,7 +31,7 @@ export interface EmployeeDialogData {
   costCenter_ID?: string;
   manager_ID?: string;
   managerName: string;
-  location: string;
+  location_ID?: string;
   positionLevel: string;
   entryDate: string;
   exitDate: string;
@@ -61,8 +60,26 @@ export interface CostCenterDialogModelData {
   costCenter: CostCenterDialogData;
 }
 
+export interface LocationDialogData {
+  ID?: string;
+  city: string;
+  country_code: string;
+  zipCode: string;
+  street: string;
+  addressSupplement?: string;
+  validFrom: string;
+  validTo?: string;
+}
+
+export interface LocationDialogModelData {
+  mode: DialogMode;
+  title: string;
+  location: LocationDialogData;
+}
+
 export interface ViewState {
   selectedClientId?: string;
   selectedEmployeeId?: string;
   selectedCostCenterId?: string;
+  selectedLocationId?: string;
 }

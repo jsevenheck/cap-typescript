@@ -1,1 +1,1 @@
-export type { ClientEntity, CostCenterEntity, EmployeeEntity } from '../../../shared/types/models';
+export type { ClientEntity, CostCenterEntity, EmployeeEntity, LocationEntity } from '../../../shared/types/models';

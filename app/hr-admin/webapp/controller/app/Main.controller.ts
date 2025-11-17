@@ -5,6 +5,7 @@ import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
 import CostCenterHandler from "../costCenters/CostCenterHandler.controller";
 import EmployeeHandler from "../employees/EmployeeHandler.controller";
+import LocationHandler from "../locations/LocationHandler.controller";
 import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -16,6 +17,7 @@ export default class Main extends Controller {
   private clients!: ClientHandler;
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
+  private locations!: LocationHandler;
 
   public onInit(): void {
     const view = this.getView();
@@ -30,6 +32,7 @@ export default class Main extends Controller {
     this.clients = new ClientHandler(this, this.models, this.selection, this.navigation);
     this.employees = new EmployeeHandler(this, this.models, this.selection);
     this.costCenters = new CostCenterHandler(this, this.models, this.selection);
+    this.locations = new LocationHandler(this, this.models, this.selection);
   }
 
   public onRefresh(): void {
@@ -148,5 +151,43 @@ export default class Main extends Controller {
 
   public onEmployeeCostCenterChange(event: Event): void {
     this.employees.handleCostCenterChange(event);
+  }
+
+  public onNavigateToLocations(): void {
+    if (this.selection.ensureClientSelected()) {
+      this.navigation.showLocationsPage();
+    }
+  }
+
+  public onRefreshLocations(): void {
+    this.locations.refresh();
+  }
+
+  public onAddLocation(): void {
+    this.locations.startCreate();
+  }
+
+  public onEditLocation(): Promise<void> {
+    return this.locations.startEdit();
+  }
+
+  public onDeleteLocation(): void {
+    this.locations.delete();
+  }
+
+  public onSaveLocation(): void {
+    this.locations.save();
+  }
+
+  public onCancelLocation(): void {
+    this.locations.cancel();
+  }
+
+  public onLocationDialogAfterClose(): void {
+    this.locations.afterDialogClose();
+  }
+
+  public onLocationsSelectionChange(event: Event): void {
+    this.locations.handleSelectionChange(event);
   }
 }

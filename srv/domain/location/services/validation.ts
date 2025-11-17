@@ -1,0 +1,1 @@
+export { validateLocationDeletion } from './service';

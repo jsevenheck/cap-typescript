@@ -24,6 +24,7 @@ import {
   findEmployeeByEmployeeId,
   findEmployeeById,
   findEmployeeIdCounterForUpdate,
+  findLocationById,
   insertEmployeeIdCounter,
   updateEmployeeIdCounter,
 } from '../repository/employee.repo';
@@ -58,6 +59,7 @@ const loadExistingEmployee = async (tx: Transaction, employeeId: string): Promis
     'status',
     'costCenter_ID',
     'manager_ID',
+    'location_ID',
   ]);
 
 const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
@@ -152,7 +154,6 @@ const sanitizeEmployeeStrings = (data: Partial<EmployeeEntity>): void => {
   if (data.firstName) data.firstName = data.firstName.trim();
   if (data.lastName) data.lastName = data.lastName.trim();
   if (data.email) data.email = data.email.trim().toLowerCase();
-  if (data.location) data.location = data.location.trim();
   if (data.positionLevel) data.positionLevel = data.positionLevel.trim();
 };
 
@@ -275,6 +276,43 @@ const resolveClientForEmployee = async (
   const client = await ensureClientExists(context.tx, clientId);
   ensureUserAuthorizedForCompany(context.user, client.companyId);
   return client;
+};
+
+const validateLocation = async (
+  context: EmployeeWriteContext,
+  client: ClientEntity,
+  existing?: EmployeeEntity,
+): Promise<Partial<EmployeeEntity>> => {
+  const updates: Partial<EmployeeEntity> = {};
+  const tx = context.tx;
+
+  const locationExplicit = context.data.location_ID !== undefined;
+  const requestedLocationId = locationExplicit ? normalizeIdentifier(context.data.location_ID) : undefined;
+  const existingLocationId = normalizeIdentifier(existing?.location_ID);
+  const finalLocationId = requestedLocationId ?? existingLocationId;
+
+  // Location is required for CREATE
+  if (context.event === 'CREATE' && !finalLocationId) {
+    throw createServiceError(400, 'Location is required for new employees.');
+  }
+
+  if (finalLocationId) {
+    const location = await findLocationById(tx, finalLocationId);
+
+    if (!location) {
+      throw createServiceError(404, `Location ${finalLocationId} not found.`);
+    }
+
+    if (location.client_ID && location.client_ID !== client.ID) {
+      throw createServiceError(400, 'Location must belong to the same client.');
+    }
+
+    if (locationExplicit) {
+      updates.location_ID = requestedLocationId ?? undefined;
+    }
+  }
+
+  return updates;
 };
 
 const validateManagerAndCostCenter = async (
@@ -480,9 +518,10 @@ export const prepareEmployeeWrite = async ({
   }
 
   const managerUpdates = await validateManagerAndCostCenter({ event, data, targetId, tx, user }, client, existingEmployee);
+  const locationUpdates = await validateLocation({ event, data, targetId, tx, user }, client, existingEmployee);
 
   return {
-    updates: { ...managerUpdates },
+    updates: { ...managerUpdates, ...locationUpdates },
     client,
     existingEmployee,
   };

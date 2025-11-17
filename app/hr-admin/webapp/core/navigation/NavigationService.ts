@@ -16,6 +16,7 @@ export default class NavigationService {
     const app = this.controller.byId("app") as App | undefined;
     const employeesPage = this.controller.byId("employeesPage") as Page | undefined;
     const costCentersPage = this.controller.byId("costCentersPage") as Page | undefined;
+    const locationsPage = this.controller.byId("locationsPage") as Page | undefined;
     if (!app || !employeesPage) {
       MessageBox.error("Unable to open employees view.");
       return;
@@ -23,8 +24,10 @@ export default class NavigationService {
 
     employeesPage.setBindingContext(context);
     costCentersPage?.setBindingContext(context);
+    locationsPage?.setBindingContext(context);
     this.selection.clearEmployee();
     this.selection.clearCostCenter();
+    this.selection.clearLocation();
     app.to(employeesPage);
   }
 
@@ -43,6 +46,21 @@ export default class NavigationService {
     app.to(costCentersPage);
   }
 
+  public showLocationsPage(): void {
+    const app = this.controller.byId("app") as App | undefined;
+    const locationsPage = this.controller.byId("locationsPage") as Page | undefined;
+    const clientContext = this.selection.getSelectedClientContext();
+
+    if (!app || !locationsPage || !clientContext) {
+      MessageBox.error("Unable to open locations view.");
+      return;
+    }
+
+    locationsPage.setBindingContext(clientContext);
+    this.selection.clearLocation();
+    app.to(locationsPage);
+  }
+
   public backToClients(): void {
     const app = this.controller.byId("app") as App | undefined;
     if (!app) {
@@ -51,6 +69,7 @@ export default class NavigationService {
 
     this.selection.clearEmployee();
     this.selection.clearCostCenter();
+    this.selection.clearLocation();
     app.back();
   }
 
@@ -61,6 +80,7 @@ export default class NavigationService {
     }
 
     this.selection.clearCostCenter();
+    this.selection.clearLocation();
     app.back();
   }
 }

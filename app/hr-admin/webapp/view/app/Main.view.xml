@@ -49,8 +49,7 @@
                             <items>
                                 <StandardListItem
                                         title="{name}"
-                                        description="{= (${companyId} || '') + (${country_code} ? ' • ' + ${country_code} : '') }"
-                                        info="{country_code}"
+                                        description="{companyId}"
                                         type="Active"/>
                             </items>
                         </List>
@@ -85,6 +84,10 @@
                                             text="Cost Centers"
                                             icon="sap-icon://collections-management"
                                             press=".onNavigateToCostCenters"/>
+                                    <Button
+                                            text="Locations"
+                                            icon="sap-icon://map"
+                                            press=".onNavigateToLocations"/>
                                     <Button
                                             type="Emphasized"
                                             text="Add"
@@ -172,6 +175,60 @@
                     </VBox>
                 </content>
             </Page>
+            <Page
+                    id="locationsPage"
+                    title="Locations"
+                    showNavButton="true"
+                    navButtonPress=".onBackToEmployees">
+                <content>
+                    <VBox class="sapUiSmallMargin">
+                        <Title level="H2" text="{= ${name} ? 'Locations of ' + ${name} : 'Locations'}"/>
+                        <Text
+                                visible="{= !!${companyId}}"
+                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
+                        <Text text="Manage locations for the selected client."/>
+                        <List
+                                id="locationsList"
+                                mode="SingleSelectMaster"
+                                includeItemInSelection="true"
+                                items="{path: 'locations'}"
+                                growing="false"
+                                selectionChange=".onLocationsSelectionChange">
+                            <headerToolbar>
+                                <Toolbar>
+                                    <Title text="Locations" level="H3"/>
+                                    <ToolbarSpacer/>
+                                    <Button
+                                            type="Emphasized"
+                                            text="Add"
+                                            icon="sap-icon://add"
+                                            press=".onAddLocation"/>
+                                    <Button
+                                            text="Edit"
+                                            icon="sap-icon://edit"
+                                            enabled="{= !!${view>/selectedLocationId}}"
+                                            press=".onEditLocation"/>
+                                    <Button
+                                            text="Delete"
+                                            icon="sap-icon://delete"
+                                            type="Transparent"
+                                            enabled="{= !!${view>/selectedLocationId}}"
+                                            press=".onDeleteLocation"/>
+                                    <Button
+                                            text="Refresh"
+                                            icon="sap-icon://refresh"
+                                            press=".onRefreshLocations"/>
+                                </Toolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                        title="{= (${street} || '') + ', ' + (${city} || '') }"
+                                        description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"/>
+                            </items>
+                        </List>
+                    </VBox>
+                </content>
+            </Page>
         </pages>
     </App>
 
@@ -186,17 +243,6 @@
                 <Input id="companyIdInput" value="{dialog>/client/companyId}" placeholder="e.g. C-1000"/>
                 <Label text="Name" required="true" labelFor="clientNameInput"/>
                 <Input id="clientNameInput" value="{dialog>/client/name}" placeholder="Client Name"/>
-                <Label text="Country" labelFor="clientCountrySelect"/>
-                <Select
-                        id="clientCountrySelect"
-                        items="{ path: 'countryOptions>/', templateShareable: false }"
-                        selectedKey="{dialog>/client/country_code}"
-                        forceSelection="false"
-                        required="true">
-                    <core:Item
-                            key="{countryOptions>key}"
-                            text="{= ${countryOptions>text} + ' (' + ${countryOptions>key} + ')' }"/>
-                </Select>
                 <Label text="Notification Endpoint" labelFor="clientNotificationInput"/>
                 <Input
                         id="clientNotificationInput"
@@ -242,8 +288,13 @@
                 </Select>
                 <Label text="Manager" labelFor="employeeManager"/>
                 <Input id="employeeManager" value="{employeeDialog>/employee/managerName}" editable="false" placeholder="Manager is derived from the cost center"/>
-                <Label text="Location" labelFor="employeeLocation"/>
-                <Input id="employeeLocation" value="{employeeDialog>/employee/location}" placeholder="Office location"/>
+                <Label text="Location" required="true" labelFor="employeeLocation"/>
+                <Select
+                        id="employeeLocation"
+                        items="{ path: 'locations', parameters: { $select: ['ID','city','street','country_code'] } }"
+                        selectedKey="{employeeDialog>/employee/location_ID}">
+                    <core:Item key="{ID}" text="{= (${street} || '') + ', ' + (${city} || '') + ' (' + (${country_code} || '') + ')' }"/>
+                </Select>
                 <Label text="Position Level" labelFor="employeePosition"/>
                 <Input id="employeePosition" value="{employeeDialog>/employee/positionLevel}" placeholder="e.g. Senior"/>
                 <Label text="Entry Date" required="true" labelFor="employeeEntryDate"/>
@@ -315,6 +366,56 @@
         </beginButton>
         <endButton>
             <Button text="Cancel" press=".onCancelCostCenter"/>
+        </endButton>
+    </Dialog>
+
+    <Dialog
+            id="locationDialog"
+            title="{locationDialog>/title}"
+            stretchOnPhone="true"
+            afterClose=".onLocationDialogAfterClose">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="City" required="true" labelFor="locationCity"/>
+                <Input id="locationCity" value="{locationDialog>/location/city}" placeholder="City name"/>
+                <Label text="Street" required="true" labelFor="locationStreet"/>
+                <Input id="locationStreet" value="{locationDialog>/location/street}" placeholder="Street and number"/>
+                <Label text="Address Supplement" labelFor="locationAddressSupplement"/>
+                <Input id="locationAddressSupplement" value="{locationDialog>/location/addressSupplement}" placeholder="Additional address info"/>
+                <Label text="ZIP Code" required="true" labelFor="locationZipCode"/>
+                <Input id="locationZipCode" value="{locationDialog>/location/zipCode}" placeholder="Postal code"/>
+                <Label text="Country" required="true" labelFor="locationCountrySelect"/>
+                <Select
+                        id="locationCountrySelect"
+                        items="{ path: 'countryOptions>/', templateShareable: false }"
+                        selectedKey="{locationDialog>/location/country_code}"
+                        forceSelection="false"
+                        required="true">
+                    <core:Item
+                            key="{countryOptions>key}"
+                            text="{= ${countryOptions>text} + ' (' + ${countryOptions>key} + ')' }"/>
+                </Select>
+                <Label text="Valid From" required="true" labelFor="locationValidFrom"/>
+                <DatePicker
+                        id="locationValidFrom"
+                        value="{locationDialog>/location/validFrom}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="Start date"/>
+                <Label text="Valid To" labelFor="locationValidTo"/>
+                <DatePicker
+                        id="locationValidTo"
+                        value="{locationDialog>/location/validTo}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="End date (optional)"/>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="Save" type="Emphasized" press=".onSaveLocation"/>
+        </beginButton>
+        <endButton>
+            <Button text="Cancel" press=".onCancelLocation"/>
         </endButton>
     </Dialog>
 </mvc:View>

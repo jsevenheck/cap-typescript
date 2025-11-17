@@ -17,6 +17,7 @@ type EmployeeRow = {
   client_ID: string;
   manager_ID?: string | null;
   costCenter_ID?: string | null;
+  location_ID?: string | null;
 };
 
 type CostCenterRow = {
@@ -25,8 +26,14 @@ type CostCenterRow = {
   responsible_ID: string;
 };
 
+type LocationRow = {
+  ID: string;
+  client_ID: string;
+};
+
 const EMPLOYEES_ENTITY = 'clientmgmt.Employees';
 const COST_CENTERS_ENTITY = 'clientmgmt.CostCenters';
+const LOCATIONS_ENTITY = 'clientmgmt.Locations';
 const { SELECT } = cds.ql;
 
 export class IntegrityValidator {
@@ -88,6 +95,38 @@ export class IntegrityValidator {
           );
         }
       }
+
+      const locationId = resolveAssociationId(employee, 'location', existing?.location_ID ?? undefined);
+      if (locationId) {
+        const locationClientId = await this.fetchClientId(LOCATIONS_ENTITY, locationId);
+        if (locationClientId && locationClientId !== clientId) {
+          throw createServiceError(
+            400,
+            `Location ${locationId} belongs to a different client than the employee.`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates location relations ensuring locations belong to a valid client.
+   */
+  async validateLocationRelations(locations: any[]): Promise<void> {
+    if (!locations.length) {
+      return;
+    }
+
+    const existingRecords = await this.loadExistingLocations(locations);
+
+    for (const location of locations) {
+      const locationId = extractEntityId(location);
+      const existing = locationId ? existingRecords.get(locationId) : undefined;
+      const clientId = resolveAssociationId(location, 'client', existing?.client_ID);
+
+      if (!clientId) {
+        throw createServiceError(400, 'Location must reference a client.');
+      }
     }
   }
 
@@ -136,7 +175,7 @@ export class IntegrityValidator {
 
     const rows = (await this.runner.run(
       SELECT.from(EMPLOYEES_ENTITY)
-        .columns('ID', 'client_ID', 'manager_ID', 'costCenter_ID')
+        .columns('ID', 'client_ID', 'manager_ID', 'costCenter_ID', 'location_ID')
         .where({ ID: { in: ids } }),
     )) as EmployeeRow[];
 
@@ -144,6 +183,29 @@ export class IntegrityValidator {
     for (const row of rows) {
       map.set(row.ID, row);
       this.cache.clientIds.set(`${EMPLOYEES_ENTITY}:${row.ID}`, row.client_ID ?? null);
+    }
+    return map;
+  }
+
+  private async loadExistingLocations(locations: any[]): Promise<Map<string, LocationRow>> {
+    const ids = locations
+      .map((location) => extractEntityId(location))
+      .filter((id): id is string => Boolean(id));
+
+    if (!ids.length) {
+      return new Map();
+    }
+
+    const rows = (await this.runner.run(
+      SELECT.from(LOCATIONS_ENTITY)
+        .columns('ID', 'client_ID')
+        .where({ ID: { in: ids } }),
+    )) as LocationRow[];
+
+    const map = new Map<string, LocationRow>();
+    for (const row of rows) {
+      map.set(row.ID, row);
+      this.cache.clientIds.set(`${LOCATIONS_ENTITY}:${row.ID}`, row.client_ID ?? null);
     }
     return map;
   }

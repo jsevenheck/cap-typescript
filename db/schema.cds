@@ -26,9 +26,22 @@ entity Clients : managed, cuid {
   companyId            : String(40) not null;
   name                 : String(120);
   notificationEndpoint : String(500);
-  country              : Association to CommonCountries not null;
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
+  locations            : Composition of many Locations on locations.client = $self;
+}
+
+@odata.etag: 'modifiedAt'
+entity Locations : managed, cuid {
+  city          : String(100) not null;
+  country       : Association to CommonCountries not null;
+  zipCode       : String(20) not null;
+  street        : String(200) not null;
+  addressSupplement : String(200);
+  validFrom     : Date not null;
+  validTo       : Date;
+  client        : Association to Clients not null;
+  employees     : Association to many Employees on employees.location = $self;
 }
 
 @odata.etag: 'modifiedAt'
@@ -39,7 +52,7 @@ entity Employees : managed, cuid {
   firstName     : String(60)  not null;
   lastName      : String(60)  not null;
   email         : String(120) not null;
-  location      : String(80);
+  location      : Association to Locations not null;
   positionLevel : String(40);
   entryDate     : Date not null;
   exitDate      : Date;

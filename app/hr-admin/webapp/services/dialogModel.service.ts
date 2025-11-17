@@ -6,6 +6,7 @@ import {
   ClientDialogModelData,
   CostCenterDialogModelData,
   EmployeeDialogModelData,
+  LocationDialogModelData,
   ViewState,
 } from "../types/DialogTypes";
 
@@ -29,6 +30,10 @@ export default class DialogModelAccessor {
 
   public getCostCenterModel(): DialogJSONModel<CostCenterDialogModelData> {
     return this.getTypedModel<CostCenterDialogModelData>("costCenterDialog");
+  }
+
+  public getLocationModel(): DialogJSONModel<LocationDialogModelData> {
+    return this.getTypedModel<LocationDialogModelData>("locationDialog");
   }
 
   public getViewStateModel(): DialogJSONModel<ViewState> {

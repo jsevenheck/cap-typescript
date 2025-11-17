@@ -7,6 +7,7 @@ import {
   EmployeeDialogModelData,
   EmployeeStatusKey,
   EmploymentTypeKey,
+  LocationDialogModelData,
   ViewState,
 } from "../types/DialogTypes";
 import {
@@ -25,7 +26,6 @@ export function createInitialClientDialogData(): ClientDialogModelData {
     client: {
       companyId: "",
       name: "",
-      country_code: "",
       notificationEndpoint: "",
     },
   };
@@ -43,7 +43,7 @@ export function createInitialEmployeeDialogData(): EmployeeDialogModelData {
       costCenter_ID: undefined,
       manager_ID: undefined,
       managerName: "",
-      location: "",
+      location_ID: undefined,
       positionLevel: "",
       entryDate: "",
       exitDate: "",
@@ -67,6 +67,22 @@ export function createInitialCostCenterDialogData(): CostCenterDialogModelData {
   };
 }
 
+export function createInitialLocationDialogData(): LocationDialogModelData {
+  return {
+    mode: "create",
+    title: "",
+    location: {
+      city: "",
+      country_code: "",
+      zipCode: "",
+      street: "",
+      addressSupplement: "",
+      validFrom: "",
+      validTo: "",
+    },
+  };
+}
+
 export function createInitialViewState(): ViewState {
   return {};
 }
@@ -75,6 +91,7 @@ export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(createInitialClientDialogData()), "dialog");
   view.setModel(new JSONModel(createInitialEmployeeDialogData()), "employeeDialog");
   view.setModel(new JSONModel(createInitialCostCenterDialogData()), "costCenterDialog");
+  view.setModel(new JSONModel(createInitialLocationDialogData()), "locationDialog");
   view.setModel(new JSONModel(createInitialViewState()), "view");
   view.setModel(new JSONModel(STATUS_OPTIONS), "statusOptions");
   view.setModel(new JSONModel(EMPLOYMENT_TYPE_OPTIONS), "employmentTypeOptions");
