@@ -34,7 +34,7 @@ export const getEmployeesInCostCenterDuringPeriod = async (
   // Query for assignments that overlap with the given period
   const assignments = await tx.run(
     ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
-      .columns('employee_ID')
+      .columns('employee_ID', 'validFrom', 'validTo')
       .where({
         costCenter_ID: costCenterId,
         employee_ID: { '!=': excludeEmployeeId },
