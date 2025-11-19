@@ -74,12 +74,18 @@ export const getEmployeesInCostCenterDuringPeriod = async (
 
   // Filter overlapping assignments in memory to handle null validTo properly
   const overlapping = assignments.filter((assignment: any) => {
-    const existingFrom = assignment.validFrom as string;
-    const existingTo = assignment.validTo as string | null | undefined;
+    const existingFrom = assignment.validFrom as string | Date;
+    const existingTo = assignment.validTo as string | Date | null | undefined;
+
+    // Normalize dates to timestamps for comparison to handle both Date objects and strings
+    const existingFromTime = new Date(existingFrom).getTime();
+    const validFromTime = new Date(validFrom).getTime();
+    const validToTime = validTo ? new Date(validTo).getTime() : null;
+    const existingToTime = existingTo ? new Date(existingTo).getTime() : null;
 
     // Check if ranges overlap
-    const startsBeforeNewEnds = validTo ? existingFrom <= validTo : true;
-    const endsAfterNewStarts = existingTo ? existingTo >= validFrom : true;
+    const startsBeforeNewEnds = validToTime !== null ? existingFromTime <= validToTime : true;
+    const endsAfterNewStarts = existingToTime !== null ? existingToTime >= validFromTime : true;
 
     return startsBeforeNewEnds && endsAfterNewStarts;
   });

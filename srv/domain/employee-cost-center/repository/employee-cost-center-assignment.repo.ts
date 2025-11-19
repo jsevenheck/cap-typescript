@@ -163,16 +163,22 @@ export const findOverlappingAssignments = async (
   const filteredRows = rows.filter((row) => {
     if (!isRecord(row)) return false;
 
-    const existingFrom = row.validFrom as string;
-    const existingTo = row.validTo as string | null | undefined;
+    const existingFrom = row.validFrom as string | Date;
+    const existingTo = row.validTo as string | Date | null | undefined;
 
     // Check if ranges overlap
     // Range 1: [validFrom, validTo]
     // Range 2: [existingFrom, existingTo]
     // Overlap if: validFrom <= existingTo (or existingTo is null) AND existingFrom <= validTo (or validTo is null)
 
-    const startsBeforeNewEnds = validTo ? existingFrom <= validTo : true;
-    const endsAfterNewStarts = existingTo ? existingTo >= validFrom : true;
+    // Normalize dates to timestamps for comparison to handle both Date objects and strings
+    const existingFromTime = new Date(existingFrom).getTime();
+    const validFromTime = new Date(validFrom).getTime();
+    const validToTime = validTo ? new Date(validTo).getTime() : null;
+    const existingToTime = existingTo ? new Date(existingTo).getTime() : null;
+
+    const startsBeforeNewEnds = validToTime !== null ? existingFromTime <= validToTime : true;
+    const endsAfterNewStarts = existingToTime !== null ? existingToTime >= validFromTime : true;
 
     return startsBeforeNewEnds && endsAfterNewStarts;
   });
