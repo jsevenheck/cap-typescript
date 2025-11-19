@@ -4,6 +4,33 @@ import type { Transaction } from '@sap/cds';
 const ql = cds.ql as typeof cds.ql;
 
 /**
+ * Check if an assignment period is currently active (contains today's date)
+ */
+export const isAssignmentCurrentlyActive = (validFrom: string, validTo: string | null | undefined): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // normalize to midnight for date-only comparison
+
+  const fromDate = new Date(validFrom);
+  fromDate.setHours(0, 0, 0, 0);
+
+  // Assignment must have started
+  if (fromDate > today) {
+    return false;
+  }
+
+  // If no end date, assignment is active
+  if (!validTo) {
+    return true;
+  }
+
+  const toDate = new Date(validTo);
+  toDate.setHours(0, 0, 0, 0);
+
+  // Assignment must not have ended
+  return toDate >= today;
+};
+
+/**
  * Update the cost center's responsible employee based on assignment responsibility
  * This should be called after an assignment is created or updated with isResponsible=true
  */
@@ -94,6 +121,9 @@ export const assignManagerToEmployeesInCostCenter = async (
 /**
  * Handle responsibility changes when an assignment is created or updated
  * This is the main entry point for manager responsibility logic
+ *
+ * Only updates the current responsible employee and manager assignments if the
+ * assignment period is currently active (contains today's date).
  */
 export const handleResponsibilityChange = async (
   tx: Transaction,
@@ -106,6 +136,12 @@ export const handleResponsibilityChange = async (
   },
 ): Promise<void> => {
   if (!assignmentData.isResponsible) {
+    return;
+  }
+
+  // Only update current responsible employee and manager assignments if this assignment is currently active
+  // Future-dated or past assignments should not affect the current state
+  if (!isAssignmentCurrentlyActive(assignmentData.validFrom, assignmentData.validTo)) {
     return;
   }
 
