@@ -1,6 +1,10 @@
 import Controller from "sap/ui/core/mvc/Controller";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
+import Router from "sap/ui/core/routing/Router";
+import Route from "sap/ui/core/routing/Route";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -11,11 +15,13 @@ import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
   private selection!: SelectionState;
   private navigation!: NavigationService;
+  private guard!: UnsavedChangesGuard;
   private clients!: ClientHandler;
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
@@ -30,20 +36,71 @@ export default class Main extends Controller {
     initializeModels(view);
     this.models = new DialogModelAccessor(this);
     this.selection = new SelectionState(this, this.models);
+    this.guard = new UnsavedChangesGuard();
     this.navigation = new NavigationService(this, this.selection);
-    this.clients = new ClientHandler(this, this.models, this.selection, this.navigation);
+    this.clients = new ClientHandler(this, this.models, this.selection, this.navigation, this.guard);
     this.employees = new EmployeeHandler(this, this.models, this.selection);
     this.costCenters = new CostCenterHandler(this, this.models, this.selection);
     this.locations = new LocationHandler(this, this.models, this.selection);
 
-    // Initialize router
+    // Initialize router and attach navigation guards
     const router = this.getOwnerComponent()?.getRouter();
     if (router) {
+      this.attachNavigationGuards(router);
       router.initialize();
     }
 
     // Load user authorization information
     this.loadAuthorizationInfo();
+  }
+
+  /**
+   * Attach navigation guards to all routes to check for unsaved changes
+   */
+  private attachNavigationGuards(router: Router): void {
+    const routes = ["clients", "employees", "costCenters", "locations"];
+
+    routes.forEach((routeName) => {
+      const route = router.getRoute(routeName);
+      if (route) {
+        route.attachBeforeMatched(this.onBeforeRouteMatched.bind(this));
+      }
+    });
+  }
+
+  /**
+   * Called before a route is matched - check for unsaved changes
+   */
+  private onBeforeRouteMatched(event: Event): void {
+    const i18n = this.getI18nBundle();
+
+    // If there are unsaved changes, show confirmation
+    if (this.guard.hasDirtyForms()) {
+      // Prevent route navigation
+      event.preventDefault();
+
+      // Get route details for pending navigation
+      const route = event.getSource() as Route;
+      const args = event.getParameter("arguments");
+
+      // Ask user to confirm
+      this.guard.checkNavigation(i18n, () => {
+        // User confirmed - manually trigger navigation
+        const router = this.getOwnerComponent()?.getRouter();
+        if (router && route) {
+          router.navTo(route.getPattern(), args);
+        }
+      });
+    }
+  }
+
+  /**
+   * Get i18n resource bundle for localized messages
+   */
+  private getI18nBundle(): ResourceBundle {
+    const view = this.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
   }
 
   /**

@@ -18,6 +18,7 @@ import { getRequiredListBinding } from "../../core/services/odata";
 import NavigationService from "../../core/navigation/NavigationService";
 import { getEventParameter } from "../../core/utils/EventParam";
 import { createAbortableRequest } from "../../core/utils/AbortableRequest";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -106,11 +107,14 @@ function isValidHttpUrl(urlString: string): boolean {
 }
 
 export default class ClientHandler {
+  private static readonly DIALOG_ID = "clientDialog";
+
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
     private readonly selection: SelectionState,
-    private readonly navigation: NavigationService
+    private readonly navigation: NavigationService,
+    private readonly guard: UnsavedChangesGuard
   ) {}
 
   private getI18nBundle(): ResourceBundle {
@@ -135,6 +139,7 @@ export default class ClientHandler {
         notificationEndpoint: "",
       },
     });
+    this.guard.markDirty(ClientHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -165,6 +170,7 @@ export default class ClientHandler {
           notificationEndpoint: currentData.notificationEndpoint ?? null,
         },
       });
+    this.guard.markDirty(ClientHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -307,6 +313,7 @@ export default class ClientHandler {
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
+              this.guard.markClean(ClientHandler.DIALOG_ID);
               MessageToast.show(i18n.getText("clientSaved"));
             })
             .catch(handleError)
@@ -340,6 +347,7 @@ export default class ClientHandler {
         .then(() => {
           dialog.setBusy(false);
           dialog.close();
+          this.guard.markClean(ClientHandler.DIALOG_ID);
           MessageToast.show(i18n.getText("clientSaved"));
         })
         .catch((error: Error) => {
@@ -352,6 +360,7 @@ export default class ClientHandler {
 
   public cancel(): void {
     const dialog = this.byId("clientDialog") as Dialog;
+    this.guard.markClean(ClientHandler.DIALOG_ID);
     dialog.close();
   }
 
