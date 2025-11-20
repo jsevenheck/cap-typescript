@@ -47,8 +47,8 @@ const validateLocationDates = (validFrom?: string, validTo?: string | null): voi
   if (validTo) {
     const fromDate = new Date(validFrom);
     const toDate = new Date(validTo);
-    if (toDate < fromDate) {
-      throw createServiceError(400, 'Valid to date must be after valid from date.');
+    if (fromDate > toDate) {
+      throw createServiceError(400, 'validFrom must be less than or equal to validTo.');
     }
   }
 };
