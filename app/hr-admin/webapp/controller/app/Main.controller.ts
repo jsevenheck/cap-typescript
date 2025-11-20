@@ -66,6 +66,22 @@ export default class Main extends Controller {
         route.attachBeforeMatched(this.onBeforeRouteMatched.bind(this));
       }
     });
+
+    // Attach pattern matched handlers to bind pages to client context
+    const employeesRoute = router.getRoute("employees");
+    if (employeesRoute) {
+      employeesRoute.attachPatternMatched(this.onEmployeesRouteMatched.bind(this));
+    }
+
+    const costCentersRoute = router.getRoute("costCenters");
+    if (costCentersRoute) {
+      costCentersRoute.attachPatternMatched(this.onCostCentersRouteMatched.bind(this));
+    }
+
+    const locationsRoute = router.getRoute("locations");
+    if (locationsRoute) {
+      locationsRoute.attachPatternMatched(this.onLocationsRouteMatched.bind(this));
+    }
   }
 
   /**
@@ -101,6 +117,120 @@ export default class Main extends Controller {
     const view = this.getView();
     const model = view?.getModel("i18n") as ResourceModel;
     return model.getResourceBundle() as ResourceBundle;
+  }
+
+  /**
+   * Handle employees route matched - bind page to client context
+   */
+  private onEmployeesRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const employeesPage = this.byId("employeesPage");
+    const costCentersPage = this.byId("costCentersPage");
+    const locationsPage = this.byId("locationsPage");
+
+    // Use bindElement to properly bind the page to the client context
+    // This handles async loading and context lifecycle automatically
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+
+    // Update selection state with the context once available
+    const context = employeesPage?.getBindingContext();
+    if (context) {
+      this.selection.setClient(context);
+      this.selection.clearEmployee();
+      this.selection.clearCostCenter();
+      this.selection.clearLocation();
+    }
+  }
+
+  /**
+   * Handle cost centers route matched - bind page to client context
+   */
+  private onCostCentersRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const costCentersPage = this.byId("costCentersPage");
+    const employeesPage = this.byId("employeesPage");
+    const locationsPage = this.byId("locationsPage");
+
+    // Use bindElement to properly bind the page to the client context
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+
+    // Update selection state
+    const context = costCentersPage?.getBindingContext();
+    if (context) {
+      this.selection.setClient(context);
+      this.selection.clearCostCenter();
+    }
+  }
+
+  /**
+   * Handle locations route matched - bind page to client context
+   */
+  private onLocationsRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const locationsPage = this.byId("locationsPage");
+    const employeesPage = this.byId("employeesPage");
+    const costCentersPage = this.byId("costCentersPage");
+
+    // Use bindElement to properly bind the page to the client context
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+
+    // Update selection state
+    const context = locationsPage?.getBindingContext();
+    if (context) {
+      this.selection.setClient(context);
+      this.selection.clearLocation();
+    }
   }
 
   /**
