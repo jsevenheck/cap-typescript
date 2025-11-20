@@ -29,10 +29,16 @@ type LocationRow = {
   client_ID: string;
 };
 
+type EmployeeCostCenterAssignmentRow = {
+  ID: string;
+  client_ID: string;
+};
+
 const CLIENTS_ENTITY = 'clientmgmt.Clients';
 const EMPLOYEES_ENTITY = 'clientmgmt.Employees';
 const COST_CENTERS_ENTITY = 'clientmgmt.CostCenters';
 const LOCATIONS_ENTITY = 'clientmgmt.Locations';
+const EMPLOYEE_COST_CENTER_ASSIGNMENTS_ENTITY = 'clientmgmt.EmployeeCostCenterAssignments';
 const { SELECT } = cds.ql;
 
 const collectPayloads = (req: Request): any[] => {
@@ -209,6 +215,45 @@ export class CompanyAuthorization {
     }
   }
 
+  async validateEmployeeCostCenterAssignmentAccess(assignments: any[]): Promise<void> {
+    if (!assignments.length || this.shouldSkip()) {
+      return;
+    }
+
+    const existingAssignments = await this.loadExistingEmployeeCostCenterAssignments(assignments);
+    const targetClientIds = new Set<string>();
+
+    for (const assignment of assignments) {
+      const assignmentId = extractEntityId(assignment);
+      const existing = assignmentId ? existingAssignments.get(assignmentId) : undefined;
+      const clientId = resolveAssociationId(assignment, 'client', existing?.client_ID);
+
+      if (existing?.client_ID) {
+        targetClientIds.add(existing.client_ID);
+      }
+      if (clientId) {
+        targetClientIds.add(clientId);
+      }
+    }
+
+    await this.ensureClientsLoaded(targetClientIds);
+
+    for (const assignment of assignments) {
+      const assignmentId = extractEntityId(assignment);
+      const existing = assignmentId ? existingAssignments.get(assignmentId) : undefined;
+      if (existing?.client_ID) {
+        this.ensureClientAccess(existing.client_ID, `assignment ${assignmentId ?? '(new)'}`);
+      }
+      const clientId = resolveAssociationId(assignment, 'client', existing?.client_ID);
+
+      if (!clientId) {
+        throw createServiceError(400, 'Employee cost center assignment must reference a client.');
+      }
+
+      this.ensureClientAccess(clientId, `assignment ${assignmentId ?? '(new)'}`);
+    }
+  }
+
   private resolveAllowedCompanies(): Set<string> {
     const allowed = new Set<string>();
     const attributeNames = ['CompanyCode', 'companyCodes'];
@@ -322,6 +367,30 @@ export class CompanyAuthorization {
     return map;
   }
 
+  private async loadExistingEmployeeCostCenterAssignments(
+    assignments: any[],
+  ): Promise<Map<string, EmployeeCostCenterAssignmentRow>> {
+    const ids = assignments
+      .map((assignment) => extractEntityId(assignment))
+      .filter((id): id is string => Boolean(id));
+
+    if (!ids.length) {
+      return new Map();
+    }
+
+    const rows = (await this.runner.run(
+      SELECT.from(EMPLOYEE_COST_CENTER_ASSIGNMENTS_ENTITY)
+        .columns('ID', 'client_ID')
+        .where({ ID: { in: ids } }),
+    )) as EmployeeCostCenterAssignmentRow[];
+
+    const map = new Map<string, EmployeeCostCenterAssignmentRow>();
+    for (const row of rows) {
+      map.set(row.ID, row);
+    }
+    return map;
+  }
+
   private async ensureClientsLoaded(clientIds: Set<string>): Promise<void> {
     const pending = Array.from(clientIds).filter((id) => !this.clientCompanyCache.has(id));
     if (!pending.length) {
@@ -367,6 +436,12 @@ export const authorizeLocations = async (req: Request): Promise<void> => {
   const entries = collectPayloads(req);
   const authorization = new CompanyAuthorization(req);
   await authorization.validateLocationAccess(entries);
+};
+
+export const authorizeEmployeeCostCenterAssignments = async (req: Request): Promise<void> => {
+  const entries = collectPayloads(req);
+  const authorization = new CompanyAuthorization(req);
+  await authorization.validateEmployeeCostCenterAssignmentAccess(entries);
 };
 
 export default CompanyAuthorization;

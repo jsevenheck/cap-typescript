@@ -29,6 +29,7 @@ entity Clients : managed, cuid {
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
   locations            : Composition of many Locations on locations.client = $self;
+  costCenterAssignments: Composition of many EmployeeCostCenterAssignments on costCenterAssignments.client = $self;
 }
 
 @odata.etag: 'modifiedAt'
@@ -64,6 +65,7 @@ entity Employees : managed, cuid {
   client        : Association to Clients not null;
   manager       : Association to Employees;
   costCenter    : Association to CostCenters;
+  costCenterAssignments : Composition of many EmployeeCostCenterAssignments on costCenterAssignments.employee = $self;
 }
 
 entity EmployeeIdCounters {
@@ -80,9 +82,25 @@ entity CostCenters : managed, cuid {
   code         : String(40)  not null;
   name         : String(120) not null;
   description  : String(255);
+  validFrom    : Date not null;
+  validTo      : Date;
   client       : Association to Clients not null;
   responsible  : Association to Employees not null;
   employees    : Association to many Employees on employees.costCenter = $self;
+  assignments  : Composition of many EmployeeCostCenterAssignments on assignments.costCenter = $self;
+}
+
+@odata.etag: 'modifiedAt'
+@cds.persistence.indices: [
+  { name: 'EmpCCAssign_emp_valid_idx', elements: ['employee_ID', 'validFrom', 'validTo'] }
+]
+entity EmployeeCostCenterAssignments : managed, cuid {
+  employee      : Association to Employees not null;
+  costCenter    : Association to CostCenters not null;
+  validFrom     : Date not null;
+  validTo       : Date;
+  isResponsible : Boolean default false;
+  client        : Association to Clients not null;
 }
 
 @cds.persistence.indices: [

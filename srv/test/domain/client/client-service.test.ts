@@ -785,6 +785,8 @@ describe('Employee business rules', () => {
         name: options.name ?? 'Validation Cost Center',
         client_ID: options.clientId ?? CLIENT_ID,
         responsible_ID: options.responsibleId,
+        validFrom: '2025-01-01',
+        validTo: null,
       }),
     );
 

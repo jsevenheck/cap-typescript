@@ -352,6 +352,20 @@
                 <Input id="costCenterName" value="{costCenterDialog>/costCenter/name}" placeholder="Cost Center Name"/>
                 <Label text="Description" labelFor="costCenterDescription"/>
                 <Input id="costCenterDescription" value="{costCenterDialog>/costCenter/description}" placeholder="Short description"/>
+                <Label text="Valid From" required="true" labelFor="costCenterValidFrom"/>
+                <DatePicker
+                        id="costCenterValidFrom"
+                        value="{costCenterDialog>/costCenter/validFrom}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="Start date"/>
+                <Label text="Valid To" labelFor="costCenterValidTo"/>
+                <DatePicker
+                        id="costCenterValidTo"
+                        value="{costCenterDialog>/costCenter/validTo}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="End date (optional)"/>
                 <Label text="Responsible" required="true" labelFor="costCenterResponsible"/>
                 <Select
                         id="costCenterResponsible"

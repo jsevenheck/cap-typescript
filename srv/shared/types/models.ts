@@ -41,8 +41,20 @@ export interface CostCenterEntity {
   code: string;
   name: string;
   description?: string;
+  validFrom: string;
+  validTo?: string | null;
   client_ID: string;
   responsible_ID: string;
+}
+
+export interface EmployeeCostCenterAssignmentEntity {
+  ID: string;
+  employee_ID: string;
+  costCenter_ID: string;
+  validFrom: string;
+  validTo?: string | null;
+  isResponsible: boolean;
+  client_ID: string;
 }
 
 export interface EmployeeIdCounterEntity {
