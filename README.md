@@ -49,8 +49,10 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 ### Frontend (SAPUI5)
 - **Framework:** SAPUI5 1.126.1 (OpenUI5)
 - **Language:** TypeScript 5.6.3
-- **UI Pattern:** Single Page Application with IconTabBar
+- **UI Pattern:** Single Page Application with UI5 Router
+- **Routing:** Hash-based routing with browser history support
 - **Data Binding:** OData V4 Model
+- **Internationalization:** i18n with ResourceBundle
 - **Theme:** Horizon
 - **Build Tool:** UI5 CLI 4.0
 - **Dev Server:** Port 8081 with proxy to backend
@@ -386,16 +388,27 @@ cf deploy mta_archives/cap-ts_1.0.0.mtar
 ## 🐛 Known Issues & Limitations
 
 ### Current Limitations
-- No routing implementation (browser back button limitations)
-- i18n keys defined but not used in views (hardcoded strings remain)
 - Test coverage at ~12% (target: 70%+)
+- Navigation guards not yet implemented (unsaved changes warning)
+- Frontend caching not yet implemented
+
+### Completed Improvements ✅
+- [x] **Implement proper UI5 routing with browser history support**
+  - Full routing configuration with 4 routes (clients, employees, costCenters, locations)
+  - Deep linking support with route parameters
+  - Browser back/forward button functionality
+  - SAP Fiori Design Guidelines compliant
+- [x] **Migrate hardcoded strings to i18n for better internationalization**
+  - All 109 strings in Main.view.xml migrated to i18n bindings
+  - ClientHandler controller fully internationalized
+  - 30+ new i18n keys added to i18n.properties
+  - Ready for multi-language support (German, French, etc.)
 
 ### Planned Improvements
-- [ ] Implement proper UI5 routing with browser history support
-- [ ] Migrate hardcoded strings to i18n for better internationalization
 - [ ] Increase test coverage to 70%+ (currently at ~12%)
 - [ ] Add navigation guards for unsaved changes warning
 - [ ] Implement frontend caching for frequently accessed data
+- [ ] Complete i18n migration for remaining controllers (Employee, CostCenter, Location)
 
 ## 🤝 Contributing
 
