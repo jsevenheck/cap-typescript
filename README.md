@@ -99,6 +99,13 @@ Optimized queries with strategic indexing:
 - Lazy loading on all lists (load 20 items, scroll for more)
 - Optimized for 1000+ records
 
+### Frontend Authorization
+- Role-based UI controls (hide/show buttons based on user permissions)
+- Backend `/userInfo()` function exposes user roles and attributes
+- HRViewer sees read-only UI (no Add/Edit/Delete buttons)
+- HREditor and HRAdmin see full write capabilities
+- Frontend provides UX enhancement only - backend enforces all security
+
 ## 🛡️ Data Integrity Features
 
 ### Optimistic Concurrency Control
@@ -215,13 +222,12 @@ OUTBOX_PARALLEL_WORKERS=3
 ### Current Limitations
 - No routing implementation (browser back button limitations)
 - i18n keys defined but not used in views (hardcoded strings remain)
-- Authorization service exists but not integrated in UI
 - Test coverage at ~12% (target: 70%+)
 
 ### Planned Improvements
 - [ ] Implement proper UI5 routing
 - [ ] Migrate hardcoded strings to i18n
-- [ ] Integrate authorization service in frontend
+- [x] Integrate authorization service in frontend
 - [ ] Increase test coverage to 70%+
 - [ ] Add navigation guards for unsaved changes
 
