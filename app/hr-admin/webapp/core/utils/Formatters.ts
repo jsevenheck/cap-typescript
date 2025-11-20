@@ -1,31 +1,22 @@
 /**
- * Formatters for UI5 data binding with XSS protection
- * All formatters properly escape HTML and handle null/undefined values
+ * Formatters for UI5 data binding
+ * UI5 automatically escapes text bindings, so no manual HTML escaping is needed
  */
 
 /**
- * Safely escape HTML special characters to prevent XSS
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
- * Safely format text with HTML escaping
+ * Format text with null/undefined handling
  */
 export function formatText(text?: string | null): string {
   if (!text) return '';
-  return escapeHtml(String(text));
+  return String(text);
 }
 
 /**
  * Format person name (firstName + lastName)
  */
 export function formatPersonName(firstName?: string | null, lastName?: string | null): string {
-  const first = firstName ? escapeHtml(String(firstName)) : '';
-  const last = lastName ? escapeHtml(String(lastName)) : '';
+  const first = firstName ? String(firstName) : '';
+  const last = lastName ? String(lastName) : '';
   return `${first} ${last}`.trim();
 }
 
@@ -46,9 +37,9 @@ export function formatEmployeeDescription(
   email?: string | null,
   employmentType?: string | null,
 ): string {
-  const emailText = email ? escapeHtml(String(email)) : '';
+  const emailText = email ? String(email) : '';
   const typeText = employmentType
-    ? ` • ${escapeHtml(employmentType === 'external' ? 'External' : 'Internal')}`
+    ? ` • ${employmentType === 'external' ? 'External' : 'Internal'}`
     : '';
   return `${emailText}${typeText}`.trim();
 }
@@ -75,9 +66,8 @@ export function formatPageTitle(
   baseTitle: string,
   clientName?: string | null,
 ): string {
-  if (!clientName) return escapeHtml(baseTitle);
-  const safeName = escapeHtml(String(clientName));
-  return `${escapeHtml(baseTitle)} ${safeName}`;
+  if (!clientName) return baseTitle;
+  return `${baseTitle} ${String(clientName)}`;
 }
 
 /**
@@ -85,15 +75,15 @@ export function formatPageTitle(
  */
 export function formatCompanyIdText(companyId?: string | null): string {
   if (!companyId) return '';
-  return `Company ID: ${escapeHtml(String(companyId))}`;
+  return `Company ID: ${String(companyId)}`;
 }
 
 /**
  * Format cost center title (Code - Name)
  */
 export function formatCostCenterTitle(code?: string | null, name?: string | null): string {
-  const codeText = code ? escapeHtml(String(code)) : '';
-  const nameText = name ? ` - ${escapeHtml(String(name))}` : '';
+  const codeText = code ? String(code) : '';
+  const nameText = name ? ` - ${String(name)}` : '';
   return `${codeText}${nameText}`.trim();
 }
 
@@ -101,8 +91,8 @@ export function formatCostCenterTitle(code?: string | null, name?: string | null
  * Format location title (Street, City)
  */
 export function formatLocationTitle(street?: string | null, city?: string | null): string {
-  const streetText = street ? escapeHtml(String(street)) : '';
-  const cityText = city ? escapeHtml(String(city)) : '';
+  const streetText = street ? String(street) : '';
+  const cityText = city ? String(city) : '';
   if (streetText && cityText) {
     return `${streetText}, ${cityText}`;
   }
@@ -116,8 +106,8 @@ export function formatLocationDescription(
   zipCode?: string | null,
   countryCode?: string | null,
 ): string {
-  const zipText = zipCode ? escapeHtml(String(zipCode)) : '';
-  const countryText = countryCode ? escapeHtml(String(countryCode)) : '';
+  const zipText = zipCode ? String(zipCode) : '';
+  const countryText = countryCode ? String(countryCode) : '';
   if (zipText && countryText) {
     return `${zipText} • ${countryText}`;
   }
@@ -128,8 +118,8 @@ export function formatLocationDescription(
  * Format country display (Name (Code))
  */
 export function formatCountryDisplay(name?: string | null, code?: string | null): string {
-  const nameText = name ? escapeHtml(String(name)) : '';
-  const codeText = code ? ` (${escapeHtml(String(code))})` : '';
+  const nameText = name ? String(name) : '';
+  const codeText = code ? ` (${String(code)})` : '';
   return `${nameText}${codeText}`.trim();
 }
 
