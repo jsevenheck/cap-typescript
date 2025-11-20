@@ -1,4 +1,4 @@
-import type { Service } from '@sap/cds';
+import type { Request, Service } from '@sap/cds';
 
 import { registerClientHandlers } from './domain/client';
 import { registerEmployeeHandlers } from './domain/employee';
@@ -14,6 +14,14 @@ import {
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues } from './shared/utils/auth';
 
+type ServiceWithOn = Service & {
+  on: (
+    event: string | string[],
+    entityOrHandler: string | ((...args: any[]) => unknown),
+    maybeHandler?: (...args: any[]) => unknown,
+  ) => unknown;
+};
+
 const registerHandlers = (srv: Service): void => {
   // Register company authorization middleware for all write operations
   // Note: Individual handlers also perform authorization checks for additional validation
@@ -24,7 +32,7 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'EmployeeCostCenterAssignments', authorizeEmployeeCostCenterAssignments);
 
   // Register userInfo function handler
-  srv.on('userInfo', (req) => {
+  (srv as ServiceWithOn).on('userInfo', (req: Request) => {
     const userContext = buildUserContext(req.user as any);
 
     return {
