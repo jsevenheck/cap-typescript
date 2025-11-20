@@ -116,7 +116,9 @@ export default class Main extends Controller {
         // User confirmed - manually trigger navigation
         const router = this.getOwnerComponent()?.getRouter();
         if (router && route) {
-          router.navTo(route.getPattern(), args);
+          // Use route name, not pattern, for navTo
+          const routeName = (route as any)._oConfig?.name || route.getPattern();
+          router.navTo(routeName, args);
         }
       });
     }
