@@ -7,11 +7,11 @@
 
     <App id="app">
         <pages>
-            <Page id="mainPage" title="Client Management">
+            <Page id="mainPage" title="{i18n>clientManagement}">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title text="Manage Clients" level="H2"/>
-                        <Text text="Create, review, update, and delete client records."/>
+                        <Title text="{i18n>manageClients}" level="H2"/>
+                        <Text text="{i18n>manageClientsDesc}"/>
                         <List
                                 id="clientsList"
                                 mode="SingleSelectMaster"
@@ -22,29 +22,29 @@
                                 itemPress=".onClientPress">
                             <headerToolbar>
                                 <Toolbar>
-                                    <Title text="Clients" level="H3"/>
+                                    <Title text="{i18n>clients}" level="H3"/>
                                     <ToolbarSpacer/>
                                     <Button
                                             type="Emphasized"
-                                            text="Add"
+                                            text="{i18n>add}"
                                             icon="sap-icon://add"
                                             visible="{auth>/canWrite}"
                                             press=".onAddClient"/>
                                     <Button
-                                            text="Edit"
+                                            text="{i18n>edit}"
                                             icon="sap-icon://edit"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedClientId}}"
                                             press=".onEditClient"/>
                                     <Button
-                                            text="Delete"
+                                            text="{i18n>delete}"
                                             icon="sap-icon://delete"
                                             type="Transparent"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedClientId}}"
                                             press=".onDeleteClient"/>
                                     <Button
-                                            text="Refresh"
+                                            text="{i18n>refresh}"
                                             icon="sap-icon://refresh"
                                             press=".onRefresh"/>
                                 </Toolbar>
@@ -61,17 +61,17 @@
             </Page>
             <Page
                     id="employeesPage"
-                    title="Employees"
+                    title="{i18n>employees}"
                     showNavButton="true"
                     navButtonPress=".onBackToClients">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title level="H2" text="{= ${name} ? 'Employees of ' + ${name} : 'Employees'}"/>
+                        <Title level="H2" text="{= ${name} ? ${i18n>employeesOf} + ' ' + ${name} : ${i18n>employees}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
-                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
+                                text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
                         <Text
-                                text="Manage employees assigned to the selected client."/>
+                                text="{i18n>manageEmployeesDesc}"/>
                         <List
                                 id="employeesList"
                                 mode="SingleSelectMaster"
@@ -81,37 +81,37 @@
                                 selectionChange=".onEmployeesSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
-                                    <Title text="Employees" level="H3"/>
+                                    <Title text="{i18n>employees}" level="H3"/>
                                     <ToolbarSpacer/>
                                     <Button
-                                            text="Cost Centers"
+                                            text="{i18n>costCenters}"
                                             icon="sap-icon://collections-management"
                                             press=".onNavigateToCostCenters"/>
                                     <Button
-                                            text="Locations"
+                                            text="{i18n>locations}"
                                             icon="sap-icon://map"
                                             press=".onNavigateToLocations"/>
                                     <Button
                                             type="Emphasized"
-                                            text="Add"
+                                            text="{i18n>add}"
                                             icon="sap-icon://add"
                                             visible="{auth>/canWrite}"
                                             press=".onAddEmployee"/>
                                     <Button
-                                            text="Edit"
+                                            text="{i18n>edit}"
                                             icon="sap-icon://edit"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onEditEmployee"/>
                                     <Button
-                                            text="Delete"
+                                            text="{i18n>delete}"
                                             icon="sap-icon://delete"
                                             type="Transparent"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onDeleteEmployee"/>
                                     <Button
-                                            text="Refresh"
+                                            text="{i18n>refresh}"
                                             icon="sap-icon://refresh"
                                             press=".onRefreshEmployees"/>
                                 </Toolbar>
@@ -119,8 +119,8 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${firstName} || '') + ' ' + (${lastName} || '') }"
-                                        description="{= (${email} || '') + (${employmentType} ? ' • ' + (${employmentType} === 'external' ? 'External' : 'Internal') : '') }"
-                                        info="{= ${status} === 'inactive' ? 'Inactive' : 'Active'}"
+                                        description="{= (${email} || '') + (${employmentType} ? ' • ' + (${employmentType} === 'external' ? ${i18n>external} : ${i18n>internal}) : '') }"
+                                        info="{= ${status} === 'inactive' ? ${i18n>inactive} : ${i18n>active}}"
                                         infoState="{= ${status} === 'inactive' ? 'Warning' : 'Success'}"/>
                             </items>
                         </List>
@@ -129,16 +129,16 @@
             </Page>
             <Page
                     id="costCentersPage"
-                    title="Cost Centers"
+                    title="{i18n>costCenters}"
                     showNavButton="true"
                     navButtonPress=".onBackToEmployees">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title level="H2" text="{= ${name} ? 'Cost Centers of ' + ${name} : 'Cost Centers'}"/>
+                        <Title level="H2" text="{= ${name} ? ${i18n>costCentersOf} + ' ' + ${name} : ${i18n>costCenters}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
-                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
-                        <Text text="Manage cost centers for the selected client."/>
+                                text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
+                        <Text text="{i18n>manageCostCentersDesc}"/>
                         <List
                                 id="costCentersList"
                                 mode="SingleSelectMaster"
@@ -148,29 +148,29 @@
                                 selectionChange=".onCostCentersSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
-                                    <Title text="Cost Centers" level="H3"/>
+                                    <Title text="{i18n>costCenters}" level="H3"/>
                                     <ToolbarSpacer/>
                                     <Button
                                             type="Emphasized"
-                                            text="Add"
+                                            text="{i18n>add}"
                                             icon="sap-icon://add"
                                             visible="{auth>/canWrite}"
                                             press=".onAddCostCenter"/>
                                     <Button
-                                            text="Edit"
+                                            text="{i18n>edit}"
                                             icon="sap-icon://edit"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedCostCenterId}}"
                                             press=".onEditCostCenter"/>
                                     <Button
-                                            text="Delete"
+                                            text="{i18n>delete}"
                                             icon="sap-icon://delete"
                                             type="Transparent"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedCostCenterId}}"
                                             press=".onDeleteCostCenter"/>
                                     <Button
-                                            text="Refresh"
+                                            text="{i18n>refresh}"
                                             icon="sap-icon://refresh"
                                             press=".onRefreshCostCenters"/>
                                 </Toolbar>
@@ -186,16 +186,16 @@
             </Page>
             <Page
                     id="locationsPage"
-                    title="Locations"
+                    title="{i18n>locations}"
                     showNavButton="true"
                     navButtonPress=".onBackToEmployees">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <Title level="H2" text="{= ${name} ? 'Locations of ' + ${name} : 'Locations'}"/>
+                        <Title level="H2" text="{= ${name} ? ${i18n>locationsOf} + ' ' + ${name} : ${i18n>locations}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
-                                text="{= ${companyId} ? 'Company ID: ' + ${companyId} : ''}"/>
-                        <Text text="Manage locations for the selected client."/>
+                                text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
+                        <Text text="{i18n>manageLocationsDesc}"/>
                         <List
                                 id="locationsList"
                                 mode="SingleSelectMaster"
@@ -205,29 +205,29 @@
                                 selectionChange=".onLocationsSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
-                                    <Title text="Locations" level="H3"/>
+                                    <Title text="{i18n>locations}" level="H3"/>
                                     <ToolbarSpacer/>
                                     <Button
                                             type="Emphasized"
-                                            text="Add"
+                                            text="{i18n>add}"
                                             icon="sap-icon://add"
                                             visible="{auth>/canWrite}"
                                             press=".onAddLocation"/>
                                     <Button
-                                            text="Edit"
+                                            text="{i18n>edit}"
                                             icon="sap-icon://edit"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedLocationId}}"
                                             press=".onEditLocation"/>
                                     <Button
-                                            text="Delete"
+                                            text="{i18n>delete}"
                                             icon="sap-icon://delete"
                                             type="Transparent"
                                             visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedLocationId}}"
                                             press=".onDeleteLocation"/>
                                     <Button
-                                            text="Refresh"
+                                            text="{i18n>refresh}"
                                             icon="sap-icon://refresh"
                                             press=".onRefreshLocations"/>
                                 </Toolbar>
@@ -251,23 +251,23 @@
             afterClose=".onDialogAfterClose">
         <content>
             <VBox class="sapUiContentPadding">
-                <Label text="Company ID" required="true" labelFor="companyIdInput"/>
-                <Input id="companyIdInput" value="{dialog>/client/companyId}" placeholder="e.g. C-1000"/>
-                <Label text="Name" required="true" labelFor="clientNameInput"/>
-                <Input id="clientNameInput" value="{dialog>/client/name}" placeholder="Client Name"/>
-                <Label text="Notification Endpoint" labelFor="clientNotificationInput"/>
+                <Label text="{i18n>companyId}" required="true" labelFor="companyIdInput"/>
+                <Input id="companyIdInput" value="{dialog>/client/companyId}" placeholder="{i18n>placeholderCompanyId}"/>
+                <Label text="{i18n>name}" required="true" labelFor="clientNameInput"/>
+                <Input id="clientNameInput" value="{dialog>/client/name}" placeholder="{i18n>placeholderClientName}"/>
+                <Label text="{i18n>notificationEndpoint}" labelFor="clientNotificationInput"/>
                 <Input
                         id="clientNotificationInput"
                         value="{dialog>/client/notificationEndpoint}"
-                        placeholder="https://example.com/webhook"
+                        placeholder="{i18n>placeholderNotificationEndpoint}"
                         type="Url"/>
             </VBox>
         </content>
         <beginButton>
-            <Button text="Save" type="Emphasized" press=".onSaveClient"/>
+            <Button text="{i18n>save}" type="Emphasized" press=".onSaveClient"/>
         </beginButton>
         <endButton>
-            <Button text="Cancel" press=".onCancelClient"/>
+            <Button text="{i18n>cancel}" press=".onCancelClient"/>
         </endButton>
     </Dialog>
 
@@ -278,19 +278,19 @@
             afterClose=".onEmployeeDialogAfterClose">
         <content>
             <VBox class="sapUiContentPadding">
-                <Label text="Employee ID" labelFor="employeeIdInput"/>
+                <Label text="{i18n>employeeId}" labelFor="employeeIdInput"/>
                 <Input
                         id="employeeIdInput"
                         value="{employeeDialog>/employee/employeeId}"
                         editable="false"
-                        placeholder="Will be generated automatically"/>
-                <Label text="First Name" required="true" labelFor="employeeFirstName"/>
-                <Input id="employeeFirstName" value="{employeeDialog>/employee/firstName}" placeholder="First name"/>
-                <Label text="Last Name" required="true" labelFor="employeeLastName"/>
-                <Input id="employeeLastName" value="{employeeDialog>/employee/lastName}" placeholder="Last name"/>
-                <Label text="Email" required="true" labelFor="employeeEmail"/>
-                <Input id="employeeEmail" type="Email" value="{employeeDialog>/employee/email}" placeholder="name@example.com"/>
-                <Label text="Cost Center" labelFor="employeeCostCenter"/>
+                        placeholder="{i18n>placeholderEmployeeId}"/>
+                <Label text="{i18n>firstName}" required="true" labelFor="employeeFirstName"/>
+                <Input id="employeeFirstName" value="{employeeDialog>/employee/firstName}" placeholder="{i18n>placeholderFirstName}"/>
+                <Label text="{i18n>lastName}" required="true" labelFor="employeeLastName"/>
+                <Input id="employeeLastName" value="{employeeDialog>/employee/lastName}" placeholder="{i18n>placeholderLastName}"/>
+                <Label text="{i18n>email}" required="true" labelFor="employeeEmail"/>
+                <Input id="employeeEmail" type="Email" value="{employeeDialog>/employee/email}" placeholder="{i18n>placeholderEmail}"/>
+                <Label text="{i18n>costCenter}" labelFor="employeeCostCenter"/>
                 <Select
                         id="employeeCostCenter"
                         items="{ path: 'costCenters', parameters: { $select: ['ID','code','name','responsible_ID'], $expand: { responsible: { $select: ['firstName','lastName'] } } } }"
@@ -298,32 +298,32 @@
                         selectedKey="{employeeDialog>/employee/costCenter_ID}">
                     <core:Item key="{ID}" text="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"/>
                 </Select>
-                <Label text="Manager" labelFor="employeeManager"/>
-                <Input id="employeeManager" value="{employeeDialog>/employee/managerName}" editable="false" placeholder="Manager is derived from the cost center"/>
-                <Label text="Location" required="true" labelFor="employeeLocation"/>
+                <Label text="{i18n>manager}" labelFor="employeeManager"/>
+                <Input id="employeeManager" value="{employeeDialog>/employee/managerName}" editable="false" placeholder="{i18n>placeholderManager}"/>
+                <Label text="{i18n>location}" required="true" labelFor="employeeLocation"/>
                 <Select
                         id="employeeLocation"
                         items="{ path: 'locations', parameters: { $select: ['ID','city','street','country_code'] } }"
                         selectedKey="{employeeDialog>/employee/location_ID}">
                     <core:Item key="{ID}" text="{= (${street} || '') + ', ' + (${city} || '') + ' (' + (${country_code} || '') + ')' }"/>
                 </Select>
-                <Label text="Position Level" labelFor="employeePosition"/>
-                <Input id="employeePosition" value="{employeeDialog>/employee/positionLevel}" placeholder="e.g. Senior"/>
-                <Label text="Entry Date" required="true" labelFor="employeeEntryDate"/>
+                <Label text="{i18n>positionLevel}" labelFor="employeePosition"/>
+                <Input id="employeePosition" value="{employeeDialog>/employee/positionLevel}" placeholder="{i18n>placeholderPosition}"/>
+                <Label text="{i18n>entryDate}" required="true" labelFor="employeeEntryDate"/>
                 <DatePicker
                         id="employeeEntryDate"
                         value="{employeeDialog>/employee/entryDate}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="Select entry date"/>
-                <Label text="Exit Date" labelFor="employeeExitDate"/>
+                        placeholder="{i18n>placeholderEntryDate}"/>
+                <Label text="{i18n>exitDate}" labelFor="employeeExitDate"/>
                 <DatePicker
                         id="employeeExitDate"
                         value="{employeeDialog>/employee/exitDate}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="Select exit date"/>
-                <Label text="Status" required="true" labelFor="employeeStatus"/>
+                        placeholder="{i18n>placeholderExitDate}"/>
+                <Label text="{i18n>status}" required="true" labelFor="employeeStatus"/>
                 <Select
                         id="employeeStatus"
                         items="{ path: 'statusOptions>/', templateShareable: false }"
@@ -332,7 +332,7 @@
                         required="true">
                     <core:Item key="{statusOptions>key}" text="{statusOptions>text}"/>
                 </Select>
-                <Label text="Employment Type" required="true" labelFor="employeeEmploymentType"/>
+                <Label text="{i18n>employmentType}" required="true" labelFor="employeeEmploymentType"/>
                 <Select
                         id="employeeEmploymentType"
                         items="{ path: 'employmentTypeOptions>/', templateShareable: false }"
@@ -344,10 +344,10 @@
             </VBox>
         </content>
         <beginButton>
-            <Button text="Save" type="Emphasized" press=".onSaveEmployee" enabled="{= !${employeeDialog>/managerLookupPending} }"/>
+            <Button text="{i18n>save}" type="Emphasized" press=".onSaveEmployee" enabled="{= !${employeeDialog>/managerLookupPending} }"/>
         </beginButton>
         <endButton>
-            <Button text="Cancel" press=".onCancelEmployee"/>
+            <Button text="{i18n>cancel}" press=".onCancelEmployee"/>
         </endButton>
     </Dialog>
 
@@ -358,27 +358,27 @@
             afterClose=".onCostCenterDialogAfterClose">
         <content>
             <VBox class="sapUiContentPadding">
-                <Label text="Code" required="true" labelFor="costCenterCode"/>
-                <Input id="costCenterCode" value="{costCenterDialog>/costCenter/code}" placeholder="e.g. CC-100"/>
-                <Label text="Name" required="true" labelFor="costCenterName"/>
-                <Input id="costCenterName" value="{costCenterDialog>/costCenter/name}" placeholder="Cost Center Name"/>
-                <Label text="Description" labelFor="costCenterDescription"/>
-                <Input id="costCenterDescription" value="{costCenterDialog>/costCenter/description}" placeholder="Short description"/>
-                <Label text="Valid From" required="true" labelFor="costCenterValidFrom"/>
+                <Label text="{i18n>code}" required="true" labelFor="costCenterCode"/>
+                <Input id="costCenterCode" value="{costCenterDialog>/costCenter/code}" placeholder="{i18n>placeholderCostCenterCode}"/>
+                <Label text="{i18n>name}" required="true" labelFor="costCenterName"/>
+                <Input id="costCenterName" value="{costCenterDialog>/costCenter/name}" placeholder="{i18n>placeholderCostCenterName}"/>
+                <Label text="{i18n>description}" labelFor="costCenterDescription"/>
+                <Input id="costCenterDescription" value="{costCenterDialog>/costCenter/description}" placeholder="{i18n>placeholderDescription}"/>
+                <Label text="{i18n>validFrom}" required="true" labelFor="costCenterValidFrom"/>
                 <DatePicker
                         id="costCenterValidFrom"
                         value="{costCenterDialog>/costCenter/validFrom}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="Start date"/>
-                <Label text="Valid To" labelFor="costCenterValidTo"/>
+                        placeholder="{i18n>placeholderValidFrom}"/>
+                <Label text="{i18n>validTo}" labelFor="costCenterValidTo"/>
                 <DatePicker
                         id="costCenterValidTo"
                         value="{costCenterDialog>/costCenter/validTo}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="End date (optional)"/>
-                <Label text="Responsible" required="true" labelFor="costCenterResponsible"/>
+                        placeholder="{i18n>placeholderValidTo}"/>
+                <Label text="{i18n>responsible}" required="true" labelFor="costCenterResponsible"/>
                 <Select
                         id="costCenterResponsible"
                         items="{path: 'employees'}"
@@ -388,10 +388,10 @@
             </VBox>
         </content>
         <beginButton>
-            <Button text="Save" type="Emphasized" press=".onSaveCostCenter"/>
+            <Button text="{i18n>save}" type="Emphasized" press=".onSaveCostCenter"/>
         </beginButton>
         <endButton>
-            <Button text="Cancel" press=".onCancelCostCenter"/>
+            <Button text="{i18n>cancel}" press=".onCancelCostCenter"/>
         </endButton>
     </Dialog>
 
@@ -402,15 +402,15 @@
             afterClose=".onLocationDialogAfterClose">
         <content>
             <VBox class="sapUiContentPadding">
-                <Label text="City" required="true" labelFor="locationCity"/>
-                <Input id="locationCity" value="{locationDialog>/location/city}" placeholder="City name"/>
-                <Label text="Street" required="true" labelFor="locationStreet"/>
-                <Input id="locationStreet" value="{locationDialog>/location/street}" placeholder="Street and number"/>
-                <Label text="Address Supplement" labelFor="locationAddressSupplement"/>
-                <Input id="locationAddressSupplement" value="{locationDialog>/location/addressSupplement}" placeholder="Additional address info"/>
-                <Label text="ZIP Code" required="true" labelFor="locationZipCode"/>
-                <Input id="locationZipCode" value="{locationDialog>/location/zipCode}" placeholder="Postal code"/>
-                <Label text="Country" required="true" labelFor="locationCountrySelect"/>
+                <Label text="{i18n>city}" required="true" labelFor="locationCity"/>
+                <Input id="locationCity" value="{locationDialog>/location/city}" placeholder="{i18n>placeholderCity}"/>
+                <Label text="{i18n>street}" required="true" labelFor="locationStreet"/>
+                <Input id="locationStreet" value="{locationDialog>/location/street}" placeholder="{i18n>placeholderStreet}"/>
+                <Label text="{i18n>addressSupplement}" labelFor="locationAddressSupplement"/>
+                <Input id="locationAddressSupplement" value="{locationDialog>/location/addressSupplement}" placeholder="{i18n>placeholderAddressSupplement}"/>
+                <Label text="{i18n>zipCode}" required="true" labelFor="locationZipCode"/>
+                <Input id="locationZipCode" value="{locationDialog>/location/zipCode}" placeholder="{i18n>placeholderZipCode}"/>
+                <Label text="{i18n>country}" required="true" labelFor="locationCountrySelect"/>
                 <Select
                         id="locationCountrySelect"
                         items="{ path: 'countryOptions>/', templateShareable: false }"
@@ -421,27 +421,27 @@
                             key="{countryOptions>key}"
                             text="{= ${countryOptions>text} + ' (' + ${countryOptions>key} + ')' }"/>
                 </Select>
-                <Label text="Valid From" required="true" labelFor="locationValidFrom"/>
+                <Label text="{i18n>validFrom}" required="true" labelFor="locationValidFrom"/>
                 <DatePicker
                         id="locationValidFrom"
                         value="{locationDialog>/location/validFrom}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="Start date"/>
-                <Label text="Valid To" labelFor="locationValidTo"/>
+                        placeholder="{i18n>placeholderValidFrom}"/>
+                <Label text="{i18n>validTo}" labelFor="locationValidTo"/>
                 <DatePicker
                         id="locationValidTo"
                         value="{locationDialog>/location/validTo}"
                         valueFormat="yyyy-MM-dd"
                         displayFormat="long"
-                        placeholder="End date (optional)"/>
+                        placeholder="{i18n>placeholderValidToOptional}"/>
             </VBox>
         </content>
         <beginButton>
-            <Button text="Save" type="Emphasized" press=".onSaveLocation"/>
+            <Button text="{i18n>save}" type="Emphasized" press=".onSaveLocation"/>
         </beginButton>
         <endButton>
-            <Button text="Cancel" press=".onCancelLocation"/>
+            <Button text="{i18n>cancel}" press=".onCancelLocation"/>
         </endButton>
     </Dialog>
 </mvc:View>

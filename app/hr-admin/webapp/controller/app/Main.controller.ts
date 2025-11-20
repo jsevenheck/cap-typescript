@@ -36,6 +36,12 @@ export default class Main extends Controller {
     this.costCenters = new CostCenterHandler(this, this.models, this.selection);
     this.locations = new LocationHandler(this, this.models, this.selection);
 
+    // Initialize router
+    const router = this.getOwnerComponent()?.getRouter();
+    if (router) {
+      router.initialize();
+    }
+
     // Load user authorization information
     this.loadAuthorizationInfo();
   }

@@ -62,6 +62,64 @@
         }
       }
     },
-    "routing": { "targets": {} }
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "type": "View",
+        "viewType": "XML",
+        "path": "hr.admin.view.app",
+        "controlId": "app",
+        "controlAggregation": "pages",
+        "transition": "slide",
+        "bypassed": {
+          "target": "notFound"
+        },
+        "async": true
+      },
+      "routes": [
+        {
+          "name": "clients",
+          "pattern": "",
+          "target": "clients"
+        },
+        {
+          "name": "employees",
+          "pattern": "clients/{clientId}/employees",
+          "target": "employees"
+        },
+        {
+          "name": "costCenters",
+          "pattern": "clients/{clientId}/costcenters",
+          "target": "costCenters"
+        },
+        {
+          "name": "locations",
+          "pattern": "clients/{clientId}/locations",
+          "target": "locations"
+        }
+      ],
+      "targets": {
+        "clients": {
+          "id": "mainPage",
+          "name": "Main",
+          "level": 1
+        },
+        "employees": {
+          "id": "employeesPage",
+          "name": "Main",
+          "level": 2
+        },
+        "costCenters": {
+          "id": "costCentersPage",
+          "name": "Main",
+          "level": 2
+        },
+        "locations": {
+          "id": "locationsPage",
+          "name": "Main",
+          "level": 2
+        }
+      }
+    }
   }
 }
