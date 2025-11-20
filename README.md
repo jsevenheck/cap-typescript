@@ -11,28 +11,49 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 ## 🎯 Key Features
 
 - **Multi-tenant Client Management** - Manage multiple company clients with isolated data
-- **Employee Management** - Track employees with personal data, assignments, and hierarchy
+- **Employee Management** - Complete lifecycle management with auto-generated employee IDs
+  - Auto-generated employee IDs: 8-character prefix + 6-digit counter per client
+  - Manager hierarchy with self-referencing relationships
+  - Personal data anonymization for GDPR compliance
+  - Status tracking (active/inactive) and employment type (internal/external)
 - **Cost Center Management** - Organize cost centers with time-based validity and responsibilities
-- **Location Management** - Maintain office locations with address details
+- **Location Management** - Maintain office locations with address details and country associations
 - **Employee-Cost Center Assignments** - Track historical and future cost center assignments
-- **Manager Hierarchy** - Automatic manager assignment based on cost center responsibilities
+  - Date range overlap validation
+  - Responsibility flag for cost center managers
+  - Automatic manager updates based on assignments
 - **Event-Driven Architecture** - Transactional outbox pattern for reliable event delivery
+  - Parallel dispatcher with 4 configurable workers
+  - Exponential backoff retry logic with dead letter queue
+  - Webhook notifications with HMAC SHA-256 signing for security
+  - Prometheus metrics for monitoring outbox performance
 - **Multi-layer Authorization** - Role-based and attribute-based access control
+  - Company code filtering enforced at database level
+  - Frontend authorization checks using AuthorizationService
+- **Third-party Integration** - REST API endpoint for active employees with API key authentication
 
 ## 🏗️ Architecture
 
 ### Backend (SAP CAP)
-- **Framework:** SAP Cloud Application Programming Model (CAP)
-- **Language:** TypeScript (strict mode)
-- **Database:** SQLite (dev), SAP HANA (production)
+- **Framework:** SAP Cloud Application Programming Model (CAP) 9.4.0
+- **Language:** TypeScript 5.6.3 (strict mode)
+- **Database:** SQLite (dev), SAP HANA (production via @cap-js/hana)
 - **OData Version:** v4
 - **Architecture Style:** Domain-Driven Design (DDD)
+- **Authentication:** Mocked users (dev), SAP IAS (production)
+- **Authorization:** SAP AMS (Authorization Management Service)
+- **Monitoring:** Prometheus metrics via prom-client
+- **Logging:** @sap/logging with correlation IDs
+- **Scheduling:** node-cron for outbox cleanup
 
 ### Frontend (SAPUI5)
-- **Framework:** SAPUI5 1.126 (OpenUI5)
-- **Language:** TypeScript
-- **UI Pattern:** Custom SAPUI5 Application
+- **Framework:** SAPUI5 1.126.1 (OpenUI5)
+- **Language:** TypeScript 5.6.3
+- **UI Pattern:** Single Page Application with IconTabBar
 - **Data Binding:** OData V4 Model
+- **Theme:** Horizon
+- **Build Tool:** UI5 CLI 4.0
+- **Dev Server:** Port 8081 with proxy to backend
 
 ### Project Structure
 ```
@@ -60,6 +81,71 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 /approuter            # Application Router (BTP deployment)
 /tests                # E2E tests (Playwright)
 ```
+
+### Frontend UI Structure
+
+The application is a **Single Page Application (SPA)** with a tab-based interface:
+
+**Main Tabs (IconTabBar):**
+1. **Clients Tab** - Manage company clients
+   - Client list table with lazy loading
+   - Client detail form (Company ID, Name, Notification Endpoint)
+   - Actions: Add, Edit, Delete, Refresh
+
+2. **Employees Tab** - Manage employee records
+   - Employee list table with filtering
+   - Employee detail form (all personal & employment data)
+   - Actions: Add, Edit, Delete, Refresh, Anonymize Former Employees
+
+3. **Cost Centers Tab** - Manage cost centers
+   - Cost center list table
+   - Cost center detail form with validity dates
+   - Actions: Add, Edit, Delete, Refresh
+
+4. **Locations Tab** - Manage office locations
+   - Location list table
+   - Location detail form with address details
+   - Actions: Add, Edit, Delete, Refresh
+
+**Key UI Features:**
+- **Responsive Design** - Works on desktop, tablet, and phone
+- **Optimistic Concurrency** - ETag handling with modifiedAt timestamps
+- **Global Error Handling** - Catches OData errors and displays user-friendly messages
+- **Validation** - Client-side validation before API submission
+- **Loading Indicators** - Busy states during all operations
+- **Data Formatters** - Date, status, and boolean field formatting
+
+### Database Schema
+
+**Core Entities:**
+- **Clients** - Multi-tenant client records (UUID key, unique companyId)
+- **Employees** - Employee records with auto-generated employeeId (8-char prefix + 6-digit counter)
+- **CostCenters** - Cost center definitions with time-based validity
+- **Locations** - Office locations with country associations
+- **EmployeeCostCenterAssignments** - Historical assignment tracking
+- **Countries** - SAP Common Countries (read-only reference data)
+
+**Technical Entities:**
+- **EmployeeIdCounters** - Auto-increment counter per client
+- **EmployeeNotificationOutbox** - Transactional outbox for reliable event delivery
+- **EmployeeNotificationDLQ** - Dead letter queue for failed notifications
+
+**Key Relationships:**
+- Clients → Employees (1:N, cascade delete)
+- Clients → CostCenters (1:N, cascade delete)
+- Clients → Locations (1:N, cascade delete)
+- Employees → Manager (self-reference for hierarchy)
+- Employees → CostCenter (N:1, current assignment)
+- Employees → Location (N:1, current location)
+- EmployeeCostCenterAssignments → Employee (N:1)
+- EmployeeCostCenterAssignments → CostCenter (N:1)
+
+**Strategic Indexes (12 total):**
+- Employees: status, employmentType, client+status composite
+- Locations: validFrom+validTo date ranges
+- CostCenters: validFrom+validTo, code+client unique constraint
+- Assignments: employee+dates, costCenter+dates, responsible flag
+- Outbox: status+nextAttemptAt for efficient polling
 
 ## 🔒 Security Features
 
@@ -98,6 +184,8 @@ Optimized queries with strategic indexing:
 ### Frontend Performance
 - Lazy loading on all lists (load 20 items, scroll for more)
 - Optimized for 1000+ records
+- Abortable requests to prevent memory leaks
+- Global error handling for OData errors and unhandled promise rejections
 
 ## 🛡️ Data Integrity Features
 
@@ -178,19 +266,74 @@ Playwright tests for full-stack integration scenarios.
 ### OData V4 Service
 Base URL: `/odata/v4/clients/`
 
-#### Entities
-- `GET /Clients` - List all clients
-- `POST /Clients` - Create client
-- `PATCH /Clients(ID)` - Update client (requires ETag)
-- `DELETE /Clients(ID)` - Delete client (requires ETag)
+#### Entities (All support standard OData operations)
 
-[Additional endpoints for Employees, CostCenters, Locations, EmployeeCostCenterAssignments]
+**Clients**
+- `GET /Clients` - List all clients (filtered by authorization)
+- `POST /Clients` - Create new client
+- `PATCH /Clients(ID)` - Update client (requires ETag via If-Match header or modifiedAt)
+- `DELETE /Clients(ID)` - Delete client with cascade (requires ETag)
 
-#### Actions
-- `POST /anonymizeFormerEmployees` - Anonymize former employees (batch operation)
+**Employees**
+- `GET /Employees` - List all employees (filtered by company code)
+- `POST /Employees` - Create new employee (auto-generates employeeId)
+- `PATCH /Employees(ID)` - Update employee (requires ETag)
+- `DELETE /Employees(ID)` - Delete employee (requires ETag)
+- Supports `$expand` for: client, manager, costCenter, location, costCenterAssignments
+
+**CostCenters**
+- `GET /CostCenters` - List all cost centers
+- `POST /CostCenters` - Create new cost center
+- `PATCH /CostCenters(ID)` - Update cost center (requires ETag)
+- `DELETE /CostCenters(ID)` - Delete cost center (requires ETag)
+- Supports `$expand` for: client, responsible, employees, assignments
+
+**Locations**
+- `GET /Locations` - List all locations
+- `POST /Locations` - Create new location
+- `PATCH /Locations(ID)` - Update location (requires ETag)
+- `DELETE /Locations(ID)` - Delete location (requires ETag)
+- Supports `$expand` for: client, country, employees
+
+**EmployeeCostCenterAssignments**
+- `GET /EmployeeCostCenterAssignments` - List all assignments
+- `POST /EmployeeCostCenterAssignments` - Create new assignment
+- `PATCH /EmployeeCostCenterAssignments(ID)` - Update assignment (requires ETag)
+- `DELETE /EmployeeCostCenterAssignments(ID)` - Delete assignment (requires ETag)
+- Supports `$expand` for: employee, costCenter, client
+
+**Countries** (Read-only, SAP Common)
+- `GET /Countries` - List all countries
+
+#### Custom Actions & Functions
+- `POST /anonymizeFormerEmployees` - Anonymize former employees before a specific date
+  - Parameter: `before` (Date)
+  - Returns: Integer (count of anonymized employees)
+  - Roles: HREditor, HRAdmin
+
+#### Utility Endpoints
+- `GET /userInfo` - Get current user's roles and authorization attributes
+  - Returns: `{ roles: string[], attributes: { CompanyCode, companyCodes } }`
+  - Used by frontend for authorization checks
+
+- `GET /health` - Health check endpoint
+  - Returns: `{ status: 'ok' }`
+
+- `GET /api/employees/active` - Active employees API for third-party integration
+  - Requires: API key authentication
+  - Returns: List of active employees
+
+#### OData Query Features
+- **Filtering:** `$filter` with company code restrictions enforced
+- **Sorting:** `$orderby` on any field
+- **Pagination:** `$top` and `$skip` for paging
+- **Selection:** `$select` to limit returned fields
+- **Expansion:** `$expand` to include related entities
+- **Counting:** `$count` to get total count
 
 ### Authorization
-All requests require JWT token with appropriate roles.
+- Production: JWT token from SAP IAS with appropriate roles
+- Development: Mocked users (`dev`, `hreditor`, `hrviewer`)
 
 ## 🔧 Configuration
 
@@ -207,7 +350,37 @@ OUTBOX_BATCH_SIZE=50
 OUTBOX_MAX_ATTEMPTS=5
 OUTBOX_RETRY_DELAY=5000
 OUTBOX_CLAIM_TTL=300000
-OUTBOX_PARALLEL_WORKERS=3
+OUTBOX_PARALLEL_WORKERS=4
+```
+
+### SAP BTP Deployment
+
+This application is configured for deployment to SAP Business Technology Platform (BTP) using Multi-Target Application (MTA) format.
+
+#### MTA Modules (5)
+1. **cap-ts-srv** - Node.js backend service (512MB)
+2. **cap-ts-db-deployer** - HANA HDI deployer (256MB)
+3. **cap-ts-ams-deployer** - AMS DCL deployer (256MB)
+4. **cap-ts-app-hr-admin** - HTML5 frontend application
+5. **cap-ts-approuter** - Application Router (256MB)
+
+#### Required BTP Services (8)
+1. **cap-ts-db** - SAP HANA HDI Container (schema-based isolation)
+2. **cap-ts-ias** - Identity Authentication Service (user authentication)
+3. **cap-ts-ams** - Authorization Management Service (role & attribute management)
+4. **cap-ts-destination** - Destination Service (external system connectivity)
+5. **cap-ts-connectivity** - Connectivity Service (on-premise integration)
+6. **cap-ts-html5-repo-host** - HTML5 Application Repository (hosting)
+7. **cap-ts-html5-repo-runtime** - HTML5 Application Repository (runtime)
+8. **cap-ts-logging** - Application Logging Service (centralized logging)
+
+#### Deployment Commands
+```bash
+# Build MTA archive
+mbt build
+
+# Deploy to BTP Cloud Foundry
+cf deploy mta_archives/cap-ts_1.0.0.mtar
 ```
 
 ## 🐛 Known Issues & Limitations
@@ -215,15 +388,14 @@ OUTBOX_PARALLEL_WORKERS=3
 ### Current Limitations
 - No routing implementation (browser back button limitations)
 - i18n keys defined but not used in views (hardcoded strings remain)
-- Authorization service exists but not integrated in UI
 - Test coverage at ~12% (target: 70%+)
 
 ### Planned Improvements
-- [ ] Implement proper UI5 routing
-- [ ] Migrate hardcoded strings to i18n
-- [ ] Integrate authorization service in frontend
-- [ ] Increase test coverage to 70%+
-- [ ] Add navigation guards for unsaved changes
+- [ ] Implement proper UI5 routing with browser history support
+- [ ] Migrate hardcoded strings to i18n for better internationalization
+- [ ] Increase test coverage to 70%+ (currently at ~12%)
+- [ ] Add navigation guards for unsaved changes warning
+- [ ] Implement frontend caching for frequently accessed data
 
 ## 🤝 Contributing
 
