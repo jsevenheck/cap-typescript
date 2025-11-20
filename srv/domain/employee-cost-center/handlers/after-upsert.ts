@@ -1,7 +1,7 @@
 import cds from '@sap/cds';
 import type { Request } from '@sap/cds';
 
-import { handleResponsibilityChange } from '../services/manager-responsibility.service';
+import { handleResponsibilityChange, handleResponsibilityRemoval, isAssignmentCurrentlyActive } from '../services/manager-responsibility.service';
 
 export const afterUpsert = async (req: Request): Promise<void> => {
   if (!req.data || typeof req.data !== 'object') {
@@ -9,6 +9,8 @@ export const afterUpsert = async (req: Request): Promise<void> => {
   }
 
   const tx = cds.transaction(req);
+  const isUpdate = req.event === 'UPDATE';
+
   const data = req.data as {
     employee_ID: string;
     costCenter_ID: string;
@@ -16,6 +18,26 @@ export const afterUpsert = async (req: Request): Promise<void> => {
     validTo?: string | null;
     isResponsible: boolean;
   };
+
+  // For updates, check if responsibility was removed using pre-update state
+  if (isUpdate) {
+    const preUpdateAssignment = (req as any)._preUpdateAssignment;
+
+    // If responsibility was removed from a currently active assignment
+    if (
+      preUpdateAssignment &&
+      preUpdateAssignment.isResponsible &&
+      !data.isResponsible &&
+      isAssignmentCurrentlyActive(preUpdateAssignment.validFrom as string, preUpdateAssignment.validTo)
+    ) {
+      // Use pre-update IDs to clean up the ORIGINAL cost center that lost its responsible employee
+      await handleResponsibilityRemoval(
+        tx,
+        preUpdateAssignment.costCenter_ID as string,
+        preUpdateAssignment.employee_ID as string,
+      );
+    }
+  }
 
   // Handle manager responsibility if this is a responsible assignment
   if (data.isResponsible) {

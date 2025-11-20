@@ -55,6 +55,9 @@ export const onUpsert = async (req: Request): Promise<void> => {
       throw new Error('Assignment not found');
     }
 
+    // Store pre-update state in request context for after-upsert handler
+    (req as any)._preUpdateAssignment = existingAssignment;
+
     // Preserve isResponsible flag on partial updates
     if (data.isResponsible === undefined && existingAssignment.isResponsible !== undefined) {
       data.isResponsible = existingAssignment.isResponsible;
