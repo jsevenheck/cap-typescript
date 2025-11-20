@@ -2,11 +2,10 @@
 
 A full-stack TypeScript application built with SAP Cloud Application Programming Model (CAP) for managing HR data including clients, employees, cost centers, and locations.
 
-## 📋 Version Information
+## 📋 Requirements
 
-**Version:** 2.0.0 (Code Review & Security Hardened)  
-**Last Updated:** 2025-11-20  
-**Node Version:** >=22.0.0  
+**Node Version:** >=22.0.0
+**npm Version:** >=10.0.0
 **TypeScript Version:** 5.6.3
 
 ## 🎯 Key Features
@@ -74,30 +73,30 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
   - `HREditor` - Read/write access to assigned companies
   - `HRViewer` - Read-only access to assigned companies
 
-### Security Hardening (v2.0.0)
-✅ **XSS Protection** - All user input properly escaped with HTML entity encoding  
-✅ **SSRF Prevention** - URL validation blocks private IP ranges and localhost  
-✅ **Email Validation** - RFC 5322 compliant with length constraints  
-✅ **Optimistic Concurrency** - Prevents data corruption from concurrent updates  
-✅ **HMAC Signing** - Third-party webhooks signed with SHA-256  
-✅ **Input Sanitization** - All user input validated and normalized
+### Security Hardening
+- **XSS Protection** - All user input properly escaped with HTML entity encoding
+- **SSRF Prevention** - URL validation blocks private IP ranges and localhost
+- **Email Validation** - RFC 5322 compliant with length constraints
+- **Optimistic Concurrency** - Prevents data corruption from concurrent updates
+- **HMAC Signing** - Third-party webhooks signed with SHA-256
+- **Input Sanitization** - All user input validated and normalized
 
-## ⚡ Performance Optimizations (v2.0.0)
+## ⚡ Performance Features
 
-✅ **Database Indexes** - 9 new indexes for faster queries:
+### Database Indexes
+Optimized queries with strategic indexing:
 - Employees: status, employmentType, client+status composite
 - Locations: validFrom+validTo date ranges
 - CostCenters: validFrom+validTo date ranges
 - Assignments: employee+dates, costCenter+dates, responsible flag
 
-✅ **Query Optimization:**
-- Batch UPDATE operations (100x faster for bulk updates)
-- Database-level date filtering (vs in-memory)
+### Query Optimization
+- Batch UPDATE operations for bulk updates
+- Database-level date filtering
 - Reduced N+1 query patterns
 
-✅ **Frontend Performance:**
+### Frontend Performance
 - Lazy loading on all lists (load 20 items, scroll for more)
-- Reduced initial page load time by 70%+
 - Optimized for 1000+ records
 
 ## 🛡️ Data Integrity Features
@@ -108,7 +107,7 @@ All entities use ETags (via `modifiedAt` timestamp) to prevent lost updates:
 - Employees require If-Match or modifiedAt
 - Cost Centers require If-Match or modifiedAt
 - Locations require If-Match or modifiedAt
-- **NEW:** Employee-Cost Center Assignments require If-Match or modifiedAt
+- Employee-Cost Center Assignments require If-Match or modifiedAt
 
 ### Referential Integrity
 - Client deletion cascades to employees, cost centers, locations
@@ -211,26 +210,6 @@ OUTBOX_CLAIM_TTL=300000
 OUTBOX_PARALLEL_WORKERS=3
 ```
 
-## 📈 Recent Changes (v2.0.0)
-
-### Critical Fixes
-✅ **Backend (Commit 97005ea):**
-- Added optimistic concurrency to employee-cost-center assignments
-- Fixed N+1 query (100x performance improvement)
-- Added 9 performance database indexes
-- Optimized date filtering (database-level)
-- Standardized error handling
-- Removed empty handler files
-- Added ETag documentation
-
-✅ **Frontend (Commit c2da081):**
-- Added XSS protection with HTML escaping
-- Fixed memory leaks (onExit lifecycle)
-- Enabled lazy loading on all lists
-- Added global error handler
-- Improved email validation (RFC 5322)
-- Added SSRF protection for URLs
-
 ## 🐛 Known Issues & Limitations
 
 ### Current Limitations
@@ -246,12 +225,6 @@ OUTBOX_PARALLEL_WORKERS=3
 - [ ] Increase test coverage to 70%+
 - [ ] Add navigation guards for unsaved changes
 
-## 📚 Documentation
-
-For detailed code review findings, see commit history:
-- `97005ea` - Backend critical fixes (10 files, 229+ additions)
-- `c2da081` - Frontend critical fixes (6 files, 358+ additions)
-
 ## 🤝 Contributing
 
 1. Create feature branch from `main`
@@ -259,9 +232,3 @@ For detailed code review findings, see commit history:
 3. Ensure all tests pass: `npm test`
 4. Run linter: `npm run lint`
 5. Submit pull request
-
----
-
-**Version:** 2.0.0 - Security Hardened & Performance Optimized  
-**Last Review:** 2025-11-20  
-**Status:** Production Ready ✅
