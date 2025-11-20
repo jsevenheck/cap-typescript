@@ -2,8 +2,6 @@ import cds from '@sap/cds';
 import type { Request } from '@sap/cds';
 
 import { handleResponsibilityChange, handleResponsibilityRemoval, isAssignmentCurrentlyActive } from '../services/manager-responsibility.service';
-import { findAssignmentById } from '../repository/employee-cost-center-assignment.repo';
-import { deriveTargetId } from '../../shared/request-context';
 
 export const afterUpsert = async (req: Request): Promise<void> => {
   if (!req.data || typeof req.data !== 'object') {
@@ -12,7 +10,6 @@ export const afterUpsert = async (req: Request): Promise<void> => {
 
   const tx = cds.transaction(req);
   const isUpdate = req.event === 'UPDATE';
-  const targetId = deriveTargetId(req);
 
   const data = req.data as {
     employee_ID: string;
@@ -22,24 +19,16 @@ export const afterUpsert = async (req: Request): Promise<void> => {
     isResponsible: boolean;
   };
 
-  // For updates, check if responsibility was removed
-  if (isUpdate && targetId) {
-    const existingAssignment = await findAssignmentById(tx, targetId, [
-      'ID',
-      'client_ID',
-      'employee_ID',
-      'costCenter_ID',
-      'isResponsible',
-      'validFrom',
-      'validTo',
-    ]);
+  // For updates, check if responsibility was removed using pre-update state
+  if (isUpdate) {
+    const preUpdateAssignment = (req as any)._preUpdateAssignment;
 
     // If responsibility was removed from a currently active assignment
     if (
-      existingAssignment &&
-      existingAssignment.isResponsible &&
+      preUpdateAssignment &&
+      preUpdateAssignment.isResponsible &&
       !data.isResponsible &&
-      isAssignmentCurrentlyActive(existingAssignment.validFrom as string, existingAssignment.validTo)
+      isAssignmentCurrentlyActive(preUpdateAssignment.validFrom as string, preUpdateAssignment.validTo)
     ) {
       await handleResponsibilityRemoval(tx, data.costCenter_ID, data.employee_ID);
     }
