@@ -1,4 +1,4 @@
-import type { Service } from '@sap/cds';
+import type { Request, Service } from '@sap/cds';
 
 import { registerClientHandlers } from './domain/client';
 import { registerEmployeeHandlers } from './domain/employee';
@@ -12,6 +12,15 @@ import {
   authorizeLocations,
   authorizeEmployeeCostCenterAssignments,
 } from './middleware/company-authorization';
+import { buildUserContext, getAttributeValues } from './shared/utils/auth';
+
+type ServiceWithOn = Service & {
+  on: (
+    event: string | string[],
+    entityOrHandler: string | ((...args: any[]) => unknown),
+    maybeHandler?: (...args: any[]) => unknown,
+  ) => unknown;
+};
 
 const registerHandlers = (srv: Service): void => {
   // Register company authorization middleware for all write operations
@@ -21,6 +30,19 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'CostCenters', authorizeCostCenters);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Locations', authorizeLocations);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'EmployeeCostCenterAssignments', authorizeEmployeeCostCenterAssignments);
+
+  // Register userInfo function handler
+  (srv as ServiceWithOn).on('userInfo', (req: Request) => {
+    const userContext = buildUserContext((req as any).user);
+
+    return {
+      roles: Array.from(userContext.roles),
+      attributes: {
+        CompanyCode: getAttributeValues(userContext, 'CompanyCode'),
+        companyCodes: getAttributeValues(userContext, 'companyCodes'),
+      },
+    };
+  });
 
   registerClientHandlers(srv);
   registerEmployeeHandlers(srv);

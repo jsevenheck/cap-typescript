@@ -83,3 +83,10 @@ export interface ViewState {
   selectedCostCenterId?: string;
   selectedLocationId?: string;
 }
+
+export interface AuthorizationState {
+  canWrite: boolean;
+  isAdmin: boolean;
+  isReadOnly: boolean;
+  loaded: boolean;
+}

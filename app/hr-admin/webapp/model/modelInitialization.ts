@@ -2,6 +2,7 @@ import View from "sap/ui/core/mvc/View";
 import JSONModel from "sap/ui/model/json/JSONModel";
 
 import {
+  AuthorizationState,
   ClientDialogModelData,
   CostCenterDialogModelData,
   EmployeeDialogModelData,
@@ -87,12 +88,22 @@ export function createInitialViewState(): ViewState {
   return {};
 }
 
+export function createInitialAuthorizationState(): AuthorizationState {
+  return {
+    canWrite: false,
+    isAdmin: false,
+    isReadOnly: true,
+    loaded: false,
+  };
+}
+
 export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(createInitialClientDialogData()), "dialog");
   view.setModel(new JSONModel(createInitialEmployeeDialogData()), "employeeDialog");
   view.setModel(new JSONModel(createInitialCostCenterDialogData()), "costCenterDialog");
   view.setModel(new JSONModel(createInitialLocationDialogData()), "locationDialog");
   view.setModel(new JSONModel(createInitialViewState()), "view");
+  view.setModel(new JSONModel(createInitialAuthorizationState()), "auth");
   view.setModel(new JSONModel(STATUS_OPTIONS), "statusOptions");
   view.setModel(new JSONModel(EMPLOYMENT_TYPE_OPTIONS), "employmentTypeOptions");
   view.setModel(new JSONModel(COUNTRY_OPTIONS), "countryOptions");

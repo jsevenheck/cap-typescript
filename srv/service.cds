@@ -93,4 +93,17 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
 
   @requires: ['HREditor', 'HRAdmin']
   action anonymizeFormerEmployees(before: Date) returns Integer;
+
+  /**
+   * Get current user information including roles and attributes.
+   * Used by frontend to adapt UI based on user permissions.
+   */
+  @readonly
+  function userInfo() returns {
+    roles: array of String;
+    attributes: {
+      CompanyCode: array of String;
+      companyCodes: array of String;
+    };
+  };
 }
