@@ -154,7 +154,8 @@
           "credentials": {
             "filename": "./db/test.db"
           }
-        }
+        },
+        "ams": false
       }
     }
   }
