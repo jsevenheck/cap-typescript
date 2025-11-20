@@ -48,9 +48,9 @@ export default class Main extends Controller {
 
     // Initialize entity handlers
     this.clients = new ClientHandler(this, this.models, this.selection, this.navigation, this.guard);
-    this.employees = new EmployeeHandler(this, this.models, this.selection);
-    this.costCenters = new CostCenterHandler(this, this.models, this.selection);
-    this.locations = new LocationHandler(this, this.models, this.selection);
+    this.employees = new EmployeeHandler(this, this.models, this.selection, this.guard);
+    this.costCenters = new CostCenterHandler(this, this.models, this.selection, this.guard);
+    this.locations = new LocationHandler(this, this.models, this.selection, this.guard);
 
     // Initialize router and attach navigation guards
     const router = this.getOwnerComponent()?.getRouter();

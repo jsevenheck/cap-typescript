@@ -7,9 +7,12 @@ import ListItemBase from "sap/m/ListItemBase";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import { getOptionalListBinding } from "../../core/services/odata";
 import { getEventParameter } from "../../core/utils/EventParam";
 
@@ -20,11 +23,20 @@ type CreationContext = {
 };
 
 export default class LocationHandler {
+  private static readonly DIALOG_ID = "locationDialog";
+
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
-    private readonly selection: SelectionState
+    private readonly selection: SelectionState,
+    private readonly guard: UnsavedChangesGuard
   ) {}
+
+  private getI18nBundle(): ResourceBundle {
+    const view = this.controller.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
+  }
 
   public refresh(): void {
     this.getLocationsBinding()?.refresh();
@@ -35,10 +47,11 @@ export default class LocationHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const dialogModel = this.models.getLocationModel();
     dialogModel.setData({
       mode: "create",
-      title: "Add Location",
+      title: i18n.getText("addLocation"),
       location: {
         city: "",
         country_code: "",
@@ -49,6 +62,7 @@ export default class LocationHandler {
         validTo: "",
       },
     });
+    this.guard.markDirty(LocationHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -57,9 +71,10 @@ export default class LocationHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedLocationContext();
     if (!context) {
-      MessageBox.error("No location selected");
+      MessageBox.error(i18n.getText("noLocationSelected"));
       return;
     }
     const view = this.controller.getView();
@@ -81,14 +96,14 @@ export default class LocationHandler {
         validTo?: string;
       } | undefined;
       if (!currentData) {
-        MessageBox.error("Unable to load the selected location.");
+        MessageBox.error(i18n.getText("unableToLoadLocation"));
         return;
       }
 
       const dialogModel = this.models.getLocationModel();
       dialogModel.setData({
         mode: "edit",
-        title: "Edit Location",
+        title: i18n.getText("editLocation"),
         location: {
           ID: currentData.ID,
           city: currentData.city ?? "",
@@ -100,9 +115,10 @@ export default class LocationHandler {
           validTo: currentData.validTo ?? "",
         },
       });
+      this.guard.markDirty(LocationHandler.DIALOG_ID);
       this.openDialog();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to load the selected location.";
+      const message = error instanceof Error ? error.message : i18n.getText("unableToLoadLocation");
       MessageBox.error(message);
     } finally {
       view.setBusy(false);
@@ -114,17 +130,18 @@ export default class LocationHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedLocationContext();
     if (!context) {
-      MessageBox.error("No location selected");
+      MessageBox.error(i18n.getText("noLocationSelected"));
       return;
     }
     const location = context.getObject() as { street?: string; city?: string };
     const title = location.street
       ? `${location.street}, ${location.city ?? ""}`
       : location.city ?? "";
-    MessageBox.confirm(`Delete location ${title}?`, {
-      title: "Confirm Deletion",
+    MessageBox.confirm(`${i18n.getText("deleteLocationMessage")} ${title}?`, {
+      title: i18n.getText("confirm"),
       emphasizedAction: MessageBox.Action.OK,
       actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
       onClose: (action: string) => {
@@ -132,11 +149,11 @@ export default class LocationHandler {
           context
             .delete("$auto")
             .then(() => {
-              MessageToast.show("Location deleted");
+              MessageToast.show(i18n.getText("locationDeleted"));
               this.selection.clearLocation();
             })
             .catch((error: Error) => {
-              MessageBox.error(error.message ?? "Failed to delete location");
+              MessageBox.error(error.message ?? i18n.getText("failedToDeleteLocation"));
             });
         }
       },
@@ -144,9 +161,10 @@ export default class LocationHandler {
   }
 
   public save(): void {
+    const i18n = this.getI18nBundle();
     const dialog = this.byId("locationDialog") as Dialog;
     if (!dialog) {
-      MessageBox.error("Dialog not found");
+      MessageBox.error(i18n.getText("errorOccurred"));
       return;
     }
     const dialogModel = this.models.getLocationModel();
@@ -164,12 +182,12 @@ export default class LocationHandler {
     };
 
     if (!payload.city || !payload.country_code || !payload.zipCode || !payload.street || !payload.validFrom) {
-      MessageBox.error("City, Country, ZIP Code, Street, and Valid From are required.");
+      MessageBox.error(i18n.getText("locationFieldsRequired"));
       return;
     }
 
     if (!clientId) {
-      MessageBox.error("Select a client first.");
+      MessageBox.error(i18n.getText("selectClientFirst"));
       return;
     }
 
@@ -181,7 +199,7 @@ export default class LocationHandler {
       const listBinding = this.getLocationsBinding();
       if (!listBinding) {
         dialog.setBusy(false);
-        MessageBox.error("Unable to access locations list.");
+        MessageBox.error(i18n.getText("unableToAccessLocationsList"));
         return;
       }
 
@@ -190,7 +208,7 @@ export default class LocationHandler {
         creationContext,
         () => {
           dialog.setBusy(false);
-          MessageBox.error("Failed to initialize location creation context.");
+          MessageBox.error(i18n.getText("failedToInitializeLocationCreation"));
         },
         (context) => {
           const readyContext = context as CreationContext & ODataContext;
@@ -201,7 +219,7 @@ export default class LocationHandler {
             const message =
               error instanceof Error && error.message
                 ? error.message
-                : "Failed to create location";
+                : i18n.getText("failedToCreateLocation");
             MessageBox.error(message);
             void readyContext.delete("$auto").catch(() => {
               // Silently ignore deletion errors for transient creation contexts
@@ -220,8 +238,9 @@ export default class LocationHandler {
           Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
               dialog.setBusy(false);
+              this.guard.markClean(LocationHandler.DIALOG_ID);
               dialog.close();
-              MessageToast.show("Location created");
+              MessageToast.show(i18n.getText("locationCreated"));
               listBinding.refresh();
             })
             .catch(handleError);
@@ -231,7 +250,7 @@ export default class LocationHandler {
       const context = this.selection.getSelectedLocationContext();
       if (!context) {
         dialog.setBusy(false);
-        MessageBox.error("Select a location first.");
+        MessageBox.error(i18n.getText("selectLocationFirst"));
         return;
       }
 
@@ -247,17 +266,19 @@ export default class LocationHandler {
         .submitBatch("$auto")
         .then(() => {
           dialog.setBusy(false);
+          this.guard.markClean(LocationHandler.DIALOG_ID);
           dialog.close();
-          MessageToast.show("Location updated");
+          MessageToast.show(i18n.getText("locationUpdated"));
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          MessageBox.error(error.message ?? "Failed to update location");
+          MessageBox.error(error.message ?? i18n.getText("failedToUpdateLocation"));
         });
     }
   }
 
   public cancel(): void {
+    this.guard.markClean(LocationHandler.DIALOG_ID);
     const dialog = this.byId("locationDialog") as Dialog;
     dialog.close();
   }

@@ -10,9 +10,12 @@ import ListItemBase from "sap/m/ListItemBase";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import { EmployeeDialogModelData } from "../../types/DialogTypes";
 import { getOptionalListBinding } from "../../core/services/odata";
 import { formatPersonName } from "../../core/utils/Formatters";
@@ -64,13 +67,21 @@ function isValidEmail(email: string): boolean {
 }
 
 export default class EmployeeHandler {
+  private static readonly DIALOG_ID = "employeeDialog";
   private currentManagerLookupToken: number = 0;
 
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
-    private readonly selection: SelectionState
+    private readonly selection: SelectionState,
+    private readonly guard: UnsavedChangesGuard
   ) {}
+
+  private getI18nBundle(): ResourceBundle {
+    const view = this.controller.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
+  }
 
   public refresh(): void {
     this.getEmployeesBinding()?.refresh();
@@ -81,10 +92,11 @@ export default class EmployeeHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const dialogModel = this.models.getEmployeeModel();
     dialogModel.setData({
       mode: "create",
-      title: "Add Employee",
+      title: i18n.getText("addEmployee"),
       employee: {
         employeeId: "",
         firstName: "",
@@ -102,6 +114,7 @@ export default class EmployeeHandler {
       },
       managerLookupPending: false,
     });
+    this.guard.markDirty(EmployeeHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -110,9 +123,10 @@ export default class EmployeeHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedEmployeeContext();
     if (!context) {
-      MessageBox.error("No employee selected");
+      MessageBox.error(i18n.getText("noEmployeeSelected"));
       return;
     }
     const view = this.controller.getView();
@@ -142,7 +156,7 @@ export default class EmployeeHandler {
         employmentType?: EmployeeDialogModelData["employee"]["employmentType"];
       } | undefined;
       if (!currentData) {
-        MessageBox.error("Unable to load the selected employee.");
+        MessageBox.error(i18n.getText("unableToLoadEmployee"));
         return;
       }
 
@@ -153,7 +167,7 @@ export default class EmployeeHandler {
       );
       dialogModel.setData({
         mode: "edit",
-        title: "Edit Employee",
+        title: i18n.getText("editEmployee"),
         employee: {
           ID: currentData.ID,
           employeeId: currentData.employeeId ?? "",
@@ -172,9 +186,10 @@ export default class EmployeeHandler {
         },
         managerLookupPending: false,
       });
+      this.guard.markDirty(EmployeeHandler.DIALOG_ID);
       this.openDialog();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to load the selected employee.";
+      const message = error instanceof Error ? error.message : i18n.getText("unableToLoadEmployee");
       MessageBox.error(message);
     } finally {
       view.setBusy(false);
@@ -186,11 +201,12 @@ export default class EmployeeHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedEmployeeContext() as Context;
     const employee = context.getObject() as { firstName?: string; lastName?: string };
     const name = formatPersonName(employee.firstName, employee.lastName);
-    MessageBox.confirm(`Delete employee ${name}?`, {
-      title: "Confirm Deletion",
+    MessageBox.confirm(`${i18n.getText("deleteEmployeeMessage")} ${name}?`, {
+      title: i18n.getText("confirm"),
       emphasizedAction: MessageBox.Action.OK,
       actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
       onClose: (action: string) => {
@@ -198,11 +214,11 @@ export default class EmployeeHandler {
           context
             .delete("$auto")
             .then(() => {
-              MessageToast.show("Employee deleted");
+              MessageToast.show(i18n.getText("employeeDeleted"));
               this.selection.clearEmployee();
             })
             .catch((error: Error) => {
-              MessageBox.error(error.message ?? "Failed to delete employee");
+              MessageBox.error(error.message ?? i18n.getText("failedToDeleteEmployee"));
             });
         }
       },
@@ -210,9 +226,10 @@ export default class EmployeeHandler {
   }
 
   public save(): void {
+    const i18n = this.getI18nBundle();
     const dialog = this.byId("employeeDialog") as Dialog;
     if (!dialog) {
-      MessageBox.error("Dialog not found");
+      MessageBox.error(i18n.getText("errorOccurred"));
       return;
     }
     const dialogModel = this.models.getEmployeeModel();
@@ -220,7 +237,7 @@ export default class EmployeeHandler {
       dialogModel.getProperty("/managerLookupPending")
     );
     if (managerLookupPending) {
-      MessageBox.warning("Please wait for the cost center manager to finish loading before saving.");
+      MessageBox.warning(i18n.getText("waitForManagerLookup"));
       return;
     }
     const data = dialogModel.getData();
@@ -265,13 +282,13 @@ export default class EmployeeHandler {
       !payload.status ||
       !payload.employmentType
     ) {
-      MessageBox.error("First name, last name, email, location, entry date, status, and employment type are required.");
+      MessageBox.error(i18n.getText("employeeFieldsRequired"));
       return;
     }
 
     // Validate email format
     if (typeof payload.email === 'string' && !isValidEmail(payload.email)) {
-      MessageBox.error("Please enter a valid email address (e.g., user@example.com).");
+      MessageBox.error(i18n.getText("invalidEmail"));
       return;
     }
 
@@ -289,22 +306,22 @@ export default class EmployeeHandler {
     // Compare as strings (YYYY-MM-DD) to avoid timezone issues
     if (exitDate && entryDate && exitDate < entryDate) {
       exitDatePicker?.setValueState(ValueState.Error);
-      exitDatePicker?.setValueStateText("Exit date cannot be before entry date.");
-      MessageBox.error("Exit date cannot be before entry date.");
+      exitDatePicker?.setValueStateText(i18n.getText("exitDateBeforeEntryDate"));
+      MessageBox.error(i18n.getText("exitDateBeforeEntryDate"));
       return;
     }
 
     if (statusValue === "inactive" && !exitDate) {
       exitDatePicker?.setValueState(ValueState.Error);
-      exitDatePicker?.setValueStateText("Inactive employees must have an exit date.");
-      MessageBox.error("Inactive employees must have an exit date.");
+      exitDatePicker?.setValueStateText(i18n.getText("inactiveEmployeesMustHaveExitDate"));
+      MessageBox.error(i18n.getText("inactiveEmployeesMustHaveExitDate"));
       return;
     }
 
     if (statusValue !== "inactive" && exitDate) {
       statusSelect?.setValueState(ValueState.Error);
-      statusSelect?.setValueStateText("Employees with an exit date must have inactive status.");
-      MessageBox.error("Employees with an exit date must have inactive status.");
+      statusSelect?.setValueStateText(i18n.getText("employeesWithExitDateMustBeInactive"));
+      MessageBox.error(i18n.getText("employeesWithExitDateMustBeInactive"));
       return;
     }
 
@@ -314,7 +331,7 @@ export default class EmployeeHandler {
       const listBinding = this.getEmployeesBinding();
       if (!listBinding) {
         dialog.setBusy(false);
-        MessageBox.error("Unable to access employees list.");
+        MessageBox.error(i18n.getText("unableToAccessEmployeesList"));
         return;
       }
 
@@ -323,7 +340,7 @@ export default class EmployeeHandler {
         creationContext,
         () => {
           dialog.setBusy(false);
-          MessageBox.error("Failed to initialize employee creation context.");
+          MessageBox.error(i18n.getText("failedToInitializeEmployeeCreation"));
         },
         (context) => {
           const readyContext = context as CreationContext & ODataContext;
@@ -334,7 +351,7 @@ export default class EmployeeHandler {
             const message =
               error instanceof Error && error.message
                 ? error.message
-                : "Failed to create employee";
+                : i18n.getText("failedToCreateEmployee");
             MessageBox.error(message);
             void readyContext.delete("$auto").catch((cleanupError) => {
               console.error("Failed to clean up failed creation context:", cleanupError);
@@ -353,8 +370,9 @@ export default class EmployeeHandler {
           Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
               dialog.setBusy(false);
+              this.guard.markClean(EmployeeHandler.DIALOG_ID);
               dialog.close();
-              MessageToast.show("Employee created");
+              MessageToast.show(i18n.getText("employeeCreated"));
               listBinding.refresh();
             })
             .catch(handleError);
@@ -364,7 +382,7 @@ export default class EmployeeHandler {
       const context = this.selection.getSelectedEmployeeContext();
       if (!context) {
         dialog.setBusy(false);
-        MessageBox.error("Select an employee first.");
+        MessageBox.error(i18n.getText("selectEmployeeFirst"));
         return;
       }
 
@@ -374,7 +392,7 @@ export default class EmployeeHandler {
       if (trimmedEmployeeId) {
         if (trimmedEmployeeId.length > 60) {
           dialog.setBusy(false);
-          MessageBox.error("Employee ID cannot exceed 60 characters.");
+          MessageBox.error(i18n.getText("employeeIdTooLongError"));
           return;
         }
         context.setProperty("employeeId", trimmedEmployeeId.toUpperCase());
@@ -394,17 +412,19 @@ export default class EmployeeHandler {
         .submitBatch("$auto")
         .then(() => {
           dialog.setBusy(false);
+          this.guard.markClean(EmployeeHandler.DIALOG_ID);
           dialog.close();
-          MessageToast.show("Employee updated");
+          MessageToast.show(i18n.getText("employeeUpdated"));
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          MessageBox.error(error.message ?? "Failed to update employee");
+          MessageBox.error(error.message ?? i18n.getText("failedToUpdateEmployee"));
         });
     }
   }
 
   public cancel(): void {
+    this.guard.markClean(EmployeeHandler.DIALOG_ID);
     const dialog = this.byId("employeeDialog") as Dialog;
     dialog.close();
   }
