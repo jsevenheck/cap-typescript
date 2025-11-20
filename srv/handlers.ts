@@ -12,6 +12,7 @@ import {
   authorizeLocations,
   authorizeEmployeeCostCenterAssignments,
 } from './middleware/company-authorization';
+import { buildUserContext, getAttributeValues } from './shared/utils/auth';
 
 const registerHandlers = (srv: Service): void => {
   // Register company authorization middleware for all write operations
@@ -21,6 +22,19 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'CostCenters', authorizeCostCenters);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Locations', authorizeLocations);
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'EmployeeCostCenterAssignments', authorizeEmployeeCostCenterAssignments);
+
+  // Register userInfo function handler
+  srv.on('userInfo', (req) => {
+    const userContext = buildUserContext(req.user as any);
+
+    return {
+      roles: Array.from(userContext.roles),
+      attributes: {
+        CompanyCode: getAttributeValues(userContext, 'CompanyCode'),
+        companyCodes: getAttributeValues(userContext, 'companyCodes'),
+      },
+    };
+  });
 
   registerClientHandlers(srv);
   registerEmployeeHandlers(srv);

@@ -28,16 +28,19 @@
                                             type="Emphasized"
                                             text="Add"
                                             icon="sap-icon://add"
+                                            visible="{auth>/canWrite}"
                                             press=".onAddClient"/>
                                     <Button
                                             text="Edit"
                                             icon="sap-icon://edit"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedClientId}}"
                                             press=".onEditClient"/>
                                     <Button
                                             text="Delete"
                                             icon="sap-icon://delete"
                                             type="Transparent"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedClientId}}"
                                             press=".onDeleteClient"/>
                                     <Button
@@ -92,16 +95,19 @@
                                             type="Emphasized"
                                             text="Add"
                                             icon="sap-icon://add"
+                                            visible="{auth>/canWrite}"
                                             press=".onAddEmployee"/>
                                     <Button
                                             text="Edit"
                                             icon="sap-icon://edit"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onEditEmployee"/>
                                     <Button
                                             text="Delete"
                                             icon="sap-icon://delete"
                                             type="Transparent"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onDeleteEmployee"/>
                                     <Button
@@ -148,16 +154,19 @@
                                             type="Emphasized"
                                             text="Add"
                                             icon="sap-icon://add"
+                                            visible="{auth>/canWrite}"
                                             press=".onAddCostCenter"/>
                                     <Button
                                             text="Edit"
                                             icon="sap-icon://edit"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedCostCenterId}}"
                                             press=".onEditCostCenter"/>
                                     <Button
                                             text="Delete"
                                             icon="sap-icon://delete"
                                             type="Transparent"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedCostCenterId}}"
                                             press=".onDeleteCostCenter"/>
                                     <Button
@@ -202,16 +211,19 @@
                                             type="Emphasized"
                                             text="Add"
                                             icon="sap-icon://add"
+                                            visible="{auth>/canWrite}"
                                             press=".onAddLocation"/>
                                     <Button
                                             text="Edit"
                                             icon="sap-icon://edit"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedLocationId}}"
                                             press=".onEditLocation"/>
                                     <Button
                                             text="Delete"
                                             icon="sap-icon://delete"
                                             type="Transparent"
+                                            visible="{auth>/canWrite}"
                                             enabled="{= !!${view>/selectedLocationId}}"
                                             press=".onDeleteLocation"/>
                                     <Button

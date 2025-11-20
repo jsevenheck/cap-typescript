@@ -1,5 +1,6 @@
 import Controller from "sap/ui/core/mvc/Controller";
 import Event from "sap/ui/base/Event";
+import JSONModel from "sap/ui/model/json/JSONModel";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -9,6 +10,7 @@ import LocationHandler from "../locations/LocationHandler.controller";
 import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -33,6 +35,43 @@ export default class Main extends Controller {
     this.employees = new EmployeeHandler(this, this.models, this.selection);
     this.costCenters = new CostCenterHandler(this, this.models, this.selection);
     this.locations = new LocationHandler(this, this.models, this.selection);
+
+    // Load user authorization information
+    this.loadAuthorizationInfo();
+  }
+
+  /**
+   * Load user authorization information from the backend
+   * and update the authorization model to control UI element visibility
+   */
+  private async loadAuthorizationInfo(): Promise<void> {
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const authModel = view.getModel("auth") as JSONModel;
+    if (!authModel) {
+      console.error("Authorization model not found");
+      return;
+    }
+
+    try {
+      const canWrite = await AuthorizationService.canWrite();
+      const isAdmin = await AuthorizationService.isAdmin();
+      const isReadOnly = await AuthorizationService.isReadOnly();
+
+      authModel.setData({
+        canWrite,
+        isAdmin,
+        isReadOnly,
+        loaded: true,
+      });
+    } catch (error) {
+      console.error("Failed to load authorization info", error);
+      // Keep default values (read-only)
+      authModel.setProperty("/loaded", true);
+    }
   }
 
   /**
@@ -68,7 +107,7 @@ export default class Main extends Controller {
     // Destroy JSON models created during initialization
     const view = this.getView();
     if (view) {
-      const modelNames = ['dialog', 'employeeDialog', 'costCenterDialog', 'locationDialog', 'view', 'statusOptions', 'employmentTypeOptions', 'countryOptions'];
+      const modelNames = ['dialog', 'employeeDialog', 'costCenterDialog', 'locationDialog', 'view', 'auth', 'statusOptions', 'employmentTypeOptions', 'countryOptions'];
       for (const modelName of modelNames) {
         const model = view.getModel(modelName);
         if (model && typeof model.destroy === 'function') {
@@ -76,6 +115,9 @@ export default class Main extends Controller {
         }
       }
     }
+
+    // Clear authorization cache
+    AuthorizationService.clearCache();
   }
 
   public onRefresh(): void {

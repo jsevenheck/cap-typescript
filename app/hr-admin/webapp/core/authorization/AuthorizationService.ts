@@ -23,47 +23,81 @@ let userInfoCache: UserInfo | null = null;
 /**
  * Authorization Service for frontend permission checks
  *
- * NOTE: This is a stub implementation. Frontend authorization checks are optional
- * UX enhancements - all actual security is enforced by the backend.
+ * NOTE: Frontend authorization checks are optional UX enhancements.
+ * All actual security is enforced by the backend.
  *
- * To implement user role detection, you would typically:
- * 1. Call a custom backend endpoint that returns user info
- * 2. Parse the JWT token from the OData model's security context
- * 3. Use the SAPUI5 UserInfo API (if available in your environment)
- *
- * See FRONTEND_AUTHORIZATION.md for complete implementation guide.
+ * This service calls the backend userInfo function to retrieve the current
+ * user's roles and attributes, then uses that information to control UI
+ * element visibility and enabled state.
  */
 export class AuthorizationService {
   /**
    * Fetch user information from the backend
    *
-   * This is a stub implementation that defaults to allowing all operations.
-   * Replace this with actual user info retrieval based on your setup.
+   * Calls the CAP service's userInfo function to retrieve authenticated
+   * user's roles and company code attributes.
    */
   private static async fetchUserInfo(): Promise<UserInfo> {
     if (userInfoCache) {
       return userInfoCache;
     }
 
-    // TODO: Implement actual user role detection
-    // Options:
-    // 1. Call a backend endpoint: GET /user-info
-    // 2. Parse user attributes from OData model security token
-    // 3. Use SAPUI5 UserInfo API if available
+    try {
+      // Call the backend userInfo function
+      const response = await fetch('/odata/v4/clients/userInfo()', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include authentication cookies
+      });
 
-    // For now, return least-privileged defaults (viewer-only)
-    // This ensures the frontend doesn't break while backend enforces security
-    console.warn("AuthorizationService: Using default read-only permissions. Implement fetchUserInfo() for role-based UI controls.");
+      if (!response.ok) {
+        console.error('Failed to fetch user info:', response.status, response.statusText);
+        throw new Error(`Failed to fetch user info: ${response.status}`);
+      }
 
-    userInfoCache = {
-      roles: [UserRole.HRViewer], // Default to least-privileged (viewer) for security
-      attributes: {},
-      isAdmin: false,
-      isViewer: true,
-      isEditor: false,
-    };
+      const data = await response.json();
+      const roles = Array.isArray(data.roles) ? data.roles : [];
+      const attributes = data.attributes || {};
 
-    return userInfoCache;
+      // Build user info from response
+      const isAdmin = roles.includes(UserRole.HRAdmin);
+      const isEditor = roles.includes(UserRole.HREditor);
+      const isViewer = roles.includes(UserRole.HRViewer);
+
+      userInfoCache = {
+        roles,
+        attributes,
+        isAdmin,
+        isEditor,
+        isViewer: isViewer && !isEditor && !isAdmin,
+      };
+
+      console.log('AuthorizationService: User info loaded', {
+        roles: userInfoCache.roles,
+        isAdmin: userInfoCache.isAdmin,
+        isEditor: userInfoCache.isEditor,
+        isViewer: userInfoCache.isViewer,
+      });
+
+      return userInfoCache;
+    } catch (error) {
+      console.error('AuthorizationService: Error fetching user info, defaulting to read-only', error);
+
+      // Fall back to least-privileged (viewer-only) on error
+      // This ensures UI doesn't break while backend still enforces security
+      userInfoCache = {
+        roles: [UserRole.HRViewer],
+        attributes: {},
+        isAdmin: false,
+        isViewer: true,
+        isEditor: false,
+      };
+
+      return userInfoCache;
+    }
   }
 
   /**
