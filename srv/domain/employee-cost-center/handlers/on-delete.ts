@@ -3,7 +3,7 @@ import type { Request } from '@sap/cds';
 
 import { validateAssignmentDeletion } from '../services/validation.service';
 import { findAssignmentById } from '../repository/employee-cost-center-assignment.repo';
-import { deriveTargetId } from '../../shared/request-context';
+import { deriveTargetId, getHeaders } from '../../shared/request-context';
 import { createServiceError } from '../../../shared/utils/errors';
 import { ensureOptimisticConcurrency, extractIfMatchHeader } from '../../../shared/utils/concurrency';
 
@@ -32,8 +32,9 @@ export const onDelete = async (req: Request): Promise<void> => {
   }
 
   // Check optimistic concurrency before deletion
-  const headerValue = extractIfMatchHeader(req.headers as Record<string, unknown>);
-  const hasHttpHeaders = Boolean(req.headers && Object.keys(req.headers).length > 0);
+  const headers = getHeaders(req);
+  const headerValue = extractIfMatchHeader(headers);
+  const hasHttpHeaders = Boolean(headers && Object.keys(headers).length > 0);
   await ensureOptimisticConcurrency({
     tx,
     entityName: 'clientmgmt.EmployeeCostCenterAssignments',
