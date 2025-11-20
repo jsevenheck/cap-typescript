@@ -204,7 +204,9 @@ export default class Main extends Controller {
     const context = costCentersPage?.getBindingContext();
     if (context) {
       this.selection.setClient(context);
+      this.selection.clearEmployee();
       this.selection.clearCostCenter();
+      this.selection.clearLocation();
     }
   }
 
@@ -241,6 +243,8 @@ export default class Main extends Controller {
     const context = locationsPage?.getBindingContext();
     if (context) {
       this.selection.setClient(context);
+      this.selection.clearEmployee();
+      this.selection.clearCostCenter();
       this.selection.clearLocation();
     }
   }
@@ -386,7 +390,7 @@ export default class Main extends Controller {
 
   public onRefreshEmployees(): void {
     // Clear employee entity cache and refresh list
-    this.cacheManager.clearEntity('Employees');
+    this.cacheManager.clearEntity('employees');
     this.employees.refresh();
   }
 
@@ -430,7 +434,7 @@ export default class Main extends Controller {
 
   public onRefreshCostCenters(): void {
     // Clear cost center entity cache and refresh list
-    this.cacheManager.clearEntity('CostCenters');
+    this.cacheManager.clearEntity('costCenters');
     this.costCenters.refresh();
   }
 
@@ -474,7 +478,7 @@ export default class Main extends Controller {
 
   public onRefreshLocations(): void {
     // Clear location entity cache and refresh list
-    this.cacheManager.clearEntity('Locations');
+    this.cacheManager.clearEntity('locations');
     this.locations.refresh();
   }
 
