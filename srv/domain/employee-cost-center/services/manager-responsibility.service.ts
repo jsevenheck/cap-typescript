@@ -58,39 +58,44 @@ export const getEmployeesInCostCenterDuringPeriod = async (
   validTo: string | null | undefined,
   excludeEmployeeId: string,
 ): Promise<Array<{ employee_ID: string }>> => {
-  // Query for assignments that overlap with the given period
+  // Query for assignments that overlap with the given period using database-level filtering
+  // Date range overlap logic: (validFrom <= existingValidTo OR existingValidTo IS NULL)
+  //                       AND (validTo >= existingValidFrom OR validTo IS NULL)
+
+  const whereConditions: any[] = [
+    { costCenter_ID: costCenterId },
+    { employee_ID: { '!=': excludeEmployeeId } },
+  ];
+
+  // Build date overlap conditions at database level
+  // Assignment must start before or when the period ends (if period has an end)
+  if (validTo !== null && validTo !== undefined) {
+    whereConditions.push({
+      or: [
+        { validFrom: { '<=': validTo } },
+      ],
+    });
+  }
+
+  // Assignment must end after or when the period starts (or has no end date)
+  whereConditions.push({
+    or: [
+      { validTo: { '>=': validFrom } },
+      { validTo: null },
+    ],
+  });
+
   const assignments = await tx.run(
     ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
-      .columns('employee_ID', 'validFrom', 'validTo')
-      .where({
-        costCenter_ID: costCenterId,
-        employee_ID: { '!=': excludeEmployeeId },
-      }),
+      .columns('employee_ID')
+      .where({ and: whereConditions }),
   );
 
   if (!Array.isArray(assignments)) {
     return [];
   }
 
-  // Filter overlapping assignments in memory to handle null validTo properly
-  const overlapping = assignments.filter((assignment: any) => {
-    const existingFrom = assignment.validFrom as string | Date;
-    const existingTo = assignment.validTo as string | Date | null | undefined;
-
-    // Normalize dates to timestamps for comparison to handle both Date objects and strings
-    const existingFromTime = new Date(existingFrom).getTime();
-    const validFromTime = new Date(validFrom).getTime();
-    const validToTime = validTo ? new Date(validTo).getTime() : null;
-    const existingToTime = existingTo ? new Date(existingTo).getTime() : null;
-
-    // Check if ranges overlap
-    const startsBeforeNewEnds = validToTime !== null ? existingFromTime <= validToTime : true;
-    const endsAfterNewStarts = existingToTime !== null ? existingToTime >= validFromTime : true;
-
-    return startsBeforeNewEnds && endsAfterNewStarts;
-  });
-
-  return overlapping.map((a: any) => ({ employee_ID: a.employee_ID }));
+  return assignments.map((a: any) => ({ employee_ID: a.employee_ID }));
 };
 
 /**
@@ -114,12 +119,13 @@ export const assignManagerToEmployeesInCostCenter = async (
     managerId,
   );
 
-  // Update the manager_ID for each of these employees
-  for (const emp of employees) {
+  // Update the manager_ID for all employees in a single batch operation
+  if (employees.length > 0) {
+    const employeeIds = employees.map((emp) => emp.employee_ID);
     await tx.run(
       ql.UPDATE('clientmgmt.Employees')
         .set({ manager_ID: managerId })
-        .where({ ID: emp.employee_ID }),
+        .where({ ID: { in: employeeIds } }),
     );
   }
 };

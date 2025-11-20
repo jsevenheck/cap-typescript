@@ -81,7 +81,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
       where: '(client.companyId in $user.CompanyCode or client.companyId in $user.companyCodes)',
     }
   ]
-  @description: 'Employee cost center assignments with date ranges for tracking historical and future cost center allocations.'
+  @description: 'Employee cost center assignments with date ranges for tracking historical and future cost center allocations. Updating or deleting an assignment requires optimistic concurrency control: supply an If-Match header when the service exposes ETags or include the latest modifiedAt timestamp in the payload.'
   entity EmployeeCostCenterAssignments as projection on db.EmployeeCostCenterAssignments;
 
   @restrict: [
