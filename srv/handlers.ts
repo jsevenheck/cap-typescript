@@ -33,7 +33,7 @@ const registerHandlers = (srv: Service): void => {
 
   // Register userInfo function handler
   (srv as ServiceWithOn).on('userInfo', (req: Request) => {
-    const userContext = buildUserContext(req.user as any);
+    const userContext = buildUserContext((req as any).user);
 
     return {
       roles: Array.from(userContext.roles),
