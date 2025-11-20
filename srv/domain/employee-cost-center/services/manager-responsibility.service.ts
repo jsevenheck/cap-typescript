@@ -125,6 +125,88 @@ export const assignManagerToEmployeesInCostCenter = async (
 };
 
 /**
+ * Find the most appropriate currently active responsible assignment for a cost center
+ * Returns the employee_ID of the responsible person, or null if none found
+ */
+const findCurrentResponsibleAssignment = async (
+  tx: Transaction,
+  costCenterId: string,
+): Promise<string | null> => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Find all responsible assignments for this cost center
+  const assignments = await tx.run(
+    ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
+      .columns('employee_ID', 'validFrom', 'validTo')
+      .where({
+        costCenter_ID: costCenterId,
+        isResponsible: true,
+      }),
+  );
+
+  if (!Array.isArray(assignments) || assignments.length === 0) {
+    return null;
+  }
+
+  // Filter for currently active assignments
+  const activeAssignments = assignments.filter((assignment: any) => {
+    const fromDate = new Date(assignment.validFrom as string);
+    fromDate.setHours(0, 0, 0, 0);
+
+    if (fromDate > today) {
+      return false; // Not started yet
+    }
+
+    if (!assignment.validTo) {
+      return true; // No end date, currently active
+    }
+
+    const toDate = new Date(assignment.validTo as string);
+    toDate.setHours(0, 0, 0, 0);
+
+    return toDate >= today; // Check if not ended
+  });
+
+  if (activeAssignments.length === 0) {
+    return null;
+  }
+
+  // Return the most recent one (by validFrom)
+  activeAssignments.sort((a: any, b: any) => {
+    const aDate = new Date(a.validFrom as string).getTime();
+    const bDate = new Date(b.validFrom as string).getTime();
+    return bDate - aDate; // Descending order
+  });
+
+  return activeAssignments[0].employee_ID as string;
+};
+
+/**
+ * Handle responsibility removal when an assignment is updated or deleted
+ * Finds another currently active responsible assignment and updates the cost center accordingly
+ */
+export const handleResponsibilityRemoval = async (
+  tx: Transaction,
+  costCenterId: string,
+  removedEmployeeId: string,
+): Promise<void> => {
+  // Find if there's another currently active responsible assignment
+  const newResponsibleId = await findCurrentResponsibleAssignment(tx, costCenterId);
+
+  if (newResponsibleId && newResponsibleId !== removedEmployeeId) {
+    // Update the cost center to use the new responsible employee
+    await updateCostCenterResponsible(tx, costCenterId, newResponsibleId);
+
+    // Note: We don't update manager assignments here because the new responsible
+    // employee should have already set up their manager assignments when their
+    // responsible assignment was created
+  }
+  // If no other responsible assignment exists, leave the cost center's responsible_ID as is
+  // (it's a required field, so we can't clear it)
+};
+
+/**
  * Handle responsibility changes when an assignment is created or updated
  * This is the main entry point for manager responsibility logic
  *

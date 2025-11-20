@@ -1,6 +1,7 @@
 /**
  * Business rules for cost center lifecycle operations.
  */
+import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import { ensureOptimisticConcurrency, type ConcurrencyCheckInput } from '../../../shared/utils/concurrency';
@@ -10,6 +11,8 @@ import type { UserContext } from '../../../shared/utils/auth';
 import { ensureUserAuthorizedForCompany } from '../../client/services/lifecycle.service';
 import type { ClientEntity, CostCenterEntity } from '../dto/cost-center.dto';
 import { findClientById, findCostCenterById, findCostCenterByCode, findEmployeeById, findEmployeesByCostCenter } from '../repository/cost-center.repo';
+
+const ql = cds.ql as typeof cds.ql;
 
 export interface CostCenterUpsertContext {
   event: 'CREATE' | 'UPDATE';
@@ -163,6 +166,23 @@ export const prepareCostCenterUpsert = async ({
   return { updates, client };
 };
 
+const findCostCenterAssignments = async (
+  tx: Transaction,
+  costCenterId: string,
+): Promise<number> => {
+  const result = await tx.run(
+    ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
+      .columns('count(*) as count')
+      .where({ costCenter_ID: costCenterId }),
+  );
+
+  if (Array.isArray(result) && result.length > 0 && typeof result[0] === 'object' && result[0] !== null) {
+    return Number((result[0] as Record<string, unknown>).count) || 0;
+  }
+
+  return 0;
+};
+
 export interface CostCenterDeletionContext {
   targetId: string;
   tx: Transaction;
@@ -201,6 +221,15 @@ export const validateCostCenterDeletion = async ({
     throw createServiceError(
       409,
       `Cannot delete cost center: ${assignedCount} employee(s) are still assigned to it.`
+    );
+  }
+
+  // Check for cost center assignments to prevent data loss
+  const assignmentCount = await findCostCenterAssignments(tx, targetId);
+  if (assignmentCount > 0) {
+    throw createServiceError(
+      409,
+      `Cannot delete cost center: ${assignmentCount} assignment record(s) exist. This would result in loss of historical data.`
     );
   }
 };
