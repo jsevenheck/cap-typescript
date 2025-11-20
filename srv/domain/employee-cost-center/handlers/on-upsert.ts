@@ -38,18 +38,32 @@ export const onUpsert = async (req: Request): Promise<void> => {
     throw new Error('client_ID is required');
   }
 
-  // Set default for isResponsible if not provided
-  if (data.isResponsible === undefined) {
-    data.isResponsible = false;
-  }
-
-  // For UPDATE, validate the assignment exists
+  // For UPDATE, validate the assignment exists and preserve isResponsible if not provided
+  let existingAssignment: Partial<EmployeeCostCenterAssignmentEntity> | undefined;
   if (isUpdate && targetId) {
-    const existing = await findAssignmentById(tx, targetId);
-    if (!existing) {
+    existingAssignment = await findAssignmentById(tx, targetId, [
+      'ID',
+      'client_ID',
+      'employee_ID',
+      'costCenter_ID',
+      'validFrom',
+      'validTo',
+      'isResponsible',
+    ]);
+    if (!existingAssignment) {
       req.error(404, 'Assignment not found');
       throw new Error('Assignment not found');
     }
+
+    // Preserve isResponsible flag on partial updates
+    if (data.isResponsible === undefined && existingAssignment.isResponsible !== undefined) {
+      data.isResponsible = existingAssignment.isResponsible;
+    }
+  }
+
+  // Set default for isResponsible if not provided (CREATE only)
+  if (data.isResponsible === undefined) {
+    data.isResponsible = false;
   }
 
   // Validate the assignment
