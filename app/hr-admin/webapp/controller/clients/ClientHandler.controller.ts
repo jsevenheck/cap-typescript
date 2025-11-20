@@ -25,7 +25,7 @@ type CreationContext = {
 
 /**
  * Validates URL format and ensures it uses http/https protocol
- * Prevents SSRF attacks by blocking private IP ranges and localhost
+ * Prevents SSRF attacks by blocking private IP ranges and localhost (IPv4 and IPv6)
  */
 function isValidHttpUrl(urlString: string): boolean {
   try {
@@ -38,12 +38,13 @@ function isValidHttpUrl(urlString: string): boolean {
 
     const hostname = url.hostname.toLowerCase();
 
-    // Block localhost and loopback addresses
+    // Block localhost and loopback addresses (IPv4 and IPv6)
     if (hostname === 'localhost' ||
         hostname === '127.0.0.1' ||
         hostname.startsWith('127.') ||
         hostname === '::1' ||
-        hostname === '0.0.0.0') {
+        hostname === '0.0.0.0' ||
+        hostname === '::') {
       return false;
     }
 
@@ -62,6 +63,20 @@ function isValidHttpUrl(urlString: string): boolean {
     }
     // 169.254.0.0/16 (link-local)
     if (hostname.match(/^169\.254\./)) {
+      return false;
+    }
+
+    // Block IPv6 private/internal ranges
+    // fc00::/7 - Unique Local Addresses (includes fd00::/8)
+    if (hostname.match(/^fc[0-9a-f]{2}:/i) || hostname.match(/^fd[0-9a-f]{2}:/i)) {
+      return false;
+    }
+    // fe80::/10 - Link-local addresses
+    if (hostname.match(/^fe[89ab][0-9a-f]:/i)) {
+      return false;
+    }
+    // ::ffff:0:0/96 - IPv4-mapped IPv6 addresses (could bypass IPv4 checks)
+    if (hostname.match(/^::ffff:/i)) {
       return false;
     }
 

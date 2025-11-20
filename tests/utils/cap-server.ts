@@ -82,8 +82,9 @@ export const startCapServer = async (): Promise<RunningServer> => {
   process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
   process.env.CDS_ENV = process.env.CDS_ENV ?? 'test';
   process.env.CDS_PROFILES = process.env.CDS_PROFILES ?? 'test';
-  const amsDisabled = true;
-  const cdsConfig = { requires: { ams: false } };
+  // Allow enabling AMS in tests via environment variable for authorization testing
+  const amsDisabled = process.env.TEST_ENABLE_AMS !== 'true';
+  const cdsConfig = { requires: { ams: !amsDisabled } };
   process.env.CDS_CONFIG = JSON.stringify(cdsConfig);
   const projectRoot = path.resolve(__dirname, '../..');
   const tsConfig = path.join(projectRoot, 'srv/tsconfig.json');
@@ -98,8 +99,8 @@ export const startCapServer = async (): Promise<RunningServer> => {
       env: {
         ...process.env,
         TS_NODE_PROJECT: tsConfig,
-        CDS_REQUIRES_AMS: 'false',
-        CDS_AMS: 'false',
+        CDS_REQUIRES_AMS: String(!amsDisabled),
+        CDS_AMS: String(!amsDisabled),
         CDS_CONFIG: JSON.stringify(cdsConfig),
         CDS_AMS_CREDENTIALS_DCLROOT: path.join(projectRoot, 'srv', 'ams'),
         CDS_AMS_CREDENTIALS_DCNROOT: path.join(projectRoot, 'srv', 'gen', 'ams', 'dcn'),
