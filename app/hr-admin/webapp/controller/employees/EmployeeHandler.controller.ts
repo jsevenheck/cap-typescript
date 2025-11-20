@@ -25,11 +25,42 @@ type CreationContext = {
 };
 
 /**
- * Validates email format using a simple regex pattern
+ * Validates email format using RFC 5322 compliant regex pattern
+ * Prevents common validation bypasses and ensures proper email format
  */
 function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  // RFC 5322 compliant email regex (simplified but robust)
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+  // Additional validation checks
+  if (!emailRegex.test(email)) {
+    return false;
+  }
+
+  // Check length constraints
+  if (email.length > 254) {
+    return false;
+  }
+
+  // Check local part (before @) length
+  const parts = email.split('@');
+  if (parts[0].length > 64) {
+    return false;
+  }
+
+  // Ensure domain has at least one dot
+  const domain = parts[1];
+  if (!domain || !domain.includes('.')) {
+    return false;
+  }
+
+  // Ensure domain doesn't start or end with dot or hyphen
+  if (domain.startsWith('.') || domain.startsWith('-') ||
+      domain.endsWith('.') || domain.endsWith('-')) {
+    return false;
+  }
+
+  return true;
 }
 
 export default class EmployeeHandler {
