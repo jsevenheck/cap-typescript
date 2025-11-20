@@ -50,8 +50,19 @@
         "settings": {
           "synchronizationMode": "None",
           "operationMode": "Server",
-          "autoExpandSelect": true
-        }
+          "autoExpandSelect": true,
+          "earlyRequests": true,
+          "updateGroupId": "$auto",
+          "groupProperties": {
+            "$auto": {
+              "submit": "Auto"
+            },
+            "read": {
+              "submit": "Auto"
+            }
+          }
+        },
+        "preload": true
       },
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",

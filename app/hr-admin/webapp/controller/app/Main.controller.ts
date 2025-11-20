@@ -5,6 +5,7 @@ import Router from "sap/ui/core/routing/Router";
 import Route from "sap/ui/core/routing/Route";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -14,6 +15,7 @@ import LocationHandler from "../locations/LocationHandler.controller";
 import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 
@@ -22,6 +24,7 @@ export default class Main extends Controller {
   private selection!: SelectionState;
   private navigation!: NavigationService;
   private guard!: UnsavedChangesGuard;
+  private cacheManager!: CacheManager;
   private clients!: ClientHandler;
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
@@ -38,6 +41,12 @@ export default class Main extends Controller {
     this.selection = new SelectionState(this, this.models);
     this.guard = new UnsavedChangesGuard();
     this.navigation = new NavigationService(this, this.selection);
+
+    // Initialize cache manager
+    const odataModel = view.getModel() as ODataModel;
+    this.cacheManager = new CacheManager(odataModel);
+
+    // Initialize entity handlers
     this.clients = new ClientHandler(this, this.models, this.selection, this.navigation, this.guard);
     this.employees = new EmployeeHandler(this, this.models, this.selection);
     this.costCenters = new CostCenterHandler(this, this.models, this.selection);
@@ -52,6 +61,9 @@ export default class Main extends Controller {
 
     // Load user authorization information
     this.loadAuthorizationInfo();
+
+    // Setup periodic cache cleanup (every 5 minutes)
+    this.setupCacheCleanup();
   }
 
   /**
@@ -268,6 +280,23 @@ export default class Main extends Controller {
   }
 
   /**
+   * Setup periodic cache cleanup to remove expired entries
+   * Runs every 5 minutes to free up storage space
+   */
+  private setupCacheCleanup(): void {
+    // Run cleanup every 5 minutes
+    const cleanupInterval = 5 * 60 * 1000;
+    setInterval(() => {
+      this.cacheManager.clearExpired();
+    }, cleanupInterval);
+
+    // Run initial cleanup after 1 minute
+    setTimeout(() => {
+      this.cacheManager.clearExpired();
+    }, 60000);
+  }
+
+  /**
    * Cleanup lifecycle method - called when controller is destroyed
    * Prevents memory leaks by destroying all service instances and models
    */
@@ -314,6 +343,8 @@ export default class Main extends Controller {
   }
 
   public onRefresh(): void {
+    // Clear client entity cache and refresh list
+    this.cacheManager.clearEntity('Clients');
     this.clients.refresh();
   }
 
@@ -354,6 +385,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshEmployees(): void {
+    // Clear employee entity cache and refresh list
+    this.cacheManager.clearEntity('Employees');
     this.employees.refresh();
   }
 
@@ -396,6 +429,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshCostCenters(): void {
+    // Clear cost center entity cache and refresh list
+    this.cacheManager.clearEntity('CostCenters');
     this.costCenters.refresh();
   }
 
@@ -438,6 +473,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshLocations(): void {
+    // Clear location entity cache and refresh list
+    this.cacheManager.clearEntity('Locations');
     this.locations.refresh();
   }
 

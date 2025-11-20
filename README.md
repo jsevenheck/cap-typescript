@@ -184,10 +184,19 @@ Optimized queries with strategic indexing:
 - Reduced N+1 query patterns
 
 ### Frontend Performance
-- Lazy loading on all lists (load 20 items, scroll for more)
-- Optimized for 1000+ records
-- Abortable requests to prevent memory leaks
-- Global error handling for OData errors and unhandled promise rejections
+- **Intelligent Caching Strategy**:
+  - OData V4 model caching with earlyRequests for optimized data loading
+  - Browser storage caching (sessionStorage/localStorage) with TTL expiration
+  - Automatic cache cleanup every 5 minutes
+  - Selective cache invalidation on refresh actions
+- **List Optimization**:
+  - Lazy loading on all lists (load 20 items, scroll for more)
+  - Optimized for 1000+ records
+- **Request Management**:
+  - Abortable requests to prevent memory leaks
+  - Automatic request batching via OData groupProperties
+- **Error Handling**:
+  - Global error handling for OData errors and unhandled promise rejections
 
 ## 🛡️ Data Integrity Features
 
@@ -389,7 +398,6 @@ cf deploy mta_archives/cap-ts_1.0.0.mtar
 
 ### Current Limitations
 - Test coverage at ~12% (target: 70%+)
-- Frontend caching not yet implemented
 - i18n migration incomplete for some controllers (Employee, CostCenter, Location)
 
 ### Completed Improvements ✅
@@ -409,10 +417,17 @@ cf deploy mta_archives/cap-ts_1.0.0.mtar
   - Confirmation dialog with Yes/No options
   - Integrated with ClientHandler (can extend to other handlers)
   - Prevents accidental data loss during navigation
+- [x] **Implement frontend caching for frequently accessed data**
+  - CacheService with TTL (time-to-live) support and automatic expiration
+  - Support for both sessionStorage (session-only) and localStorage (persistent)
+  - CacheManager for coordinated cache invalidation (OData + browser storage)
+  - OData V4 model caching enabled with earlyRequests and groupProperties
+  - Periodic cache cleanup (every 5 minutes) to free up storage space
+  - Manual cache invalidation on refresh button clicks
+  - Cache statistics for monitoring (entry count, size in KB)
 
 ### Planned Improvements
 - [ ] Increase test coverage to 70%+ (currently at ~12%)
-- [ ] Implement frontend caching for frequently accessed data
 - [ ] Complete i18n migration for remaining controllers (Employee, CostCenter, Location)
 - [ ] Extend navigation guards to all entity handlers
 
