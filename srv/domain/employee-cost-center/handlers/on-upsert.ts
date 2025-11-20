@@ -4,8 +4,9 @@ import type { Request } from '@sap/cds';
 import type { EmployeeCostCenterAssignmentEntity } from '../dto/employee-cost-center-assignment.dto';
 import { validateAssignment } from '../services/validation.service';
 import { findAssignmentById } from '../repository/employee-cost-center-assignment.repo';
-import { deriveTargetId } from '../../shared/request-context';
+import { deriveTargetId, getHeaders } from '../../shared/request-context';
 import { createServiceError } from '../../../shared/utils/errors';
+import { ensureOptimisticConcurrency, extractIfMatchHeader } from '../../../shared/utils/concurrency';
 
 export const onUpsert = async (req: Request): Promise<void> => {
   if (!req.data || typeof req.data !== 'object') {
@@ -19,23 +20,19 @@ export const onUpsert = async (req: Request): Promise<void> => {
 
   // Validate required fields
   if (!data.employee_ID) {
-    req.error(400, 'employee_ID is required');
-    throw new Error('employee_ID is required');
+    throw createServiceError(400, 'employee_ID is required');
   }
 
   if (!data.costCenter_ID) {
-    req.error(400, 'costCenter_ID is required');
-    throw new Error('costCenter_ID is required');
+    throw createServiceError(400, 'costCenter_ID is required');
   }
 
   if (!data.validFrom) {
-    req.error(400, 'validFrom is required');
-    throw new Error('validFrom is required');
+    throw createServiceError(400, 'validFrom is required');
   }
 
   if (!data.client_ID) {
-    req.error(400, 'client_ID is required');
-    throw new Error('client_ID is required');
+    throw createServiceError(400, 'client_ID is required');
   }
 
   // For UPDATE, validate the assignment exists and preserve isResponsible if not provided
@@ -49,11 +46,24 @@ export const onUpsert = async (req: Request): Promise<void> => {
       'validFrom',
       'validTo',
       'isResponsible',
+      'modifiedAt',
     ]);
     if (!existingAssignment) {
-      req.error(404, 'Assignment not found');
-      throw new Error('Assignment not found');
+      throw createServiceError(404, 'Assignment not found');
     }
+
+    // Check optimistic concurrency
+    const headers = getHeaders(req);
+    const headerValue = extractIfMatchHeader(headers);
+    const hasHttpHeaders = Boolean(headers && Object.keys(headers).length > 0);
+    await ensureOptimisticConcurrency({
+      tx,
+      entityName: 'clientmgmt.EmployeeCostCenterAssignments',
+      targetId,
+      headerValue,
+      hasHttpHeaders,
+      payloadValue: data.modifiedAt,
+    });
 
     // Store pre-update state in request context for after-upsert handler
     (req as any)._preUpdateAssignment = existingAssignment;

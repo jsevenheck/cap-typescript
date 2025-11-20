@@ -35,6 +35,49 @@ export default class Main extends Controller {
     this.locations = new LocationHandler(this, this.models, this.selection);
   }
 
+  /**
+   * Cleanup lifecycle method - called when controller is destroyed
+   * Prevents memory leaks by destroying all service instances and models
+   */
+  public onExit(): void {
+    // Destroy handler instances
+    if (this.clients && typeof (this.clients as any).destroy === 'function') {
+      (this.clients as any).destroy();
+    }
+    if (this.employees && typeof (this.employees as any).destroy === 'function') {
+      (this.employees as any).destroy();
+    }
+    if (this.costCenters && typeof (this.costCenters as any).destroy === 'function') {
+      (this.costCenters as any).destroy();
+    }
+    if (this.locations && typeof (this.locations as any).destroy === 'function') {
+      (this.locations as any).destroy();
+    }
+
+    // Destroy service instances
+    if (this.navigation && typeof (this.navigation as any).destroy === 'function') {
+      (this.navigation as any).destroy();
+    }
+    if (this.selection && typeof (this.selection as any).destroy === 'function') {
+      (this.selection as any).destroy();
+    }
+    if (this.models && typeof (this.models as any).destroy === 'function') {
+      (this.models as any).destroy();
+    }
+
+    // Destroy JSON models created during initialization
+    const view = this.getView();
+    if (view) {
+      const modelNames = ['dialog', 'employeeDialog', 'costCenterDialog', 'locationDialog', 'view', 'statusOptions', 'employmentTypeOptions', 'countryOptions'];
+      for (const modelName of modelNames) {
+        const model = view.getModel(modelName);
+        if (model && typeof model.destroy === 'function') {
+          model.destroy();
+        }
+      }
+    }
+  }
+
   public onRefresh(): void {
     this.clients.refresh();
   }

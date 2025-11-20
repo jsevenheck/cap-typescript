@@ -33,6 +33,9 @@ entity Clients : managed, cuid {
 }
 
 @odata.etag: 'modifiedAt'
+@cds.persistence.indices: [
+  { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
+]
 entity Locations : managed, cuid {
   city          : String(100) not null;
   country       : Association to CommonCountries not null;
@@ -47,6 +50,11 @@ entity Locations : managed, cuid {
 
 @odata.etag: 'modifiedAt'
 @personalData: { dataSubject: 'Employee' }
+@cds.persistence.indices: [
+  { name: 'Employees_status_idx', elements: ['status'] },
+  { name: 'Employees_employmentType_idx', elements: ['employmentType'] },
+  { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] }
+]
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
@@ -76,7 +84,8 @@ entity EmployeeIdCounters {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] }
+  { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] },
+  { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
 ]
 entity CostCenters : managed, cuid {
   code         : String(40)  not null;
@@ -92,7 +101,9 @@ entity CostCenters : managed, cuid {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'EmpCCAssign_emp_valid_idx', elements: ['employee_ID', 'validFrom', 'validTo'] }
+  { name: 'EmpCCAssign_emp_valid_idx', elements: ['employee_ID', 'validFrom', 'validTo'] },
+  { name: 'EmpCCAssign_cc_valid_idx', elements: ['costCenter_ID', 'validFrom', 'validTo'] },
+  { name: 'EmpCCAssign_responsible_idx', elements: ['costCenter_ID', 'isResponsible'] }
 ]
 entity EmployeeCostCenterAssignments : managed, cuid {
   employee      : Association to Employees not null;

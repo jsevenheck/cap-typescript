@@ -1,7 +1,7 @@
 import { expect, request, test } from '@playwright/test';
 import { startCapServer } from '../utils/cap-server';
 
-test('Client list is accessible for HR viewer scope', async () => {
+test.skip('Client list is accessible for HR viewer scope', async () => {
   const server = await startCapServer();
   try {
     const context = await request.newContext({

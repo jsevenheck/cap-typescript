@@ -1,6 +1,5 @@
 import type { Request, Service } from '@sap/cds';
 
-import { onRead } from './handlers/on-read';
 import { onUpsert } from './handlers/on-upsert';
 import { onDelete } from './handlers/on-delete';
 import { createIntegrityValidator } from '../shared/integrity-handler';
@@ -23,20 +22,11 @@ const validateLocationIntegrity = async (req: Request): Promise<void> => {
   await validator.validateLocationRelations(entries);
 };
 
-type ServiceWithOn = Service & {
-  on: (
-    event: string | string[],
-    entityOrHandler: string | ((...args: any[]) => unknown),
-    maybeHandler?: (...args: any[]) => unknown,
-  ) => unknown;
-};
-
 export const registerLocationHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE'], 'Locations', validateLocationIntegrity);
   srv.before('CREATE', 'Locations', onUpsert);
   srv.before('UPDATE', 'Locations', onUpsert);
   srv.before('DELETE', 'Locations', onDelete);
-  (srv as ServiceWithOn).on('READ', 'Locations', onRead);
 };
 
 export default registerLocationHandlers;

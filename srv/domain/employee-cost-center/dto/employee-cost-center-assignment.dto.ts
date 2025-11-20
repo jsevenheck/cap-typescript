@@ -6,6 +6,10 @@ export interface EmployeeCostCenterAssignmentEntity {
   validTo?: string | null;
   isResponsible: boolean;
   client_ID: string;
+  modifiedAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  createdBy?: string | null;
+  modifiedBy?: string | null;
 }
 
 export interface EmployeeEntity {
