@@ -30,7 +30,12 @@ export const afterUpsert = async (req: Request): Promise<void> => {
       !data.isResponsible &&
       isAssignmentCurrentlyActive(preUpdateAssignment.validFrom as string, preUpdateAssignment.validTo)
     ) {
-      await handleResponsibilityRemoval(tx, data.costCenter_ID, data.employee_ID);
+      // Use pre-update IDs to clean up the ORIGINAL cost center that lost its responsible employee
+      await handleResponsibilityRemoval(
+        tx,
+        preUpdateAssignment.costCenter_ID as string,
+        preUpdateAssignment.employee_ID as string,
+      );
     }
   }
 
