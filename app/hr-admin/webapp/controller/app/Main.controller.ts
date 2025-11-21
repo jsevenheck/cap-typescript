@@ -481,7 +481,7 @@ export default class Main extends Controller {
 
   public onRefreshEmployees(): void {
     // Clear employee entity cache and refresh list
-    this.cacheManager.clearEntity('employees');
+    this.cacheManager.clearEntity('Employees');
     this.employees.refresh();
   }
 
@@ -525,7 +525,7 @@ export default class Main extends Controller {
 
   public onRefreshCostCenters(): void {
     // Clear cost center entity cache and refresh list
-    this.cacheManager.clearEntity('costCenters');
+    this.cacheManager.clearEntity('CostCenters');
     this.costCenters.refresh();
   }
 
@@ -569,7 +569,7 @@ export default class Main extends Controller {
 
   public onRefreshLocations(): void {
     // Clear location entity cache and refresh list
-    this.cacheManager.clearEntity('locations');
+    this.cacheManager.clearEntity('Locations');
     this.locations.refresh();
   }
 
