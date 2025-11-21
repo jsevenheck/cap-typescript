@@ -7,6 +7,7 @@ import { findAssignmentById } from '../repository/employee-cost-center-assignmen
 import { deriveTargetId, getHeaders } from '../../shared/request-context';
 import { createServiceError } from '../../../shared/utils/errors';
 import { ensureOptimisticConcurrency, extractIfMatchHeader } from '../../../shared/utils/concurrency';
+import { validateDateRange } from '../../../shared/utils/date';
 
 export const onUpsert = async (req: Request): Promise<void> => {
   if (!req.data || typeof req.data !== 'object') {
@@ -33,6 +34,13 @@ export const onUpsert = async (req: Request): Promise<void> => {
 
   if (!data.client_ID) {
     throw createServiceError(400, 'client_ID is required');
+  }
+
+  // Validate date range: validFrom must be before validTo
+  try {
+    validateDateRange(data.validFrom, data.validTo, 'EmployeeCostCenterAssignment');
+  } catch (error) {
+    throw createServiceError(400, error instanceof Error ? error.message : 'Invalid date range');
   }
 
   // For UPDATE, validate the assignment exists and preserve isResponsible if not provided

@@ -1,4 +1,5 @@
 /** Utility helpers for parsing and normalising date values. */
+
 /** Converts a variety of input types into a valid Date or undefined. */
 export const toDateValue = (value: unknown): Date | undefined => {
   if (value instanceof Date) {
@@ -16,4 +17,39 @@ export const toDateValue = (value: unknown): Date | undefined => {
   }
 
   return undefined;
+};
+
+/**
+ * Validates that validFrom is before validTo for date range fields.
+ * Throws an error if validation fails.
+ *
+ * @param validFrom - The start date of the range
+ * @param validTo - The end date of the range (optional)
+ * @param entityName - Name of the entity for error messaging
+ * @throws {Error} If validFrom >= validTo
+ */
+export const validateDateRange = (
+  validFrom: unknown,
+  validTo: unknown,
+  entityName: string = 'entity',
+): void => {
+  // If validTo is not provided, validation passes
+  if (validTo === null || validTo === undefined) {
+    return;
+  }
+
+  const fromDate = toDateValue(validFrom);
+  const toDate = toDateValue(validTo);
+
+  // If either date is invalid, let other validation catch it
+  if (!fromDate || !toDate) {
+    return;
+  }
+
+  // Validate that validFrom < validTo
+  if (fromDate >= toDate) {
+    throw new Error(
+      `Invalid date range for ${entityName}: validFrom must be before validTo (validFrom: ${fromDate.toISOString()}, validTo: ${toDate.toISOString()})`,
+    );
+  }
 };

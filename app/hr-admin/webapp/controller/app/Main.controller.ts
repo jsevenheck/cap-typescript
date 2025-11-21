@@ -6,6 +6,7 @@ import Route from "sap/ui/core/routing/Route";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import Log from "sap/base/Log";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -29,6 +30,8 @@ export default class Main extends Controller {
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
   private locations!: LocationHandler;
+  private cacheCleanupIntervalId?: number;
+  private initialCacheCleanupTimeoutId?: number;
 
   public onInit(): void {
     const view = this.getView();
@@ -146,7 +149,7 @@ export default class Main extends Controller {
     const clientId = args?.clientId;
 
     if (!clientId) {
-      console.error("No clientId in route parameters");
+      Log.error("No clientId in route parameters", undefined, "hr.admin.Main");
       return;
     }
 
@@ -157,7 +160,7 @@ export default class Main extends Controller {
 
     const model = view.getModel() as ODataModel;
     if (!model) {
-      console.error("OData model not found");
+      Log.error("OData model not found", undefined, "hr.admin.Main");
       return;
     }
 
@@ -210,7 +213,7 @@ export default class Main extends Controller {
     const clientId = args?.clientId;
 
     if (!clientId) {
-      console.error("No clientId in route parameters");
+      Log.error("No clientId in route parameters", undefined, "hr.admin.Main");
       return;
     }
 
@@ -221,7 +224,7 @@ export default class Main extends Controller {
 
     const model = view.getModel() as ODataModel;
     if (!model) {
-      console.error("OData model not found");
+      Log.error("OData model not found", undefined, "hr.admin.Main");
       return;
     }
 
@@ -273,7 +276,7 @@ export default class Main extends Controller {
     const clientId = args?.clientId;
 
     if (!clientId) {
-      console.error("No clientId in route parameters");
+      Log.error("No clientId in route parameters", undefined, "hr.admin.Main");
       return;
     }
 
@@ -284,7 +287,7 @@ export default class Main extends Controller {
 
     const model = view.getModel() as ODataModel;
     if (!model) {
-      console.error("OData model not found");
+      Log.error("OData model not found", undefined, "hr.admin.Main");
       return;
     }
 
@@ -352,7 +355,7 @@ export default class Main extends Controller {
 
     const authModel = view.getModel("auth") as JSONModel;
     if (!authModel) {
-      console.error("Authorization model not found");
+      Log.error("Authorization model not found", undefined, "hr.admin.Main");
       return;
     }
 
@@ -368,7 +371,7 @@ export default class Main extends Controller {
         loaded: true,
       });
     } catch (error) {
-      console.error("Failed to load authorization info", error);
+      Log.error("Failed to load authorization info", error instanceof Error ? error.message : String(error), "hr.admin.Main");
       // Keep default values (read-only)
       authModel.setProperty("/loaded", true);
     }
@@ -381,14 +384,14 @@ export default class Main extends Controller {
   private setupCacheCleanup(): void {
     // Run cleanup every 5 minutes
     const cleanupInterval = 5 * 60 * 1000;
-    setInterval(() => {
+    this.cacheCleanupIntervalId = setInterval(() => {
       this.cacheManager.clearExpired();
-    }, cleanupInterval);
+    }, cleanupInterval) as unknown as number;
 
     // Run initial cleanup after 1 minute
-    setTimeout(() => {
+    this.initialCacheCleanupTimeoutId = setTimeout(() => {
       this.cacheManager.clearExpired();
-    }, 60000);
+    }, 60000) as unknown as number;
   }
 
   /**
@@ -396,6 +399,16 @@ export default class Main extends Controller {
    * Prevents memory leaks by destroying all service instances and models
    */
   public onExit(): void {
+    // Clear timers to prevent memory leaks
+    if (this.cacheCleanupIntervalId !== undefined) {
+      clearInterval(this.cacheCleanupIntervalId);
+      this.cacheCleanupIntervalId = undefined;
+    }
+    if (this.initialCacheCleanupTimeoutId !== undefined) {
+      clearTimeout(this.initialCacheCleanupTimeoutId);
+      this.initialCacheCleanupTimeoutId = undefined;
+    }
+
     // Destroy handler instances
     if (this.clients && typeof (this.clients as any).destroy === 'function') {
       (this.clients as any).destroy();

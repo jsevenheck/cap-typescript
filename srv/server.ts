@@ -2,6 +2,8 @@ import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
 
 import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
+import { apiRateLimiter } from './middleware/rateLimit';
+import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import {
@@ -41,14 +43,52 @@ const correlationIdMiddleware = (req: Request, res: Response, next: NextFunction
 };
 
 cds.on('bootstrap', (app: Application) => {
+  // Add security headers to all responses
+  app.use(securityHeadersMiddleware);
+
   // Add correlation ID middleware to all routes
   app.use(correlationIdMiddleware);
 
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'ok' });
+  /**
+   * Health check endpoint - verifies application and database connectivity
+   * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
+   */
+  app.get('/health', async (_req, res) => {
+    try {
+      // Verify database connectivity by attempting a simple query
+      const db = (cds as any).db ?? (await cds.connect.to('db'));
+
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+
+      // Simple connectivity test - query for any client (limit 1)
+      const { SELECT } = cds.ql;
+      await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
+
+      res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        checks: {
+          database: 'connected',
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Health check failed');
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        checks: {
+          database: 'disconnected',
+        },
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   });
 
-  app.get('/api/employees/active', apiKeyMiddleware, activeEmployeesHandler);
+  // Public API endpoint with rate limiting and API key authentication
+  // Rate limiter runs first to prevent brute-force API key attacks
+  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
 
   logger.info('Application bootstrap complete');
 });
