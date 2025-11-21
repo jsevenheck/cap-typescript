@@ -145,6 +145,17 @@ export default class Main extends Controller {
       return;
     }
 
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
     // Bind all detail pages to the client entity
     const clientPath = `/Clients('${clientId}')`;
     const employeesPage = this.byId("employeesPage");
@@ -163,8 +174,11 @@ export default class Main extends Controller {
       locationsPage.bindElement({ path: clientPath });
     }
 
-    // Update selection state with the context once available
-    const context = employeesPage?.getBindingContext();
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+    const context = contextBinding.getBoundContext();
+
     if (context) {
       this.selection.setClient(context);
       this.selection.clearEmployee();
@@ -185,6 +199,17 @@ export default class Main extends Controller {
       return;
     }
 
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
     // Bind all detail pages to the client entity
     const clientPath = `/Clients('${clientId}')`;
     const costCentersPage = this.byId("costCentersPage");
@@ -202,8 +227,11 @@ export default class Main extends Controller {
       locationsPage.bindElement({ path: clientPath });
     }
 
-    // Update selection state
-    const context = costCentersPage?.getBindingContext();
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+    const context = contextBinding.getBoundContext();
+
     if (context) {
       this.selection.setClient(context);
       this.selection.clearEmployee();
@@ -224,6 +252,17 @@ export default class Main extends Controller {
       return;
     }
 
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
     // Bind all detail pages to the client entity
     const clientPath = `/Clients('${clientId}')`;
     const locationsPage = this.byId("locationsPage");
@@ -241,8 +280,11 @@ export default class Main extends Controller {
       costCentersPage.bindElement({ path: clientPath });
     }
 
-    // Update selection state
-    const context = locationsPage?.getBindingContext();
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+    const context = contextBinding.getBoundContext();
+
     if (context) {
       this.selection.setClient(context);
       this.selection.clearEmployee();
