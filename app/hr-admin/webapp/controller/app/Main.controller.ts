@@ -94,6 +94,11 @@ export default class Main extends Controller {
     if (locationsRoute) {
       locationsRoute.attachPatternMatched(this.onLocationsRouteMatched.bind(this));
     }
+
+    const clientsRoute = router.getRoute("clients");
+    if (clientsRoute) {
+      clientsRoute.attachPatternMatched(this.onClientsRouteMatched.bind(this));
+    }
   }
 
   /**
@@ -185,6 +190,12 @@ export default class Main extends Controller {
       this.selection.clearCostCenter();
       this.selection.clearLocation();
     }
+
+    // Navigate to employees page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && employeesPage) {
+      app.to(employeesPage.getId());
+    }
   }
 
   /**
@@ -238,6 +249,12 @@ export default class Main extends Controller {
       this.selection.clearCostCenter();
       this.selection.clearLocation();
     }
+
+    // Navigate to cost centers page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && costCentersPage) {
+      app.to(costCentersPage.getId());
+    }
   }
 
   /**
@@ -290,6 +307,24 @@ export default class Main extends Controller {
       this.selection.clearEmployee();
       this.selection.clearCostCenter();
       this.selection.clearLocation();
+    }
+
+    // Navigate to locations page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && locationsPage) {
+      app.to(locationsPage.getId());
+    }
+  }
+
+  /**
+   * Handle clients route matched - navigate back to main page
+   */
+  private onClientsRouteMatched(): void {
+    // Navigate back to clients page in the App NavContainer
+    const app = this.byId("app") as any;
+    const mainPage = this.byId("mainPage");
+    if (app && mainPage) {
+      app.to(mainPage.getId());
     }
   }
 
