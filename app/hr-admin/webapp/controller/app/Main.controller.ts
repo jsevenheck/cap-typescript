@@ -1,6 +1,11 @@
 import Controller from "sap/ui/core/mvc/Controller";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
+import Router from "sap/ui/core/routing/Router";
+import Route from "sap/ui/core/routing/Route";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -10,12 +15,16 @@ import LocationHandler from "../locations/LocationHandler.controller";
 import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
   private selection!: SelectionState;
   private navigation!: NavigationService;
+  private guard!: UnsavedChangesGuard;
+  private cacheManager!: CacheManager;
   private clients!: ClientHandler;
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
@@ -30,14 +39,305 @@ export default class Main extends Controller {
     initializeModels(view);
     this.models = new DialogModelAccessor(this);
     this.selection = new SelectionState(this, this.models);
+    this.guard = new UnsavedChangesGuard();
     this.navigation = new NavigationService(this, this.selection);
-    this.clients = new ClientHandler(this, this.models, this.selection, this.navigation);
-    this.employees = new EmployeeHandler(this, this.models, this.selection);
-    this.costCenters = new CostCenterHandler(this, this.models, this.selection);
-    this.locations = new LocationHandler(this, this.models, this.selection);
+
+    // Initialize cache manager
+    const odataModel = view.getModel() as ODataModel;
+    this.cacheManager = new CacheManager(odataModel);
+
+    // Initialize entity handlers
+    this.clients = new ClientHandler(this, this.models, this.selection, this.navigation, this.guard);
+    this.employees = new EmployeeHandler(this, this.models, this.selection, this.guard);
+    this.costCenters = new CostCenterHandler(this, this.models, this.selection, this.guard);
+    this.locations = new LocationHandler(this, this.models, this.selection, this.guard);
+
+    // Initialize router and attach navigation guards
+    const router = this.getOwnerComponent()?.getRouter();
+    if (router) {
+      this.attachNavigationGuards(router);
+      router.initialize();
+    }
 
     // Load user authorization information
     this.loadAuthorizationInfo();
+
+    // Setup periodic cache cleanup (every 5 minutes)
+    this.setupCacheCleanup();
+  }
+
+  /**
+   * Attach navigation guards to all routes to check for unsaved changes
+   */
+  private attachNavigationGuards(router: Router): void {
+    const routes = ["clients", "employees", "costCenters", "locations"];
+
+    routes.forEach((routeName) => {
+      const route = router.getRoute(routeName);
+      if (route) {
+        route.attachBeforeMatched(this.onBeforeRouteMatched.bind(this));
+      }
+    });
+
+    // Attach pattern matched handlers to bind pages to client context
+    const employeesRoute = router.getRoute("employees");
+    if (employeesRoute) {
+      employeesRoute.attachPatternMatched(this.onEmployeesRouteMatched.bind(this));
+    }
+
+    const costCentersRoute = router.getRoute("costCenters");
+    if (costCentersRoute) {
+      costCentersRoute.attachPatternMatched(this.onCostCentersRouteMatched.bind(this));
+    }
+
+    const locationsRoute = router.getRoute("locations");
+    if (locationsRoute) {
+      locationsRoute.attachPatternMatched(this.onLocationsRouteMatched.bind(this));
+    }
+
+    const clientsRoute = router.getRoute("clients");
+    if (clientsRoute) {
+      clientsRoute.attachPatternMatched(this.onClientsRouteMatched.bind(this));
+    }
+  }
+
+  /**
+   * Called before a route is matched - check for unsaved changes
+   */
+  private onBeforeRouteMatched(event: Event): void {
+    const i18n = this.getI18nBundle();
+
+    // If there are unsaved changes, show confirmation
+    if (this.guard.hasDirtyForms()) {
+      // Prevent route navigation
+      event.preventDefault();
+
+      // Get route details for pending navigation
+      const route = event.getSource() as Route;
+      const args = event.getParameter("arguments");
+
+      // Ask user to confirm
+      this.guard.checkNavigation(i18n, () => {
+        // User confirmed - manually trigger navigation
+        const router = this.getOwnerComponent()?.getRouter();
+        if (router && route) {
+          // Use route name, not pattern, for navTo
+          const routeName = (route as any)._oConfig?.name || route.getPattern();
+          router.navTo(routeName, args);
+        }
+      });
+    }
+  }
+
+  /**
+   * Get i18n resource bundle for localized messages
+   */
+  private getI18nBundle(): ResourceBundle {
+    const view = this.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
+  }
+
+  /**
+   * Handle employees route matched - bind page to client context
+   */
+  private onEmployeesRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const employeesPage = this.byId("employeesPage");
+    const costCentersPage = this.byId("costCentersPage");
+    const locationsPage = this.byId("locationsPage");
+
+    // Use bindElement to properly bind the page to the client context
+    // This handles async loading and context lifecycle automatically
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
+
+    // Navigate to employees page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && employeesPage) {
+      app.to(employeesPage.getId());
+    }
+  }
+
+  /**
+   * Handle cost centers route matched - bind page to client context
+   */
+  private onCostCentersRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const costCentersPage = this.byId("costCentersPage");
+    const employeesPage = this.byId("employeesPage");
+    const locationsPage = this.byId("locationsPage");
+
+    // Use bindElement to properly bind the page to the client context
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
+
+    // Navigate to cost centers page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && costCentersPage) {
+      app.to(costCentersPage.getId());
+    }
+  }
+
+  /**
+   * Handle locations route matched - bind page to client context
+   */
+  private onLocationsRouteMatched(event: Event): void {
+    const args = event.getParameter("arguments") as { clientId: string };
+    const clientId = args?.clientId;
+
+    if (!clientId) {
+      console.error("No clientId in route parameters");
+      return;
+    }
+
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const model = view.getModel() as ODataModel;
+    if (!model) {
+      console.error("OData model not found");
+      return;
+    }
+
+    // Bind all detail pages to the client entity
+    const clientPath = `/Clients('${clientId}')`;
+    const locationsPage = this.byId("locationsPage");
+    const employeesPage = this.byId("employeesPage");
+    const costCentersPage = this.byId("costCentersPage");
+
+    // Use bindElement to properly bind the page to the client context
+    if (locationsPage) {
+      locationsPage.bindElement({ path: clientPath });
+    }
+    if (employeesPage) {
+      employeesPage.bindElement({ path: clientPath });
+    }
+    if (costCentersPage) {
+      costCentersPage.bindElement({ path: clientPath });
+    }
+
+    // Create context for selection state using model.bindContext
+    // This returns a context immediately, even before data is loaded
+    const contextBinding = model.bindContext(clientPath);
+
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
+
+    // Navigate to locations page in the App NavContainer
+    const app = this.byId("app") as any;
+    if (app && locationsPage) {
+      app.to(locationsPage.getId());
+    }
+  }
+
+  /**
+   * Handle clients route matched - navigate back to main page
+   */
+  private onClientsRouteMatched(): void {
+    // Navigate back to clients page in the App NavContainer
+    const app = this.byId("app") as any;
+    const mainPage = this.byId("mainPage");
+    if (app && mainPage) {
+      app.to(mainPage.getId());
+    }
   }
 
   /**
@@ -72,6 +372,23 @@ export default class Main extends Controller {
       // Keep default values (read-only)
       authModel.setProperty("/loaded", true);
     }
+  }
+
+  /**
+   * Setup periodic cache cleanup to remove expired entries
+   * Runs every 5 minutes to free up storage space
+   */
+  private setupCacheCleanup(): void {
+    // Run cleanup every 5 minutes
+    const cleanupInterval = 5 * 60 * 1000;
+    setInterval(() => {
+      this.cacheManager.clearExpired();
+    }, cleanupInterval);
+
+    // Run initial cleanup after 1 minute
+    setTimeout(() => {
+      this.cacheManager.clearExpired();
+    }, 60000);
   }
 
   /**
@@ -121,6 +438,8 @@ export default class Main extends Controller {
   }
 
   public onRefresh(): void {
+    // Clear client entity cache and refresh list
+    this.cacheManager.clearEntity('Clients');
     this.clients.refresh();
   }
 
@@ -161,6 +480,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshEmployees(): void {
+    // Clear employee entity cache and refresh list
+    this.cacheManager.clearEntity('Employees');
     this.employees.refresh();
   }
 
@@ -203,6 +524,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshCostCenters(): void {
+    // Clear cost center entity cache and refresh list
+    this.cacheManager.clearEntity('CostCenters');
     this.costCenters.refresh();
   }
 
@@ -245,6 +568,8 @@ export default class Main extends Controller {
   }
 
   public onRefreshLocations(): void {
+    // Clear location entity cache and refresh list
+    this.cacheManager.clearEntity('Locations');
     this.locations.refresh();
   }
 

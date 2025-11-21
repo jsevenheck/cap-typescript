@@ -49,8 +49,10 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 ### Frontend (SAPUI5)
 - **Framework:** SAPUI5 1.126.1 (OpenUI5)
 - **Language:** TypeScript 5.6.3
-- **UI Pattern:** Single Page Application with IconTabBar
+- **UI Pattern:** Single Page Application with UI5 Router
+- **Routing:** Hash-based routing with browser history support
 - **Data Binding:** OData V4 Model
+- **Internationalization:** i18n with ResourceBundle
 - **Theme:** Horizon
 - **Build Tool:** UI5 CLI 4.0
 - **Dev Server:** Port 8081 with proxy to backend
@@ -182,10 +184,19 @@ Optimized queries with strategic indexing:
 - Reduced N+1 query patterns
 
 ### Frontend Performance
-- Lazy loading on all lists (load 20 items, scroll for more)
-- Optimized for 1000+ records
-- Abortable requests to prevent memory leaks
-- Global error handling for OData errors and unhandled promise rejections
+- **Intelligent Caching Strategy**:
+  - OData V4 model caching with earlyRequests for optimized data loading
+  - Browser storage caching (sessionStorage/localStorage) with TTL expiration
+  - Automatic cache cleanup every 5 minutes
+  - Selective cache invalidation on refresh actions
+- **List Optimization**:
+  - Lazy loading on all lists (load 20 items, scroll for more)
+  - Optimized for 1000+ records
+- **Request Management**:
+  - Abortable requests to prevent memory leaks
+  - Automatic request batching via OData groupProperties
+- **Error Handling**:
+  - Global error handling for OData errors and unhandled promise rejections
 
 ## 🛡️ Data Integrity Features
 
@@ -386,16 +397,37 @@ cf deploy mta_archives/cap-ts_1.0.0.mtar
 ## 🐛 Known Issues & Limitations
 
 ### Current Limitations
-- No routing implementation (browser back button limitations)
-- i18n keys defined but not used in views (hardcoded strings remain)
 - Test coverage at ~12% (target: 70%+)
 
+### Completed Improvements ✅
+- [x] **Implement proper UI5 routing with browser history support**
+  - Full routing configuration with 4 routes (clients, employees, costCenters, locations)
+  - Deep linking support with route parameters
+  - Browser back/forward button functionality
+  - SAP Fiori Design Guidelines compliant
+- [x] **Migrate hardcoded strings to i18n for better internationalization**
+  - All 109 strings in Main.view.xml migrated to i18n bindings
+  - All controllers fully internationalized (Client, Employee, CostCenter, Location)
+  - 140+ i18n keys added across the application
+  - Consistent ResourceBundle usage pattern throughout
+  - Ready for multi-language support (German, French, etc.)
+- [x] **Add navigation guards for unsaved changes warning**
+  - UnsavedChangesGuard service tracks form dirty state
+  - beforeMatched route event interception
+  - Confirmation dialog with Yes/No options
+  - Integrated with all entity handlers (Client, Employee, CostCenter, Location)
+  - Prevents accidental data loss during navigation across entire application
+- [x] **Implement frontend caching for frequently accessed data**
+  - CacheService with TTL (time-to-live) support and automatic expiration
+  - Support for both sessionStorage (session-only) and localStorage (persistent)
+  - CacheManager for coordinated cache invalidation (OData + browser storage)
+  - OData V4 model caching enabled with earlyRequests and groupProperties
+  - Periodic cache cleanup (every 5 minutes) to free up storage space
+  - Manual cache invalidation on refresh button clicks
+  - Cache statistics for monitoring (entry count, size in KB)
+
 ### Planned Improvements
-- [ ] Implement proper UI5 routing with browser history support
-- [ ] Migrate hardcoded strings to i18n for better internationalization
 - [ ] Increase test coverage to 70%+ (currently at ~12%)
-- [ ] Add navigation guards for unsaved changes warning
-- [ ] Implement frontend caching for frequently accessed data
 
 ## 🤝 Contributing
 

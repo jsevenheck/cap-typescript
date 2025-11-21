@@ -1,7 +1,7 @@
-import App from "sap/m/App";
 import MessageBox from "sap/m/MessageBox";
-import Page from "sap/m/Page";
 import Controller from "sap/ui/core/mvc/Controller";
+import UIComponent from "sap/ui/core/UIComponent";
+import Router from "sap/ui/core/routing/Router";
 import Context from "sap/ui/model/odata/v4/Context";
 
 import SelectionState from "../../services/selection.service";
@@ -12,75 +12,96 @@ export default class NavigationService {
     private readonly selection: SelectionState
   ) {}
 
+  private getRouter(): Router | undefined {
+    const component = this.controller.getOwnerComponent() as UIComponent | undefined;
+    return component?.getRouter();
+  }
+
   public showEmployeesPage(context: Context): void {
-    const app = this.controller.byId("app") as App | undefined;
-    const employeesPage = this.controller.byId("employeesPage") as Page | undefined;
-    const costCentersPage = this.controller.byId("costCentersPage") as Page | undefined;
-    const locationsPage = this.controller.byId("locationsPage") as Page | undefined;
-    if (!app || !employeesPage) {
+    const router = this.getRouter();
+    if (!router) {
       MessageBox.error("Unable to open employees view.");
       return;
     }
 
-    employeesPage.setBindingContext(context);
-    costCentersPage?.setBindingContext(context);
-    locationsPage?.setBindingContext(context);
+    const clientId = context.getProperty("ID") as string;
+    if (!clientId) {
+      MessageBox.error("Client ID not found.");
+      return;
+    }
+
     this.selection.clearEmployee();
     this.selection.clearCostCenter();
     this.selection.clearLocation();
-    app.to(employeesPage);
+
+    router.navTo("employees", { clientId });
   }
 
   public showCostCentersPage(): void {
-    const app = this.controller.byId("app") as App | undefined;
-    const costCentersPage = this.controller.byId("costCentersPage") as Page | undefined;
+    const router = this.getRouter();
     const clientContext = this.selection.getSelectedClientContext();
 
-    if (!app || !costCentersPage || !clientContext) {
+    if (!router || !clientContext) {
       MessageBox.error("Unable to open cost centers view.");
       return;
     }
 
-    costCentersPage.setBindingContext(clientContext);
+    const clientId = clientContext.getProperty("ID") as string;
+    if (!clientId) {
+      MessageBox.error("Client ID not found.");
+      return;
+    }
+
     this.selection.clearCostCenter();
-    app.to(costCentersPage);
+    router.navTo("costCenters", { clientId });
   }
 
   public showLocationsPage(): void {
-    const app = this.controller.byId("app") as App | undefined;
-    const locationsPage = this.controller.byId("locationsPage") as Page | undefined;
+    const router = this.getRouter();
     const clientContext = this.selection.getSelectedClientContext();
 
-    if (!app || !locationsPage || !clientContext) {
+    if (!router || !clientContext) {
       MessageBox.error("Unable to open locations view.");
       return;
     }
 
-    locationsPage.setBindingContext(clientContext);
+    const clientId = clientContext.getProperty("ID") as string;
+    if (!clientId) {
+      MessageBox.error("Client ID not found.");
+      return;
+    }
+
     this.selection.clearLocation();
-    app.to(locationsPage);
+    router.navTo("locations", { clientId });
   }
 
   public backToClients(): void {
-    const app = this.controller.byId("app") as App | undefined;
-    if (!app) {
+    const router = this.getRouter();
+    if (!router) {
       return;
     }
 
     this.selection.clearEmployee();
     this.selection.clearCostCenter();
     this.selection.clearLocation();
-    app.back();
+    router.navTo("clients");
   }
 
   public backToEmployees(): void {
-    const app = this.controller.byId("app") as App | undefined;
-    if (!app) {
+    const router = this.getRouter();
+    const clientContext = this.selection.getSelectedClientContext();
+
+    if (!router || !clientContext) {
+      return;
+    }
+
+    const clientId = clientContext.getProperty("ID") as string;
+    if (!clientId) {
       return;
     }
 
     this.selection.clearCostCenter();
     this.selection.clearLocation();
-    app.back();
+    router.navTo("employees", { clientId });
   }
 }

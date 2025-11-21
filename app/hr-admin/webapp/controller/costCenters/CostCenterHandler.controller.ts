@@ -7,9 +7,12 @@ import ListItemBase from "sap/m/ListItemBase";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import { getOptionalListBinding } from "../../core/services/odata";
 import { getEventParameter } from "../../core/utils/EventParam";
 
@@ -20,11 +23,20 @@ type CreationContext = {
 };
 
 export default class CostCenterHandler {
+  private static readonly DIALOG_ID = "costCenterDialog";
+
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
-    private readonly selection: SelectionState
+    private readonly selection: SelectionState,
+    private readonly guard: UnsavedChangesGuard
   ) {}
+
+  private getI18nBundle(): ResourceBundle {
+    const view = this.controller.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
+  }
 
   public refresh(): void {
     this.getCostCentersBinding()?.refresh();
@@ -35,10 +47,11 @@ export default class CostCenterHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const dialogModel = this.models.getCostCenterModel();
     dialogModel.setData({
       mode: "create",
-      title: "Add Cost Center",
+      title: i18n.getText("addCostCenter"),
       costCenter: {
         code: "",
         name: "",
@@ -48,6 +61,7 @@ export default class CostCenterHandler {
         responsible_ID: undefined,
       },
     });
+    this.guard.markDirty(CostCenterHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -56,9 +70,10 @@ export default class CostCenterHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedCostCenterContext();
     if (!context) {
-      MessageBox.error("No cost center selected");
+      MessageBox.error(i18n.getText("noCostCenterSelected"));
       return;
     }
     const view = this.controller.getView();
@@ -80,14 +95,14 @@ export default class CostCenterHandler {
         responsible?: { ID?: string };
       } | undefined;
       if (!currentData) {
-        MessageBox.error("Unable to load the selected cost center.");
+        MessageBox.error(i18n.getText("unableToLoadCostCenter"));
         return;
       }
 
       const dialogModel = this.models.getCostCenterModel();
       dialogModel.setData({
         mode: "edit",
-        title: "Edit Cost Center",
+        title: i18n.getText("editCostCenter"),
         costCenter: {
           ID: currentData.ID,
           code: currentData.code ?? "",
@@ -98,9 +113,10 @@ export default class CostCenterHandler {
           responsible_ID: currentData.responsible_ID ?? currentData.responsible?.ID,
         },
       });
+      this.guard.markDirty(CostCenterHandler.DIALOG_ID);
       this.openDialog();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unable to load the selected cost center.";
+      const message = error instanceof Error ? error.message : i18n.getText("unableToLoadCostCenter");
       MessageBox.error(message);
     } finally {
       view.setBusy(false);
@@ -112,17 +128,18 @@ export default class CostCenterHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedCostCenterContext();
     if (!context) {
-      MessageBox.error("No cost center selected");
+      MessageBox.error(i18n.getText("noCostCenterSelected"));
       return;
     }
     const costCenter = context.getObject() as { code?: string; name?: string };
     const title = costCenter.code
       ? `${costCenter.code}${costCenter.name ? " - " + costCenter.name : ""}`
       : costCenter.name ?? "";
-    MessageBox.confirm(`Delete cost center ${title}?`, {
-      title: "Confirm Deletion",
+    MessageBox.confirm(`${i18n.getText("deleteCostCenterMessage")} ${title}?`, {
+      title: i18n.getText("confirm"),
       emphasizedAction: MessageBox.Action.OK,
       actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
       onClose: (action: string) => {
@@ -130,11 +147,11 @@ export default class CostCenterHandler {
           context
             .delete("$auto")
             .then(() => {
-              MessageToast.show("Cost center deleted");
+              MessageToast.show(i18n.getText("costCenterDeleted"));
               this.selection.clearCostCenter();
             })
             .catch((error: Error) => {
-              MessageBox.error(error.message ?? "Failed to delete cost center");
+              MessageBox.error(error.message ?? i18n.getText("failedToDeleteCostCenter"));
             });
         }
       },
@@ -142,9 +159,10 @@ export default class CostCenterHandler {
   }
 
   public save(): void {
+    const i18n = this.getI18nBundle();
     const dialog = this.byId("costCenterDialog") as Dialog;
     if (!dialog) {
-      MessageBox.error("Dialog not found");
+      MessageBox.error(i18n.getText("errorOccurred"));
       return;
     }
     const dialogModel = this.models.getCostCenterModel();
@@ -161,12 +179,12 @@ export default class CostCenterHandler {
     };
 
     if (!payload.code || !payload.name || !payload.responsible_ID || !payload.validFrom) {
-      MessageBox.error("Code, Name, Valid From, and Responsible are required.");
+      MessageBox.error(i18n.getText("costCenterFieldsRequiredError"));
       return;
     }
 
     if (!clientId) {
-      MessageBox.error("Select a client first.");
+      MessageBox.error(i18n.getText("selectClientFirst"));
       return;
     }
 
@@ -178,7 +196,7 @@ export default class CostCenterHandler {
       const listBinding = this.getCostCentersBinding();
       if (!listBinding) {
         dialog.setBusy(false);
-        MessageBox.error("Unable to access cost centers list.");
+        MessageBox.error(i18n.getText("unableToAccessCostCentersList"));
         return;
       }
 
@@ -187,7 +205,7 @@ export default class CostCenterHandler {
         creationContext,
         () => {
           dialog.setBusy(false);
-          MessageBox.error("Failed to initialize cost center creation context.");
+          MessageBox.error(i18n.getText("failedToInitializeCostCenterCreation"));
         },
         (context) => {
           const readyContext = context as CreationContext & ODataContext;
@@ -198,7 +216,7 @@ export default class CostCenterHandler {
             const message =
               error instanceof Error && error.message
                 ? error.message
-                : "Failed to create cost center";
+                : i18n.getText("failedToCreateCostCenter");
             MessageBox.error(message);
             void readyContext.delete("$auto").catch(() => {
               // Silently ignore deletion errors for transient creation contexts
@@ -217,8 +235,9 @@ export default class CostCenterHandler {
           Promise.all([creationPromise, model.submitBatch("$auto")])
             .then(() => {
               dialog.setBusy(false);
+              this.guard.markClean(CostCenterHandler.DIALOG_ID);
               dialog.close();
-              MessageToast.show("Cost center created");
+              MessageToast.show(i18n.getText("costCenterCreated"));
               listBinding.refresh();
             })
             .catch(handleError);
@@ -228,7 +247,7 @@ export default class CostCenterHandler {
       const context = this.selection.getSelectedCostCenterContext();
       if (!context) {
         dialog.setBusy(false);
-        MessageBox.error("Select a cost center first.");
+        MessageBox.error(i18n.getText("selectCostCenterFirst"));
         return;
       }
 
@@ -243,17 +262,19 @@ export default class CostCenterHandler {
         .submitBatch("$auto")
         .then(() => {
           dialog.setBusy(false);
+          this.guard.markClean(CostCenterHandler.DIALOG_ID);
           dialog.close();
-          MessageToast.show("Cost center updated");
+          MessageToast.show(i18n.getText("costCenterUpdated"));
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
-          MessageBox.error(error.message ?? "Failed to update cost center");
+          MessageBox.error(error.message ?? i18n.getText("failedToUpdateCostCenter"));
         });
     }
   }
 
   public cancel(): void {
+    this.guard.markClean(CostCenterHandler.DIALOG_ID);
     const dialog = this.byId("costCenterDialog") as Dialog;
     dialog.close();
   }
@@ -261,6 +282,8 @@ export default class CostCenterHandler {
   public afterDialogClose(): void {
     const dialog = this.byId("costCenterDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(CostCenterHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {

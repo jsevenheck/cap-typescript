@@ -8,6 +8,8 @@ import Controller from "sap/ui/core/mvc/Controller";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Context from "sap/ui/model/odata/v4/Context";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -16,6 +18,7 @@ import { getRequiredListBinding } from "../../core/services/odata";
 import NavigationService from "../../core/navigation/NavigationService";
 import { getEventParameter } from "../../core/utils/EventParam";
 import { createAbortableRequest } from "../../core/utils/AbortableRequest";
+import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -104,28 +107,39 @@ function isValidHttpUrl(urlString: string): boolean {
 }
 
 export default class ClientHandler {
+  private static readonly DIALOG_ID = "clientDialog";
+
   constructor(
     private readonly controller: Controller,
     private readonly models: DialogModelAccessor,
     private readonly selection: SelectionState,
-    private readonly navigation: NavigationService
+    private readonly navigation: NavigationService,
+    private readonly guard: UnsavedChangesGuard
   ) {}
+
+  private getI18nBundle(): ResourceBundle {
+    const view = this.controller.getView();
+    const model = view?.getModel("i18n") as ResourceModel;
+    return model.getResourceBundle() as ResourceBundle;
+  }
 
   public refresh(): void {
     this.getClientsBinding().refresh();
   }
 
   public startCreate(): void {
+    const i18n = this.getI18nBundle();
     const dialogModel = this.models.getClientModel();
     dialogModel.setData({
       mode: "create",
-      title: "Add Client",
+      title: i18n.getText("addClient"),
       client: {
         companyId: "",
         name: "",
         notificationEndpoint: "",
       },
     });
+    this.guard.markDirty(ClientHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -134,6 +148,7 @@ export default class ClientHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedClientContext();
     const dialogModel = this.models.getClientModel();
     const currentData = context?.getObject() as (ClientDialogModelData["client"] & {
@@ -141,13 +156,13 @@ export default class ClientHandler {
     }) | undefined;
 
     if (!currentData) {
-      MessageBox.error("Unable to load the selected client.");
+      MessageBox.error(i18n.getText("errorLoading", ["client"]));
       return;
     }
 
     dialogModel.setData({
       mode: "edit",
-      title: "Edit Client",
+      title: i18n.getText("editClient"),
         client: {
           ID: currentData.ID,
           companyId: currentData.companyId,
@@ -155,6 +170,7 @@ export default class ClientHandler {
           notificationEndpoint: currentData.notificationEndpoint ?? null,
         },
       });
+    this.guard.markDirty(ClientHandler.DIALOG_ID);
     this.openDialog();
   }
 
@@ -163,14 +179,15 @@ export default class ClientHandler {
       return;
     }
 
+    const i18n = this.getI18nBundle();
     const context = this.selection.getSelectedClientContext();
     if (!context) {
-      MessageBox.error("No client selected");
+      MessageBox.error(i18n.getText("noClientSelected"));
       return;
     }
     const client = context.getObject() as { name?: string };
-    MessageBox.confirm(`Delete client ${client.name ?? ""}?`, {
-      title: "Confirm Deletion",
+    MessageBox.confirm(i18n.getText("deleteClientConfirm") + ` ${client.name ?? ""}?`, {
+      title: i18n.getText("confirm"),
       emphasizedAction: MessageBox.Action.OK,
       actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
       onClose: (action: string) => {
@@ -178,12 +195,12 @@ export default class ClientHandler {
           context
             .delete("$auto")
             .then(() => {
-              MessageToast.show("Client deleted");
+              MessageToast.show(i18n.getText("clientDeleted"));
               this.selection.clearClient();
             })
             .catch((error: Error) => {
               console.error("Error deleting client:", error);
-              MessageBox.error(error.message ?? "Failed to delete client");
+              MessageBox.error(error.message ?? i18n.getText("errorDeleting", ["client"]));
             });
         }
       },
@@ -191,9 +208,10 @@ export default class ClientHandler {
   }
 
   public save(): void {
+    const i18n = this.getI18nBundle();
     const dialog = this.byId("clientDialog") as Dialog;
     if (!dialog) {
-      MessageBox.error("Dialog not found");
+      MessageBox.error(i18n.getText("errorOccurred"));
       return;
     }
     const dialogModel = this.models.getClientModel();
@@ -209,15 +227,13 @@ export default class ClientHandler {
 
     // Enhanced validation
     if (!payload.companyId || !payload.name) {
-      MessageBox.error("Company ID and Name are required.");
+      MessageBox.error(i18n.getText("clientIdRequired"));
       return;
     }
 
     // Validate notification endpoint URL if provided
     if (payload.notificationEndpoint && !isValidHttpUrl(payload.notificationEndpoint)) {
-      MessageBox.error(
-        "Notification endpoint must be a valid HTTP or HTTPS URL (e.g., https://example.com/webhook)."
-      );
+      MessageBox.error(i18n.getText("invalidUrl"));
       return;
     }
 
@@ -230,7 +246,7 @@ export default class ClientHandler {
         creationContext,
         () => {
           dialog.setBusy(false);
-          MessageBox.error("Failed to initialize client creation context.");
+          MessageBox.error(i18n.getText("errorOccurred"));
         },
         (context) => {
           const readyContext = context as CreationContext & ODataContext;
@@ -239,8 +255,8 @@ export default class ClientHandler {
           const handleError = (error: unknown): void => {
             console.error("Error creating client:", error);
             dialog.setBusy(false);
-            
-            let message = "Failed to create client";
+
+            let message = i18n.getText("errorSaving", ["client"]);
             
             // Enhanced error message extraction for OData errors
             if (error instanceof Error) {
@@ -297,7 +313,8 @@ export default class ClientHandler {
             .then(() => {
               dialog.setBusy(false);
               dialog.close();
-              MessageToast.show("Client created");
+              this.guard.markClean(ClientHandler.DIALOG_ID);
+              MessageToast.show(i18n.getText("clientSaved"));
             })
             .catch(handleError)
             .finally(() => cleanup());
@@ -307,7 +324,7 @@ export default class ClientHandler {
       const context = this.selection.getSelectedClientContext();
       if (!context) {
         dialog.setBusy(false);
-        MessageBox.error("Select a client first.");
+        MessageBox.error(i18n.getText("selectClientFirst"));
         return;
       }
 
@@ -319,7 +336,7 @@ export default class ClientHandler {
       // Add timeout for update as well
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
-          reject(new Error("Update operation timed out after 30 seconds."));
+          reject(new Error(i18n.getText("errorOccurred")));
         }, 30000);
       });
 
@@ -330,24 +347,28 @@ export default class ClientHandler {
         .then(() => {
           dialog.setBusy(false);
           dialog.close();
-          MessageToast.show("Client updated");
+          this.guard.markClean(ClientHandler.DIALOG_ID);
+          MessageToast.show(i18n.getText("clientSaved"));
         })
         .catch((error: Error) => {
           console.error("Error updating client:", error);
           dialog.setBusy(false);
-          MessageBox.error(error.message ?? "Failed to update client");
+          MessageBox.error(error.message ?? i18n.getText("errorSaving", ["client"]));
         });
     }
   }
 
   public cancel(): void {
     const dialog = this.byId("clientDialog") as Dialog;
+    this.guard.markClean(ClientHandler.DIALOG_ID);
     dialog.close();
   }
 
   public afterDialogClose(): void {
     const dialog = this.byId("clientDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(ClientHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {
