@@ -282,6 +282,8 @@ export default class CostCenterHandler {
   public afterDialogClose(): void {
     const dialog = this.byId("costCenterDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(CostCenterHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {

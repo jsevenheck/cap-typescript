@@ -182,14 +182,18 @@ export default class Main extends Controller {
     // Create context for selection state using model.bindContext
     // This returns a context immediately, even before data is loaded
     const contextBinding = model.bindContext(clientPath);
-    const context = contextBinding.getBoundContext();
 
-    if (context) {
-      this.selection.setClient(context);
-      this.selection.clearEmployee();
-      this.selection.clearCostCenter();
-      this.selection.clearLocation();
-    }
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
 
     // Navigate to employees page in the App NavContainer
     const app = this.byId("app") as any;
@@ -241,14 +245,18 @@ export default class Main extends Controller {
     // Create context for selection state using model.bindContext
     // This returns a context immediately, even before data is loaded
     const contextBinding = model.bindContext(clientPath);
-    const context = contextBinding.getBoundContext();
 
-    if (context) {
-      this.selection.setClient(context);
-      this.selection.clearEmployee();
-      this.selection.clearCostCenter();
-      this.selection.clearLocation();
-    }
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
 
     // Navigate to cost centers page in the App NavContainer
     const app = this.byId("app") as any;
@@ -300,14 +308,18 @@ export default class Main extends Controller {
     // Create context for selection state using model.bindContext
     // This returns a context immediately, even before data is loaded
     const contextBinding = model.bindContext(clientPath);
-    const context = contextBinding.getBoundContext();
 
-    if (context) {
-      this.selection.setClient(context);
-      this.selection.clearEmployee();
-      this.selection.clearCostCenter();
-      this.selection.clearLocation();
-    }
+    // Wait for context to be ready before updating selection state
+    // This is critical for deep links and page refresh scenarios
+    contextBinding.attachEventOnce("dataReceived", () => {
+      const context = contextBinding.getBoundContext();
+      if (context) {
+        this.selection.setClient(context);
+        this.selection.clearEmployee();
+        this.selection.clearCostCenter();
+        this.selection.clearLocation();
+      }
+    });
 
     // Navigate to locations page in the App NavContainer
     const app = this.byId("app") as any;

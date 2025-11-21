@@ -286,6 +286,8 @@ export default class LocationHandler {
   public afterDialogClose(): void {
     const dialog = this.byId("locationDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(LocationHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {

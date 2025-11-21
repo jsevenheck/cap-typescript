@@ -367,6 +367,8 @@ export default class ClientHandler {
   public afterDialogClose(): void {
     const dialog = this.byId("clientDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(ClientHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {

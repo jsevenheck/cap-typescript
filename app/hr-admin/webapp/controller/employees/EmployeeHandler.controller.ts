@@ -432,6 +432,8 @@ export default class EmployeeHandler {
   public afterDialogClose(): void {
     const dialog = this.byId("employeeDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear unsaved changes guard in case dialog was closed via ESC or X button
+    this.guard.markClean(EmployeeHandler.DIALOG_ID);
   }
 
   public handleSelectionChange(event: Event): void {
