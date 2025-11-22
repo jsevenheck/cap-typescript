@@ -43,6 +43,9 @@ const correlationIdMiddleware = (req: Request, res: Response, next: NextFunction
 };
 
 cds.on('bootstrap', (app: Application) => {
+  // Respect X-Forwarded-* headers when behind a reverse proxy (e.g., approuter)
+  app.set('trust proxy', true);
+
   // Add security headers to all responses
   app.use(securityHeadersMiddleware);
 

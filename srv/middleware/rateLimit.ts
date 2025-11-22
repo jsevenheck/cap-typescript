@@ -30,10 +30,19 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     message = 'Too many requests, please try again later',
     statusCode = 429,
     keyGenerator = (req: Request) => {
-      // Default: Use IP address + User-Agent for rate limiting
-      const ip = req.ip || req.socket.remoteAddress || 'unknown';
-      const userAgent = req.get('user-agent') || 'unknown';
-      return `${ip}:${userAgent}`;
+      const forwardedFor = req.header('x-forwarded-for');
+      const forwardedIp = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : forwardedFor?.split(',')[0]?.trim();
+
+      const clientIp = forwardedIp || req.ip || req.socket.remoteAddress || 'unknown';
+
+      const authorization = req.header('authorization');
+      const apiKeyMatch = authorization?.match(/^ApiKey\s+(?<key>.+)$/i);
+      const apiKey = req.header('x-api-key') || apiKeyMatch?.groups?.key;
+
+      // Prefer API key when present to avoid grouping all clients behind a proxy
+      return apiKey ? `api-key:${apiKey}` : `ip:${clientIp}`;
     },
   } = config;
 
