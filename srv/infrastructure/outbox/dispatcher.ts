@@ -369,6 +369,19 @@ const serializePayload = (payload: NotificationEnvelope): string =>
     headers: payload.headers,
   });
 
+/**
+ * Enqueue an outbox entry for reliable event delivery.
+ *
+ * IMPORTANT: This function will throw if enqueue fails after all retry attempts,
+ * which will cause the parent transaction to rollback. This ensures atomicity
+ * between the business operation and the outbox entry - both succeed or both fail.
+ *
+ * @param tx - The active transaction
+ * @param input - The outbox entry details
+ * @param config - Outbox configuration
+ * @param metrics - Metrics collector
+ * @throws {Error} If enqueue fails after all retry attempts (triggers transaction rollback)
+ */
 export const enqueueOutboxEntry = async (
   tx: Transaction,
   input: OutboxEnqueueInput,
@@ -406,10 +419,17 @@ export const enqueueOutboxEntry = async (
       if (attempt >= maxAttempts) {
         logger.error(
           { err: error, eventType: input.eventType, endpoint: input.endpoint, attempts: attempt },
-          `Failed to enqueue after ${attempt} attempts`,
+          `Failed to enqueue outbox entry after ${attempt} attempts - transaction will rollback`,
         );
         metrics.recordEnqueueFailure();
-        throw error;
+
+        // Re-throw to trigger transaction rollback and prevent data loss
+        // This ensures the parent operation fails atomically if we cannot guarantee event delivery
+        const enrichedError = error instanceof Error
+          ? error
+          : new Error(String(error));
+        enrichedError.message = `Outbox enqueue failed after ${attempt} attempts: ${enrichedError.message}`;
+        throw enrichedError;
       }
 
       const exponent = Math.max(0, attempt - 1);
