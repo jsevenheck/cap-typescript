@@ -2,6 +2,9 @@ import { getLogger } from './logger';
 
 const logger = getLogger('secrets');
 
+// Track warnings that were already emitted to avoid noisy logs when secrets are missing
+const missingSecretWarnings = new Set<string>();
+
 // Type declarations for @sap/xsenv (doesn't have TypeScript definitions)
 interface XsenvServices {
   [serviceName: string]: {
@@ -145,7 +148,11 @@ export const getSecret = async (
     }
   }
 
-  logger.warn({ namespace, name, envVarFallback }, 'Secret not found in Credential Store or environment');
+  const warningKey = `${namespace}:${name}:${envVarFallback ?? 'NO_FALLBACK'}`;
+  if (!missingSecretWarnings.has(warningKey)) {
+    missingSecretWarnings.add(warningKey);
+    logger.warn({ namespace, name, envVarFallback }, 'Secret not found in Credential Store or environment');
+  }
   return undefined;
 };
 
