@@ -22,6 +22,7 @@ import SelectionState from "../../services/selection.service";
 import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
+import HashChanger from "sap/ui/core/routing/HashChanger";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -36,6 +37,7 @@ export default class Main extends Controller {
   private assignments!: AssignmentHandler;
   private cacheCleanupIntervalId?: number;
   private initialCacheCleanupTimeoutId?: number;
+  private lastHash?: string;
 
   public onInit(): void {
     const view = this.getView();
@@ -78,6 +80,26 @@ export default class Main extends Controller {
    * Attach navigation guards to all routes to check for unsaved changes
    */
   private attachNavigationGuards(router: Router): void {
+    const hashChanger = HashChanger.getInstance();
+    this.lastHash = hashChanger.getHash();
+
+    router.attachBeforeRouteMatched(() => {
+      const pendingHash = hashChanger.getHash();
+      const currentHash = this.lastHash ?? pendingHash;
+      const i18n = this.getI18nBundle();
+
+      const proceed = (): void => {
+        this.lastHash = pendingHash;
+        hashChanger.setHash(pendingHash);
+      };
+
+      if (!this.guard.checkNavigation(i18n, proceed)) {
+        hashChanger.setHash(currentHash);
+      } else {
+        this.lastHash = pendingHash;
+      }
+    });
+
     // Attach pattern matched handlers to bind pages to client context
     const employeesRoute = router.getRoute("employees");
     if (employeesRoute) {
