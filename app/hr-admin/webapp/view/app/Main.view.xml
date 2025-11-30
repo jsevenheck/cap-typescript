@@ -586,7 +586,7 @@
                 <Label text="{i18n>costCenter}" required="true" labelFor="assignmentCostCenter"/>
                 <Select
                         id="assignmentCostCenter"
-                        items="{ path: 'costCenters', parameters: { $select: ['ID','code','name'] } }"
+                        items="{ path: 'client/costCenters', parameters: { $select: ['ID','code','name'] } }"
                         selectedKey="{assignmentDialog>/assignment/costCenter_ID}">
                     <core:Item key="{ID}" text="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"/>
                 </Select>

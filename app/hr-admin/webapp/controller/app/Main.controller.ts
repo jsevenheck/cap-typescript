@@ -5,7 +5,6 @@ import MessageToast from "sap/m/MessageToast";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Router from "sap/ui/core/routing/Router";
-import Route from "sap/ui/core/routing/Route";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
@@ -79,15 +78,6 @@ export default class Main extends Controller {
    * Attach navigation guards to all routes to check for unsaved changes
    */
   private attachNavigationGuards(router: Router): void {
-    const routes = ["clients", "employees", "costCenters", "locations"];
-
-    routes.forEach((routeName) => {
-      const route = router.getRoute(routeName);
-      if (route) {
-        route.attachBeforeMatched(this.onBeforeRouteMatched.bind(this));
-      }
-    });
-
     // Attach pattern matched handlers to bind pages to client context
     const employeesRoute = router.getRoute("employees");
     if (employeesRoute) {
@@ -107,34 +97,6 @@ export default class Main extends Controller {
     const clientsRoute = router.getRoute("clients");
     if (clientsRoute) {
       clientsRoute.attachPatternMatched(this.onClientsRouteMatched.bind(this));
-    }
-  }
-
-  /**
-   * Called before a route is matched - check for unsaved changes
-   */
-  private onBeforeRouteMatched(event: Event): void {
-    const i18n = this.getI18nBundle();
-
-    // If there are unsaved changes, show confirmation
-    if (this.guard.hasDirtyForms()) {
-      // Prevent route navigation
-      event.preventDefault();
-
-      // Get route details for pending navigation
-      const route = event.getSource() as Route;
-      const args = event.getParameter("arguments");
-
-      // Ask user to confirm
-      this.guard.checkNavigation(i18n, () => {
-        // User confirmed - manually trigger navigation
-        const router = this.getOwnerComponent()?.getRouter();
-        if (router && route) {
-          // Use route name, not pattern, for navTo
-          const routeName = (route as any)._oConfig?.name || route.getPattern();
-          router.navTo(routeName, args);
-        }
-      });
     }
   }
 
@@ -506,7 +468,7 @@ export default class Main extends Controller {
   }
 
   public onClientPress(event: Event): void {
-    this.clients.handleClientPress(event);
+    this.confirmNavigation(() => this.clients.handleClientPress(event));
   }
 
   public onTabSelect(event: Event): void {
@@ -515,46 +477,53 @@ export default class Main extends Controller {
   }
 
   private navigateToTab(key: string): void {
-    const router = this.getOwnerComponent()?.getRouter();
-    if (!router) {
-      return;
-    }
+    const i18n = this.getI18nBundle();
+    const proceed = (): void => {
+      const router = this.getOwnerComponent()?.getRouter();
+      if (!router) {
+        return;
+      }
 
-    switch (key) {
-      case "clients":
-        router.navTo("clients");
-        break;
-      case "employees":
-        if (this.selection.ensureClientSelected()) {
-          router.navTo("employees", { clientId: this.selection.getSelectedClientId() });
-        } else {
-          this.setSelectedTab("clients");
+      switch (key) {
+        case "clients":
           router.navTo("clients");
-        }
-        break;
-      case "costCenters":
-        if (this.selection.ensureClientSelected()) {
-          router.navTo("costCenters", { clientId: this.selection.getSelectedClientId() });
-        } else {
-          this.setSelectedTab("clients");
+          break;
+        case "employees":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("employees", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        case "costCenters":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("costCenters", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        case "locations":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("locations", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        default:
           router.navTo("clients");
-        }
-        break;
-      case "locations":
-        if (this.selection.ensureClientSelected()) {
-          router.navTo("locations", { clientId: this.selection.getSelectedClientId() });
-        } else {
-          this.setSelectedTab("clients");
-          router.navTo("clients");
-        }
-        break;
-      default:
-        router.navTo("clients");
+      }
+    };
+
+    if (this.guard.checkNavigation(i18n, proceed)) {
+      proceed();
     }
   }
 
   public onBackToClients(): void {
-    this.navigation.backToClients();
+    this.confirmNavigation(() => this.navigation.backToClients());
   }
 
   public onRefreshEmployees(): void {
@@ -598,7 +567,7 @@ export default class Main extends Controller {
   }
 
   public onBackToEmployees(): void {
-    this.navigation.backToEmployees();
+    this.confirmNavigation(() => this.navigation.backToEmployees());
   }
 
   public onRefreshCostCenters(): void {
@@ -754,5 +723,12 @@ export default class Main extends Controller {
   public onCancelAnonymize(): void {
     const dialog = this.byId("anonymizeDialog") as Dialog;
     dialog.close();
+  }
+
+  private confirmNavigation(action: () => void): void {
+    const i18n = this.getI18nBundle();
+    if (this.guard.checkNavigation(i18n, action)) {
+      action();
+    }
   }
 }
