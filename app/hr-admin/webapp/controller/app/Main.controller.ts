@@ -702,7 +702,7 @@ export default class Main extends Controller {
     }
 
     dialog.setBusy(true);
-    const action = model.bindAction("/anonymizeFormerEmployees");
+    const action = model.bindContext("/anonymizeFormerEmployees(...)");
     action.setParameter("before", before);
     action
       .execute()
