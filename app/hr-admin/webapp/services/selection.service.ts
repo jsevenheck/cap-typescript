@@ -10,6 +10,7 @@ export default class SelectionState {
   private employeeContext?: Context;
   private costCenterContext?: Context;
   private locationContext?: Context;
+  private assignmentContext?: Context;
   private readonly clearingSelections = new Set<string>();
 
   constructor(
@@ -29,6 +30,7 @@ export default class SelectionState {
     this.clearEmployee();
     this.clearCostCenter();
     this.clearLocation();
+    this.clearAssignment();
   }
 
   public clearClient(): void {
@@ -39,6 +41,7 @@ export default class SelectionState {
     this.clearEmployee();
     this.clearCostCenter();
     this.clearLocation();
+    this.clearAssignment();
   }
 
   public getSelectedClientContext(): Context | undefined {
@@ -66,6 +69,7 @@ export default class SelectionState {
     this.employeeContext = context;
     const viewModel = this.models.getViewStateModel();
     viewModel.setProperty("/selectedEmployeeId", context.getProperty("ID"));
+    this.clearAssignment();
   }
 
   public clearEmployee(): void {
@@ -73,6 +77,7 @@ export default class SelectionState {
     this.clearListSelection("employeesList");
     const viewModel = this.models.getViewStateModel();
     viewModel.setProperty("/selectedEmployeeId", undefined);
+    viewModel.setProperty("/selectedAssignmentId", undefined);
   }
 
   public getSelectedEmployeeContext(): Context | undefined {
@@ -133,6 +138,7 @@ export default class SelectionState {
     this.clearListSelection("locationsList");
     const viewModel = this.models.getViewStateModel();
     viewModel.setProperty("/selectedLocationId", undefined);
+    this.clearAssignment();
   }
 
   public getSelectedLocationContext(): Context | undefined {
@@ -142,6 +148,36 @@ export default class SelectionState {
   public ensureLocationSelected(): boolean {
     if (!this.locationContext) {
       MessageBox.error("Select a location first.");
+      return false;
+    }
+    return true;
+  }
+
+  public setAssignment(context?: Context): void {
+    if (!context) {
+      this.clearAssignment();
+      return;
+    }
+
+    this.assignmentContext = context;
+    const viewModel = this.models.getViewStateModel();
+    viewModel.setProperty("/selectedAssignmentId", context.getProperty("ID"));
+  }
+
+  public clearAssignment(): void {
+    this.assignmentContext = undefined;
+    this.clearListSelection("assignmentsList");
+    const viewModel = this.models.getViewStateModel();
+    viewModel.setProperty("/selectedAssignmentId", undefined);
+  }
+
+  public getSelectedAssignmentContext(): Context | undefined {
+    return this.assignmentContext;
+  }
+
+  public ensureAssignmentSelected(): boolean {
+    if (!this.assignmentContext) {
+      MessageBox.error("Select an assignment first.");
       return false;
     }
     return true;

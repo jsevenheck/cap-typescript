@@ -46,6 +46,20 @@ export interface EmployeeDialogModelData {
   managerLookupPending: boolean;
 }
 
+export interface AssignmentDialogData {
+  ID?: string;
+  costCenter_ID?: string;
+  validFrom: string;
+  validTo?: string;
+  isResponsible: boolean;
+}
+
+export interface AssignmentDialogModelData {
+  mode: DialogMode;
+  title: string;
+  assignment: AssignmentDialogData;
+}
+
 export interface CostCenterDialogData {
   ID?: string;
   code: string;
@@ -82,6 +96,9 @@ export interface ViewState {
   selectedEmployeeId?: string;
   selectedCostCenterId?: string;
   selectedLocationId?: string;
+  selectedAssignmentId?: string;
+  selectedTabKey: string;
+  anonymizeBefore?: string;
 }
 
 export interface AuthorizationState {

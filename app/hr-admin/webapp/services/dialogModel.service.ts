@@ -3,6 +3,7 @@ import View from "sap/ui/core/mvc/View";
 import JSONModel from "sap/ui/model/json/JSONModel";
 
 import {
+  AssignmentDialogModelData,
   ClientDialogModelData,
   CostCenterDialogModelData,
   EmployeeDialogModelData,
@@ -34,6 +35,10 @@ export default class DialogModelAccessor {
 
   public getLocationModel(): DialogJSONModel<LocationDialogModelData> {
     return this.getTypedModel<LocationDialogModelData>("locationDialog");
+  }
+
+  public getAssignmentModel(): DialogJSONModel<AssignmentDialogModelData> {
+    return this.getTypedModel<AssignmentDialogModelData>("assignmentDialog");
   }
 
   public getViewStateModel(): DialogJSONModel<ViewState> {

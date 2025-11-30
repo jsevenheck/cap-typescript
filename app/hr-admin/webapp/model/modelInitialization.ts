@@ -3,6 +3,7 @@ import JSONModel from "sap/ui/model/json/JSONModel";
 
 import {
   AuthorizationState,
+  AssignmentDialogModelData,
   ClientDialogModelData,
   CostCenterDialogModelData,
   EmployeeDialogModelData,
@@ -85,7 +86,23 @@ export function createInitialLocationDialogData(): LocationDialogModelData {
 }
 
 export function createInitialViewState(): ViewState {
-  return {};
+  return {
+    selectedTabKey: "clients",
+    anonymizeBefore: "",
+  };
+}
+
+export function createInitialAssignmentDialogData(): AssignmentDialogModelData {
+  return {
+    mode: "create",
+    title: "",
+    assignment: {
+      costCenter_ID: undefined,
+      validFrom: "",
+      validTo: "",
+      isResponsible: false,
+    },
+  };
 }
 
 export function createInitialAuthorizationState(): AuthorizationState {
@@ -102,6 +119,7 @@ export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(createInitialEmployeeDialogData()), "employeeDialog");
   view.setModel(new JSONModel(createInitialCostCenterDialogData()), "costCenterDialog");
   view.setModel(new JSONModel(createInitialLocationDialogData()), "locationDialog");
+  view.setModel(new JSONModel(createInitialAssignmentDialogData()), "assignmentDialog");
   view.setModel(new JSONModel(createInitialViewState()), "view");
   view.setModel(new JSONModel(createInitialAuthorizationState()), "auth");
   view.setModel(new JSONModel(STATUS_OPTIONS), "statusOptions");

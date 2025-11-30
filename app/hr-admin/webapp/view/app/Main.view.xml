@@ -10,6 +10,31 @@
             <Page id="mainPage" title="{i18n>clientManagement}">
                 <content>
                     <VBox class="sapUiSmallMargin">
+                        <IconTabBar
+                                id="clientsTabBar"
+                                selectedKey="{view>/selectedTabKey}"
+                                select=".onTabSelect"
+                                expandable="false"
+                                upperCase="false">
+                            <items>
+                                <IconTabFilter key="clients" text="{i18n>clients}" icon="sap-icon://customer"/>
+                                <IconTabFilter
+                                        key="employees"
+                                        text="{i18n>employees}"
+                                        icon="sap-icon://group"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                                <IconTabFilter
+                                        key="costCenters"
+                                        text="{i18n>costCenters}"
+                                        icon="sap-icon://collections-management"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                                <IconTabFilter
+                                        key="locations"
+                                        text="{i18n>locations}"
+                                        icon="sap-icon://map"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                            </items>
+                        </IconTabBar>
                         <Title text="{i18n>manageClients}" level="H2"/>
                         <Text text="{i18n>manageClientsDesc}"/>
                         <List
@@ -66,6 +91,27 @@
                     navButtonPress=".onBackToClients">
                 <content>
                     <VBox class="sapUiSmallMargin">
+                        <IconTabBar
+                                id="employeesTabBar"
+                                selectedKey="{view>/selectedTabKey}"
+                                select=".onTabSelect"
+                                expandable="false"
+                                upperCase="false">
+                            <items>
+                                <IconTabFilter key="clients" text="{i18n>clients}" icon="sap-icon://customer"/>
+                                <IconTabFilter key="employees" text="{i18n>employees}" icon="sap-icon://group"/>
+                                <IconTabFilter
+                                        key="costCenters"
+                                        text="{i18n>costCenters}"
+                                        icon="sap-icon://collections-management"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                                <IconTabFilter
+                                        key="locations"
+                                        text="{i18n>locations}"
+                                        icon="sap-icon://map"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                            </items>
+                        </IconTabBar>
                         <Title level="H2" text="{= ${name} ? ${i18n>employeesOf} + ' ' + ${name} : ${i18n>employees}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
@@ -111,6 +157,12 @@
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onDeleteEmployee"/>
                                     <Button
+                                            text="{i18n>anonymizeFormerEmployees}"
+                                            icon="sap-icon://eraser"
+                                            type="Transparent"
+                                            visible="{auth>/canWrite}"
+                                            press=".onOpenAnonymizeDialog"/>
+                                    <Button
                                             text="{i18n>refresh}"
                                             icon="sap-icon://refresh"
                                             press=".onRefreshEmployees"/>
@@ -124,6 +176,55 @@
                                         infoState="{= ${status} === 'inactive' ? 'Warning' : 'Success'}"/>
                             </items>
                         </List>
+                        <Panel
+                                headerText="{i18n>assignments}"
+                                expandable="false"
+                                class="sapUiSmallMarginTop">
+                            <List
+                                    id="assignmentsList"
+                                    mode="SingleSelectMaster"
+                                    includeItemInSelection="true"
+                                    items="{path: 'costCenterAssignments', parameters: { $expand: { costCenter: { $select: ['code','name'] } } } }"
+                                    growing="true" growingThreshold="10" growingScrollToLoad="true"
+                                    selectionChange=".onAssignmentsSelectionChange">
+                                <headerToolbar>
+                                    <Toolbar>
+                                        <Title text="{i18n>assignments}" level="H3"/>
+                                        <ToolbarSpacer/>
+                                        <Button
+                                                type="Emphasized"
+                                                text="{i18n>add}"
+                                                icon="sap-icon://add"
+                                                visible="{auth>/canWrite}"
+                                                press=".onAddAssignment"/>
+                                        <Button
+                                                text="{i18n>edit}"
+                                                icon="sap-icon://edit"
+                                                visible="{auth>/canWrite}"
+                                                enabled="{= !!${view>/selectedAssignmentId}}"
+                                                press=".onEditAssignment"/>
+                                        <Button
+                                                text="{i18n>delete}"
+                                                icon="sap-icon://delete"
+                                                type="Transparent"
+                                                visible="{auth>/canWrite}"
+                                                enabled="{= !!${view>/selectedAssignmentId}}"
+                                                press=".onDeleteAssignment"/>
+                                        <Button
+                                                text="{i18n>refresh}"
+                                                icon="sap-icon://refresh"
+                                                press=".onRefreshAssignments"/>
+                                    </Toolbar>
+                                </headerToolbar>
+                                <items>
+                                    <StandardListItem
+                                            title="{= (${costCenter/code} || '') + ( ${costCenter/name} ? ' - ' + ${costCenter/name} : '' ) }"
+                                            description="{= (${validFrom} || '') + ' → ' + (${validTo} || ${i18n>openEnded}) }"
+                                            info="{= ${isResponsible} ? ${i18n>responsible} : ''}"
+                                            infoState="Success"/>
+                                </items>
+                            </List>
+                        </Panel>
                     </VBox>
                 </content>
             </Page>
@@ -134,6 +235,23 @@
                     navButtonPress=".onBackToEmployees">
                 <content>
                     <VBox class="sapUiSmallMargin">
+                        <IconTabBar
+                                id="costCentersTabBar"
+                                selectedKey="{view>/selectedTabKey}"
+                                select=".onTabSelect"
+                                expandable="false"
+                                upperCase="false">
+                            <items>
+                                <IconTabFilter key="clients" text="{i18n>clients}" icon="sap-icon://customer"/>
+                                <IconTabFilter key="employees" text="{i18n>employees}" icon="sap-icon://group"/>
+                                <IconTabFilter key="costCenters" text="{i18n>costCenters}" icon="sap-icon://collections-management"/>
+                                <IconTabFilter
+                                        key="locations"
+                                        text="{i18n>locations}"
+                                        icon="sap-icon://map"
+                                        enabled="{= !!${view>/selectedClientId}}"/>
+                            </items>
+                        </IconTabBar>
                         <Title level="H2" text="{= ${name} ? ${i18n>costCentersOf} + ' ' + ${name} : ${i18n>costCenters}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
@@ -191,6 +309,19 @@
                     navButtonPress=".onBackToEmployees">
                 <content>
                     <VBox class="sapUiSmallMargin">
+                        <IconTabBar
+                                id="locationsTabBar"
+                                selectedKey="{view>/selectedTabKey}"
+                                select=".onTabSelect"
+                                expandable="false"
+                                upperCase="false">
+                            <items>
+                                <IconTabFilter key="clients" text="{i18n>clients}" icon="sap-icon://customer"/>
+                                <IconTabFilter key="employees" text="{i18n>employees}" icon="sap-icon://group"/>
+                                <IconTabFilter key="costCenters" text="{i18n>costCenters}" icon="sap-icon://collections-management"/>
+                                <IconTabFilter key="locations" text="{i18n>locations}" icon="sap-icon://map"/>
+                            </items>
+                        </IconTabBar>
                         <Title level="H2" text="{= ${name} ? ${i18n>locationsOf} + ' ' + ${name} : ${i18n>locations}}"/>
                         <Text
                                 visible="{= !!${companyId}}"
@@ -442,6 +573,72 @@
         </beginButton>
         <endButton>
             <Button text="{i18n>cancel}" press=".onCancelLocation"/>
+        </endButton>
+    </Dialog>
+
+    <Dialog
+            id="assignmentDialog"
+            title="{assignmentDialog>/title}"
+            stretchOnPhone="true"
+            afterClose=".onAssignmentDialogAfterClose">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="{i18n>costCenter}" required="true" labelFor="assignmentCostCenter"/>
+                <Select
+                        id="assignmentCostCenter"
+                        items="{ path: 'costCenters', parameters: { $select: ['ID','code','name'] } }"
+                        selectedKey="{assignmentDialog>/assignment/costCenter_ID}">
+                    <core:Item key="{ID}" text="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"/>
+                </Select>
+                <Label text="{i18n>validFrom}" required="true" labelFor="assignmentValidFrom"/>
+                <DatePicker
+                        id="assignmentValidFrom"
+                        value="{assignmentDialog>/assignment/validFrom}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="{i18n>placeholderValidFrom}"/>
+                <Label text="{i18n>validTo}" labelFor="assignmentValidTo"/>
+                <DatePicker
+                        id="assignmentValidTo"
+                        value="{assignmentDialog>/assignment/validTo}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="{i18n>placeholderValidTo}"/>
+                <CheckBox
+                        id="assignmentResponsible"
+                        text="{i18n>responsibleFlag}"
+                        selected="{assignmentDialog>/assignment/isResponsible}"/>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="{i18n>save}" type="Emphasized" press=".onSaveAssignment"/>
+        </beginButton>
+        <endButton>
+            <Button text="{i18n>cancel}" press=".onCancelAssignment"/>
+        </endButton>
+    </Dialog>
+
+    <Dialog
+            id="anonymizeDialog"
+            title="{i18n>anonymizeFormerEmployees}"
+            stretchOnPhone="true">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Text text="{i18n>anonymizeDescription}"/>
+                <Label text="{i18n>anonymizeBefore}" required="true" labelFor="anonymizeBeforeDate"/>
+                <DatePicker
+                        id="anonymizeBeforeDate"
+                        value="{view>/anonymizeBefore}"
+                        valueFormat="yyyy-MM-dd"
+                        displayFormat="long"
+                        placeholder="{i18n>placeholderAnonymizeBefore}"/>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="{i18n>confirm}" type="Emphasized" press=".onConfirmAnonymize"/>
+        </beginButton>
+        <endButton>
+            <Button text="{i18n>cancel}" press=".onCancelAnonymize"/>
         </endButton>
     </Dialog>
 </mvc:View>
