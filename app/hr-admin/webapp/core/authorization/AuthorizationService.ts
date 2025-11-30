@@ -86,17 +86,16 @@ export class AuthorizationService {
     } catch (error) {
       console.error('AuthorizationService: Error fetching user info, defaulting to read-only', error);
 
-      // Fall back to least-privileged (viewer-only) on error
-      // This ensures UI doesn't break while backend still enforces security
-      userInfoCache = {
+      // Fall back to least-privileged (viewer-only) on error, but do not cache
+      // the degraded state so that a subsequent successful call can restore the
+      // correct roles once the backend recovers.
+      return {
         roles: [UserRole.HRViewer],
         attributes: {},
         isAdmin: false,
         isViewer: true,
         isEditor: false,
       };
-
-      return userInfoCache;
     }
   }
 

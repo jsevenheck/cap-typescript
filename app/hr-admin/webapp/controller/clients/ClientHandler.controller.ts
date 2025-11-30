@@ -241,7 +241,20 @@ export default class ClientHandler {
 
     if (data.mode === "create") {
       const listBinding = this.getClientsBinding();
-      const creationContext = listBinding.create(payload) as Context | undefined;
+      let creationContext: Context | undefined;
+      try {
+        creationContext = listBinding.create(payload) as Context | undefined;
+      } catch (error) {
+        console.error("Failed to start client creation:", error);
+        dialog.setBusy(false);
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : i18n.getText("errorSaving", ["client"]);
+        MessageBox.error(message);
+        return;
+      }
       this.runWithCreationContext(
         creationContext,
         () => {
