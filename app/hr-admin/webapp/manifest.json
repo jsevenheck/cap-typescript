@@ -54,9 +54,6 @@
           "earlyRequests": true,
           "updateGroupId": "$auto",
           "groupProperties": {
-            "$auto": {
-              "submit": "Auto"
-            },
             "read": {
               "submit": "Auto"
             }
