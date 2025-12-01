@@ -1,4 +1,5 @@
 import Dialog from "sap/m/Dialog";
+import List from "sap/m/List";
 import MessageBox from "sap/m/MessageBox";
 import MessageToast from "sap/m/MessageToast";
 import DatePicker from "sap/m/DatePicker";
@@ -440,6 +441,11 @@ export default class EmployeeHandler {
     const listItem = getEventParameter<ListItemBase | null>(event, "listItem") ?? null;
     const context = listItem ? (listItem.getBindingContext() as Context) : undefined;
     this.selection.setEmployee(context || undefined);
+
+    const assignmentsList = this.byId("assignmentsList") as List | undefined;
+    if (assignmentsList) {
+      assignmentsList.setBindingContext(context || null);
+    }
   }
 
   public handleCostCenterChange(event: Event): void {

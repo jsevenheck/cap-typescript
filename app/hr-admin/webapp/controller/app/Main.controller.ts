@@ -1,8 +1,10 @@
 import Controller from "sap/ui/core/mvc/Controller";
+import Dialog from "sap/m/Dialog";
+import MessageBox from "sap/m/MessageBox";
+import MessageToast from "sap/m/MessageToast";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Router from "sap/ui/core/routing/Router";
-import Route from "sap/ui/core/routing/Route";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
@@ -12,6 +14,7 @@ import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
 import CostCenterHandler from "../costCenters/CostCenterHandler.controller";
 import EmployeeHandler from "../employees/EmployeeHandler.controller";
+import AssignmentHandler from "../assignments/AssignmentHandler.controller";
 import LocationHandler from "../locations/LocationHandler.controller";
 import NavigationService from "../../core/navigation/NavigationService";
 import DialogModelAccessor from "../../services/dialogModel.service";
@@ -19,6 +22,7 @@ import SelectionState from "../../services/selection.service";
 import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
+import HashChanger from "sap/ui/core/routing/HashChanger";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -30,8 +34,10 @@ export default class Main extends Controller {
   private employees!: EmployeeHandler;
   private costCenters!: CostCenterHandler;
   private locations!: LocationHandler;
+  private assignments!: AssignmentHandler;
   private cacheCleanupIntervalId?: number;
   private initialCacheCleanupTimeoutId?: number;
+  private lastHash?: string;
 
   public onInit(): void {
     const view = this.getView();
@@ -54,6 +60,7 @@ export default class Main extends Controller {
     this.employees = new EmployeeHandler(this, this.models, this.selection, this.guard);
     this.costCenters = new CostCenterHandler(this, this.models, this.selection, this.guard);
     this.locations = new LocationHandler(this, this.models, this.selection, this.guard);
+    this.assignments = new AssignmentHandler(this, this.models, this.selection, this.guard);
 
     // Initialize router and attach navigation guards
     const router = this.getOwnerComponent()?.getRouter();
@@ -73,12 +80,23 @@ export default class Main extends Controller {
    * Attach navigation guards to all routes to check for unsaved changes
    */
   private attachNavigationGuards(router: Router): void {
-    const routes = ["clients", "employees", "costCenters", "locations"];
+    const hashChanger = HashChanger.getInstance();
+    this.lastHash = hashChanger.getHash();
 
-    routes.forEach((routeName) => {
-      const route = router.getRoute(routeName);
-      if (route) {
-        route.attachBeforeMatched(this.onBeforeRouteMatched.bind(this));
+    router.attachBeforeRouteMatched(() => {
+      const pendingHash = hashChanger.getHash();
+      const currentHash = this.lastHash ?? pendingHash;
+      const i18n = this.getI18nBundle();
+
+      const proceed = (): void => {
+        this.lastHash = pendingHash;
+        hashChanger.setHash(pendingHash);
+      };
+
+      if (!this.guard.checkNavigation(i18n, proceed)) {
+        hashChanger.setHash(currentHash);
+      } else {
+        this.lastHash = pendingHash;
       }
     });
 
@@ -105,40 +123,17 @@ export default class Main extends Controller {
   }
 
   /**
-   * Called before a route is matched - check for unsaved changes
-   */
-  private onBeforeRouteMatched(event: Event): void {
-    const i18n = this.getI18nBundle();
-
-    // If there are unsaved changes, show confirmation
-    if (this.guard.hasDirtyForms()) {
-      // Prevent route navigation
-      event.preventDefault();
-
-      // Get route details for pending navigation
-      const route = event.getSource() as Route;
-      const args = event.getParameter("arguments");
-
-      // Ask user to confirm
-      this.guard.checkNavigation(i18n, () => {
-        // User confirmed - manually trigger navigation
-        const router = this.getOwnerComponent()?.getRouter();
-        if (router && route) {
-          // Use route name, not pattern, for navTo
-          const routeName = (route as any)._oConfig?.name || route.getPattern();
-          router.navTo(routeName, args);
-        }
-      });
-    }
-  }
-
-  /**
    * Get i18n resource bundle for localized messages
    */
   private getI18nBundle(): ResourceBundle {
     const view = this.getView();
     const model = view?.getModel("i18n") as ResourceModel;
     return model.getResourceBundle() as ResourceBundle;
+  }
+
+  private setSelectedTab(key: string): void {
+    const viewModel = this.models.getViewStateModel();
+    viewModel.setProperty("/selectedTabKey", key);
   }
 
   /**
@@ -152,6 +147,8 @@ export default class Main extends Controller {
       Log.error("No clientId in route parameters", undefined, "hr.admin.Main");
       return;
     }
+
+    this.setSelectedTab("employees");
 
     const view = this.getView();
     if (!view) {
@@ -217,6 +214,8 @@ export default class Main extends Controller {
       return;
     }
 
+    this.setSelectedTab("costCenters");
+
     const view = this.getView();
     if (!view) {
       return;
@@ -280,6 +279,8 @@ export default class Main extends Controller {
       return;
     }
 
+    this.setSelectedTab("locations");
+
     const view = this.getView();
     if (!view) {
       return;
@@ -335,6 +336,7 @@ export default class Main extends Controller {
    * Handle clients route matched - navigate back to main page
    */
   private onClientsRouteMatched(): void {
+    this.setSelectedTab("clients");
     // Navigate back to clients page in the App NavContainer
     const app = this.byId("app") as any;
     const mainPage = this.byId("mainPage");
@@ -422,6 +424,9 @@ export default class Main extends Controller {
     if (this.locations && typeof (this.locations as any).destroy === 'function') {
       (this.locations as any).destroy();
     }
+    if (this.assignments && typeof (this.assignments as any).destroy === 'function') {
+      (this.assignments as any).destroy();
+    }
 
     // Destroy service instances
     if (this.navigation && typeof (this.navigation as any).destroy === 'function') {
@@ -485,11 +490,62 @@ export default class Main extends Controller {
   }
 
   public onClientPress(event: Event): void {
-    this.clients.handleClientPress(event);
+    this.confirmNavigation(() => this.clients.handleClientPress(event));
+  }
+
+  public onTabSelect(event: Event): void {
+    const key = event.getParameter("key") as string;
+    this.navigateToTab(key);
+  }
+
+  private navigateToTab(key: string): void {
+    const i18n = this.getI18nBundle();
+    const proceed = (): void => {
+      const router = this.getOwnerComponent()?.getRouter();
+      if (!router) {
+        return;
+      }
+
+      switch (key) {
+        case "clients":
+          router.navTo("clients");
+          break;
+        case "employees":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("employees", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        case "costCenters":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("costCenters", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        case "locations":
+          if (this.selection.ensureClientSelected()) {
+            router.navTo("locations", { clientId: this.selection.getSelectedClientId() });
+          } else {
+            this.setSelectedTab("clients");
+            router.navTo("clients");
+          }
+          break;
+        default:
+          router.navTo("clients");
+      }
+    };
+
+    if (this.guard.checkNavigation(i18n, proceed)) {
+      proceed();
+    }
   }
 
   public onBackToClients(): void {
-    this.navigation.backToClients();
+    this.confirmNavigation(() => this.navigation.backToClients());
   }
 
   public onRefreshEmployees(): void {
@@ -528,12 +584,12 @@ export default class Main extends Controller {
 
   public onNavigateToCostCenters(): void {
     if (this.selection.ensureClientSelected()) {
-      this.navigation.showCostCentersPage();
+      this.navigateToTab("costCenters");
     }
   }
 
   public onBackToEmployees(): void {
-    this.navigation.backToEmployees();
+    this.confirmNavigation(() => this.navigation.backToEmployees());
   }
 
   public onRefreshCostCenters(): void {
@@ -576,7 +632,7 @@ export default class Main extends Controller {
 
   public onNavigateToLocations(): void {
     if (this.selection.ensureClientSelected()) {
-      this.navigation.showLocationsPage();
+      this.navigateToTab("locations");
     }
   }
 
@@ -612,5 +668,89 @@ export default class Main extends Controller {
 
   public onLocationsSelectionChange(event: Event): void {
     this.locations.handleSelectionChange(event);
+  }
+
+  public onRefreshAssignments(): void {
+    this.assignments.refresh();
+  }
+
+  public onAddAssignment(): void {
+    this.assignments.startCreate();
+  }
+
+  public onEditAssignment(): Promise<void> {
+    return this.assignments.startEdit();
+  }
+
+  public onDeleteAssignment(): void {
+    this.assignments.delete();
+  }
+
+  public onSaveAssignment(): void {
+    this.assignments.save();
+  }
+
+  public onCancelAssignment(): void {
+    this.assignments.cancel();
+  }
+
+  public onAssignmentDialogAfterClose(): void {
+    this.assignments.afterDialogClose();
+  }
+
+  public onAssignmentsSelectionChange(event: Event): void {
+    this.assignments.handleSelectionChange(event);
+  }
+
+  public onOpenAnonymizeDialog(): void {
+    const dialog = this.byId("anonymizeDialog") as Dialog;
+    const viewModel = this.models.getViewStateModel();
+    const today = new Date();
+    viewModel.setProperty("/anonymizeBefore", today.toISOString().slice(0, 10));
+    dialog.open();
+  }
+
+  public onConfirmAnonymize(): void {
+    const view = this.getView();
+    const i18n = this.getI18nBundle();
+    const dialog = this.byId("anonymizeDialog") as Dialog;
+    const model = view?.getModel() as ODataModel;
+    const viewModel = this.models.getViewStateModel();
+    const before = viewModel.getProperty("/anonymizeBefore") as string;
+
+    if (!before) {
+      MessageBox.error(i18n.getText("anonymizeDateRequired"));
+      return;
+    }
+
+    dialog.setBusy(true);
+    const action = model.bindContext("/anonymizeFormerEmployees(...)");
+    action.setParameter("before", before);
+    action
+      .execute()
+      .then(() => {
+        const context = action.getBoundContext();
+        const result = context?.getObject() as number | { value?: number } | undefined;
+        const affected = typeof result === "number" ? result : result?.value ?? 0;
+        MessageToast.show(i18n.getText("anonymizeSuccess", [affected]));
+        dialog.setBusy(false);
+        dialog.close();
+      })
+      .catch((error: Error) => {
+        dialog.setBusy(false);
+        MessageBox.error(error.message ?? i18n.getText("anonymizeFailed"));
+      });
+  }
+
+  public onCancelAnonymize(): void {
+    const dialog = this.byId("anonymizeDialog") as Dialog;
+    dialog.close();
+  }
+
+  private confirmNavigation(action: () => void): void {
+    const i18n = this.getI18nBundle();
+    if (this.guard.checkNavigation(i18n, action)) {
+      action();
+    }
   }
 }
