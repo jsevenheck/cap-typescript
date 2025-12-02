@@ -13,7 +13,6 @@ export interface ClientDialogData {
   ID?: string;
   companyId: string;
   name: string;
-  notificationEndpoint?: string | null;
 }
 
 export interface ClientDialogModelData {
