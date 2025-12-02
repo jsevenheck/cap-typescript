@@ -101,10 +101,8 @@ const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastErro
     return;
   }
 
-  let tx;
   try {
-    tx = db.tx({ tenant });
-    await tx.run(
+    await db.run(
       ql.INSERT.into(DLQ_TABLE).entries({
         originalID: entry.ID,
         eventType: entry.eventType,
@@ -117,12 +115,8 @@ const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastErro
       }),
     );
 
-    await tx.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
-    await tx.commit();
+    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
   } catch (error) {
-    if (tx?.rollback) {
-      await tx.rollback(error);
-    }
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
   }
 };
@@ -348,8 +342,8 @@ export class ParallelDispatcher {
       return;
     }
 
-    const delay = Math.pow(2, attempts - 1) * this.config.retryDelay;
-    const nextAttemptAt = new Date(Date.now() + delay);
+    const delay = Math.max(1, Math.pow(2, attempts - 1) * this.config.retryDelay);
+    const nextAttemptAt = new Date(Date.now() + delay + 1);
 
     await db.run(
       ql.UPDATE(OUTBOX_TABLE)
