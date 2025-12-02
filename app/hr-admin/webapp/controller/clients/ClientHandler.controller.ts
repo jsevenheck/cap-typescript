@@ -328,6 +328,8 @@ export default class ClientHandler {
               dialog.close();
               this.guard.markClean(ClientHandler.DIALOG_ID);
               MessageToast.show(i18n.getText("clientSaved"));
+              // Refresh the list to ensure any backend-normalized data is displayed consistently
+              this.getClientsBinding().refresh();
             })
             .catch(handleError)
             .finally(() => cleanup());
