@@ -5,7 +5,7 @@ import type { OutboxConfig } from './config';
 import { OutboxMetrics } from './metrics';
 import { EmployeeThirdPartyNotifier, type NotificationEnvelope } from '../api/third-party/employee-notifier';
 import { getLogger } from '../../shared/utils/logger';
-import { resolveTenant, resolveTenantFromTx } from '../../shared/utils/tenant';
+import { resolveTenantFromTx } from '../../shared/utils/tenant';
 
 const ql = cds.ql as any;
 
@@ -95,14 +95,16 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
 };
 
 const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
-  const tenant = entry.tenant ?? resolveTenant();
+  const tenant = entry.tenant;
   if (!tenant) {
     logger.error({ entryId: entry.ID }, 'Cannot move entry to DLQ without tenant context');
     return;
   }
 
+  let tx;
   try {
-    await db.run(
+    tx = db.tx({ tenant });
+    await tx.run(
       ql.INSERT.into(DLQ_TABLE).entries({
         originalID: entry.ID,
         eventType: entry.eventType,
@@ -115,8 +117,12 @@ const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastErro
       }),
     );
 
-    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
+    await tx.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
+    await tx.commit();
   } catch (error) {
+    if (tx?.rollback) {
+      await tx.rollback(error);
+    }
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
   }
 };
@@ -192,7 +198,7 @@ export class ParallelDispatcher {
     const claimed: OutboxEntry[] = [];
 
     for (const entry of claimable) {
-      const tenant = entry.tenant ?? resolveTenant();
+      const tenant = entry.tenant;
       if (!tenant) {
         logger.warn({ entryId: entry.ID }, 'Skipping claim for entry without tenant');
         continue;
@@ -292,7 +298,7 @@ export class ParallelDispatcher {
     try {
       await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
-      const tenant = entry.tenant ?? resolveTenant();
+      const tenant = entry.tenant;
       if (!tenant) {
         logger.warn({ entryId: entry.ID }, 'Skipping completion update without tenant');
         return;
@@ -324,7 +330,7 @@ export class ParallelDispatcher {
   private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
     const attempts = (entry.attempts ?? 0) + 1;
     const errorMessage = error?.message ?? 'Unknown error';
-    const tenant = entry.tenant ?? resolveTenant();
+    const tenant = entry.tenant;
 
     if (!tenant) {
       logger.warn({ entryId: entry.ID }, 'Skipping failure handling without tenant');
