@@ -1,24 +1,26 @@
-jest.mock('axios', () => ({
-  __esModule: true,
-  default: {
-    create: jest.fn(),
-  },
-}));
-
 import path from 'node:path';
 import cds from '@sap/cds';
-import axios from 'axios';
+import { getDestination, isHttpDestination } from '@sap-cloud-sdk/connectivity';
 
 import { EmployeeThirdPartyNotifier } from '../../../infrastructure/api/third-party/employee-notifier';
+import { postEmployeeNotification } from '../../../infrastructure/api/third-party/employee.client';
+
+jest.mock('@sap-cloud-sdk/connectivity', () => ({
+  __esModule: true,
+  getDestination: jest.fn(),
+  isHttpDestination: jest.fn(),
+}));
+
+jest.mock('../../../infrastructure/api/third-party/employee.client', () => ({
+  __esModule: true,
+  postEmployeeNotification: jest.fn(),
+}));
 
 cds.test(path.join(__dirname, '..', '..', '..'));
-const mockedAxios = axios as unknown as { create: jest.Mock };
 
-const buildMockClient = (postImpl?: jest.Mock): { post: jest.Mock } => {
-  const post = postImpl ?? jest.fn().mockResolvedValue({ status: 200 });
-  mockedAxios.create.mockReturnValue({ post } as any);
-  return { post };
-};
+const mockGetDestination = getDestination as unknown as jest.Mock;
+const mockIsHttpDestination = isHttpDestination as unknown as jest.Mock;
+const mockPostEmployeeNotification = postEmployeeNotification as unknown as jest.Mock;
 
 describe('EmployeeThirdPartyNotifier', () => {
   let db: any;
@@ -32,12 +34,17 @@ describe('EmployeeThirdPartyNotifier', () => {
     }
   });
 
+  beforeEach(() => {
+    mockGetDestination.mockReset();
+    mockIsHttpDestination.mockReset();
+    mockPostEmployeeNotification.mockReset();
+  });
+
   afterEach(() => {
-    jest.clearAllMocks();
     delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
   });
 
-  it('groups employees by client endpoint when preparing notifications', async () => {
+  it('groups employees by client destination when preparing notifications', async () => {
     const notifier = new EmployeeThirdPartyNotifier(db);
 
     const notification = await notifier.prepareEmployeesCreated(
@@ -66,10 +73,10 @@ describe('EmployeeThirdPartyNotifier', () => {
     );
 
     expect(notification.eventType).toBe('EMPLOYEE_CREATED');
-    expect(notification.payloadsByEndpoint.size).toBe(2);
+    expect(notification.payloadsByDestination.size).toBe(2);
 
-    const alpha = notification.payloadsByEndpoint.get('https://alpha.example.com/webhook');
-    const beta = notification.payloadsByEndpoint.get('https://beta.example.com/webhook');
+    const alpha = notification.payloadsByDestination.get('client-alpha-dest');
+    const beta = notification.payloadsByDestination.get('client-beta-dest');
 
     expect(alpha).toBeDefined();
     expect(beta).toBeDefined();
@@ -85,21 +92,22 @@ describe('EmployeeThirdPartyNotifier', () => {
     });
   });
 
-  it('dispatches notifications with HMAC signatures and retries on failure', async () => {
-    const mockPost = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('transient error'))
-      .mockResolvedValue({ status: 200 });
-    buildMockClient(mockPost);
+  it('dispatches notifications through configured destinations with signing secret', async () => {
+    mockGetDestination.mockResolvedValue({
+      name: 'client-alpha-dest',
+      url: 'https://alpha.example.com/webhook',
+      authentication: 'NoAuthentication',
+    });
+    mockIsHttpDestination.mockReturnValue(true);
 
     const notifier = new EmployeeThirdPartyNotifier();
     process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'super-secret';
 
     const payload = {
       eventType: 'EMPLOYEE_CREATED',
-      payloadsByEndpoint: new Map([
+      payloadsByDestination: new Map([
         [
-          'https://example.com/webhook',
+          'client-alpha-dest',
           [
             {
               body: {
@@ -115,13 +123,13 @@ describe('EmployeeThirdPartyNotifier', () => {
 
     await notifier.dispatch(payload);
 
-    expect(mockPost).toHaveBeenCalledTimes(2);
-    const [endpoint, body, options] = mockPost.mock.calls[0];
-    expect(endpoint).toBe('https://example.com/webhook');
-    expect(body).toMatchObject({
-      eventType: 'EMPLOYEE_CREATED',
-      employees: [expect.objectContaining({ employeeId: 'EMP-100' })],
-    });
-    expect(options?.headers?.['x-signature-sha256']).toBeDefined();
+    expect(mockGetDestination).toHaveBeenCalledWith({ destinationName: 'client-alpha-dest' });
+    expect(mockIsHttpDestination).toHaveBeenCalled();
+    expect(mockPostEmployeeNotification).toHaveBeenCalledTimes(1);
+
+    const [{ destination, payload: body, secret }] = mockPostEmployeeNotification.mock.calls[0];
+    expect(destination.name).toBe('client-alpha-dest');
+    expect(body).toContain('EMP-100');
+    expect(secret).toBe('super-secret');
   });
 });

@@ -1,9 +1,9 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
-import crypto from 'crypto';
-import axios, { type AxiosInstance } from 'axios';
+import { getDestination, isHttpDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
 
 import { getThirdPartyEmployeeSecret } from '../../../shared/utils/secrets';
+import { postEmployeeNotification } from './employee.client';
 
 const ql = cds.ql as typeof cds.ql & { SELECT: typeof cds.ql.SELECT };
 
@@ -15,7 +15,7 @@ export interface NotificationEnvelope {
 
 export interface PreparedNotification {
   eventType: string;
-  payloadsByEndpoint: Map<string, NotificationEnvelope[]>;
+  payloadsByDestination: Map<string, NotificationEnvelope[]>;
 }
 
 interface ClientRow {
@@ -40,24 +40,13 @@ interface EmployeeSnapshot {
   client_ID?: string;
 }
 
-const DEFAULT_RETRY_ATTEMPTS = 3;
-
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 const mergeEmployeeSnapshots = (request: any, persisted: any): EmployeeSnapshot => ({
   ...request,
   ...persisted,
 });
 
 export class EmployeeThirdPartyNotifier {
-  private readonly httpClient: AxiosInstance;
-
-  constructor(private readonly tx?: Transaction) {
-    this.httpClient = axios.create({
-      timeout: 10_000,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  constructor(private readonly tx?: Transaction) {}
 
   private defaultSecretPromise: Promise<string | undefined> | null = null;
 
@@ -72,10 +61,10 @@ export class EmployeeThirdPartyNotifier {
     requestEntries: any[],
     persistedRows: any[],
   ): Promise<PreparedNotification> {
-    const payloadsByEndpoint = new Map<string, NotificationEnvelope[]>();
+    const payloadsByDestination = new Map<string, NotificationEnvelope[]>();
 
     if (!Array.isArray(requestEntries) || !Array.isArray(persistedRows) || !persistedRows.length) {
-      return { eventType: 'EMPLOYEE_CREATED', payloadsByEndpoint };
+      return { eventType: 'EMPLOYEE_CREATED', payloadsByDestination };
     }
 
     const snapshots: EmployeeSnapshot[] = persistedRows.map((row, index) =>
@@ -97,13 +86,13 @@ export class EmployeeThirdPartyNotifier {
     }
 
     if (!byClient.size) {
-      return { eventType: 'EMPLOYEE_CREATED', payloadsByEndpoint };
+      return { eventType: 'EMPLOYEE_CREATED', payloadsByDestination };
     }
 
     const clientIds = Array.from(byClient.keys());
     const tx = this.tx ?? ((cds as any).db ?? (await cds.connect.to('db')));
     if (!tx) {
-      return { eventType: 'EMPLOYEE_CREATED', payloadsByEndpoint };
+      return { eventType: 'EMPLOYEE_CREATED', payloadsByDestination };
     }
 
     const clients = (await tx.run(
@@ -122,8 +111,8 @@ export class EmployeeThirdPartyNotifier {
 
     for (const [clientId, employees] of byClient.entries()) {
       const client = clientsById.get(clientId);
-      const endpoint = client?.notificationEndpoint ?? undefined;
-      if (!client || !endpoint) {
+      const destinationName = client?.notificationEndpoint ?? undefined;
+      if (!client || !destinationName) {
         continue;
       }
 
@@ -155,22 +144,22 @@ export class EmployeeThirdPartyNotifier {
         secret: defaultSecret ?? undefined,
       };
 
-      if (!payloadsByEndpoint.has(endpoint)) {
-        payloadsByEndpoint.set(endpoint, []);
+      if (!payloadsByDestination.has(destinationName)) {
+        payloadsByDestination.set(destinationName, []);
       }
 
-      payloadsByEndpoint.get(endpoint)?.push(envelope);
+      payloadsByDestination.get(destinationName)?.push(envelope);
     }
 
-    return { eventType: 'EMPLOYEE_CREATED', payloadsByEndpoint };
+    return { eventType: 'EMPLOYEE_CREATED', payloadsByDestination };
   }
 
   async dispatch(notification: PreparedNotification): Promise<void> {
     const tasks: Promise<void>[] = [];
 
-    for (const [endpoint, envelopes] of notification.payloadsByEndpoint.entries()) {
+    for (const [destinationName, envelopes] of notification.payloadsByDestination.entries()) {
       for (const envelope of envelopes) {
-        tasks.push(this.dispatchEnvelope(notification.eventType, endpoint, envelope));
+        tasks.push(this.dispatchEnvelope(notification.eventType, destinationName, envelope));
       }
     }
 
@@ -189,7 +178,7 @@ export class EmployeeThirdPartyNotifier {
 
   async dispatchEnvelope(
     eventType: string,
-    endpoint: string,
+    destinationName: string,
     envelope: NotificationEnvelope,
   ): Promise<void> {
     const payload = { ...envelope.body };
@@ -200,45 +189,34 @@ export class EmployeeThirdPartyNotifier {
       payload.timestamp = new Date().toISOString();
     }
 
-    await this.sendWithRetry(endpoint, payload, envelope.headers ?? {}, envelope.secret, 1);
+    const payloadString = JSON.stringify(payload);
+    const destination = await this.resolveDestination(destinationName);
+    const signingSecret = envelope.secret ?? (await this.getDefaultSecret());
+
+    await postEmployeeNotification({
+      destination,
+      payload: payloadString,
+      secret: signingSecret,
+      timeoutMs: 10_000,
+      headers: envelope.headers,
+    });
   }
 
-  generateSignature(payload: any, secret: string): string {
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(JSON.stringify(payload));
-    return hmac.digest('hex');
-  }
-
-  private async sendWithRetry(
-    endpoint: string,
-    payload: Record<string, unknown>,
-    headers: Record<string, string>,
-    secret?: string,
-    attempt: number = 1,
-  ): Promise<void> {
-    const maxAttempts = DEFAULT_RETRY_ATTEMPTS;
-    const signingSecret = secret ?? (await this.getDefaultSecret());
-
-    const finalHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...headers,
-    };
-
-    if (signingSecret) {
-      finalHeaders['x-signature-sha256'] = this.generateSignature(payload, signingSecret);
+  private async resolveDestination(destinationName: string): Promise<HttpDestination> {
+    const destination = await getDestination({ destinationName });
+    if (!destination) {
+      throw new Error(`Destination ${destinationName} not found`);
     }
 
-    try {
-      await this.httpClient.post(endpoint, payload, { headers: finalHeaders });
-    } catch (error) {
-      if (attempt >= maxAttempts) {
-        throw error;
-      }
-
-      const backoff = Math.pow(2, attempt - 1) * 1000;
-      await delay(backoff);
-      await this.sendWithRetry(endpoint, payload, headers, secret, attempt + 1);
+    if (!isHttpDestination(destination)) {
+      throw new Error(`Destination ${destinationName} is not an HTTP destination`);
     }
+
+    if (!destination.url || !destination.url.startsWith('https://')) {
+      throw new Error(`Destination ${destinationName} must resolve to an HTTPS URL`);
+    }
+
+    return destination;
   }
 }
 

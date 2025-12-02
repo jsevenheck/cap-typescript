@@ -672,7 +672,7 @@ describe('Client name validation', () => {
 
         await tx.run(
           UPDATE(tx.entities.Clients)
-            .set({ notificationEndpoint: 'https://example.com', modifiedAt: created.modifiedAt })
+            .set({ notificationEndpoint: 'dest-example-com', modifiedAt: created.modifiedAt })
             .where({ ID: clientId }),
         );
 
