@@ -12,6 +12,9 @@ const ql = cds.ql as any;
 const OUTBOX_TABLE = 'clientmgmt.EmployeeNotificationOutbox';
 const DLQ_TABLE = 'clientmgmt.EmployeeNotificationDLQ';
 
+const MAX_OUTBOX_PAYLOAD_BYTES = 500 * 1024; // 500KB safety limit
+const ALLOWED_OUTBOX_HEADERS = new Set(['content-type', 'x-signature-sha256', 'x-correlation-id']);
+
 const logger = getLogger('outbox-dispatcher');
 
 export interface OutboxEntry {
@@ -32,19 +35,32 @@ interface ParsedPayload extends NotificationEnvelope {
   body: Record<string, unknown>;
 }
 
-const normalizeHeaders = (headers: unknown): Record<string, string> | undefined => {
+const sanitizeHeaders = (headers: unknown): Record<string, string> | undefined => {
   if (!headers || typeof headers !== 'object') {
     return undefined;
   }
 
   const normalized: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers as Record<string, unknown>)) {
-    if (typeof value === 'string') {
-      normalized[key] = value;
+    if (typeof value !== 'string') {
+      continue;
+    }
+
+    const lowerKey = key.toLowerCase();
+    if (ALLOWED_OUTBOX_HEADERS.has(lowerKey)) {
+      normalized[lowerKey] = value;
     }
   }
 
   return Object.keys(normalized).length ? normalized : undefined;
+};
+
+const enforceMaxPayloadSize = (body: Record<string, unknown>): void => {
+  const serialized = JSON.stringify(body);
+  const sizeBytes = Buffer.byteLength(serialized, 'utf8');
+  if (sizeBytes > MAX_OUTBOX_PAYLOAD_BYTES) {
+    throw new Error(`Payload exceeds maximum allowed size of ${MAX_OUTBOX_PAYLOAD_BYTES} bytes`);
+  }
 };
 
 const parsePayload = (entry: OutboxEntry): ParsedPayload => {
@@ -58,13 +74,15 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
     const bodyCandidate = record['body'];
 
     if (bodyCandidate && typeof bodyCandidate === 'object') {
+      enforceMaxPayloadSize(bodyCandidate as Record<string, unknown>);
+
       const secretCandidate = record['secret'];
       const headersCandidate = record['headers'];
 
       return {
         body: bodyCandidate as Record<string, unknown>,
         secret: typeof secretCandidate === 'string' ? (secretCandidate as string) : undefined,
-        headers: normalizeHeaders(headersCandidate),
+        headers: sanitizeHeaders(headersCandidate),
       };
     }
 
@@ -83,10 +101,12 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
       throw new Error('Payload body is required.');
     }
 
+    enforceMaxPayloadSize(legacyBody);
+
     return {
       body: legacyBody,
       secret: typeof secret === 'string' ? secret : undefined,
-      headers: normalizeHeaders(headers),
+      headers: sanitizeHeaders(headers),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown payload parsing error';
@@ -386,7 +406,7 @@ export class ParallelDispatcher {
 
 export interface OutboxEnqueueInput {
   eventType: string;
-  endpoint: string;
+  destinationName: string;
   payload: NotificationEnvelope;
 }
 
@@ -424,7 +444,7 @@ export const enqueueOutboxEntry = async (
       await tx.run(
         ql.INSERT.into(OUTBOX_TABLE).entries({
           eventType: input.eventType,
-          destinationName: input.endpoint,
+          destinationName: input.destinationName,
           payload: serializePayload(input.payload),
           status: 'PENDING',
           attempts: 0,
@@ -437,7 +457,7 @@ export const enqueueOutboxEntry = async (
 
       if (attempt > 1) {
         logger.info(
-          { eventType: input.eventType, endpoint: input.endpoint, attempt },
+          { eventType: input.eventType, destinationName: input.destinationName, attempt },
           `Successfully enqueued after ${attempt} attempt(s)`,
         );
         metrics.recordEnqueueRetrySuccess();
@@ -447,7 +467,7 @@ export const enqueueOutboxEntry = async (
     } catch (error) {
       if (attempt >= maxAttempts) {
         logger.error(
-          { err: error, eventType: input.eventType, endpoint: input.endpoint, attempts: attempt },
+          { err: error, eventType: input.eventType, destinationName: input.destinationName, attempts: attempt },
           `Failed to enqueue outbox entry after ${attempt} attempts - transaction will rollback`,
         );
         metrics.recordEnqueueFailure();
@@ -465,7 +485,13 @@ export const enqueueOutboxEntry = async (
       const delay = config.enqueueRetryDelay * Math.pow(2, exponent);
 
       logger.warn(
-        { err: error, eventType: input.eventType, endpoint: input.endpoint, attempt, retryDelayMs: delay },
+        {
+          err: error,
+          eventType: input.eventType,
+          destinationName: input.destinationName,
+          attempt,
+          retryDelayMs: delay,
+        },
         `Enqueue attempt ${attempt} failed, retrying in ${delay}ms`,
       );
       metrics.recordEnqueueRetry();

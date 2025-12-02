@@ -2,7 +2,6 @@ export interface ClientEntity {
   ID: string;
   companyId: string;
   name?: string;
-  notificationEndpoint?: string;
 }
 
 export interface LocationEntity {

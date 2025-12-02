@@ -386,12 +386,6 @@
                 <Input id="companyIdInput" value="{dialog>/client/companyId}" placeholder="{i18n>placeholderCompanyId}"/>
                 <Label text="{i18n>name}" required="true" labelFor="clientNameInput"/>
                 <Input id="clientNameInput" value="{dialog>/client/name}" placeholder="{i18n>placeholderClientName}"/>
-                <Label text="{i18n>notificationEndpoint}" labelFor="clientNotificationInput"/>
-                <Input
-                        id="clientNotificationInput"
-                        value="{dialog>/client/notificationEndpoint}"
-                        placeholder="{i18n>placeholderNotificationEndpoint}"
-                        type="Url"/>
             </VBox>
         </content>
         <beginButton>

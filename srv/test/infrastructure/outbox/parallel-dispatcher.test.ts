@@ -17,8 +17,8 @@ const OTHER_TENANT = 't1';
 class StubNotifier {
   constructor(private readonly handler: jest.Mock) {}
 
-  async dispatchEnvelope(eventType: string, endpoint: string, envelope: any): Promise<void> {
-    await this.handler(eventType, endpoint, envelope);
+  async dispatchEnvelope(eventType: string, destinationName: string, envelope: any): Promise<void> {
+    await this.handler(eventType, destinationName, envelope);
   }
 }
 
@@ -123,7 +123,7 @@ describe('ParallelDispatcher', () => {
     expect(envelope.body).not.toHaveProperty('secret');
     expect(envelope.body).not.toHaveProperty('headers');
     expect(envelope.secret).toBe('legacy-secret');
-    expect(envelope.headers).toEqual({ 'x-extra': 'value' });
+    expect(envelope.headers).toBeUndefined();
   });
 
   it('retries failed dispatches with exponential backoff', async () => {
@@ -318,7 +318,7 @@ describe('ParallelDispatcher', () => {
     try {
       await enqueueOutboxEntry(tx, {
         eventType: 'EMPLOYEE_CREATED',
-        endpoint: 'https://example.com/enqueue',
+        destinationName: 'dest-enqueue',
         payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
       }, config, metrics);
 
@@ -346,7 +346,7 @@ describe('ParallelDispatcher', () => {
         tx,
         {
           eventType: 'EMPLOYEE_CREATED',
-          endpoint: 'https://example.com/enqueue',
+          destinationName: 'dest-enqueue',
           payload: { body: { eventType: 'EMPLOYEE_CREATED', employees: [] } },
         },
         config,

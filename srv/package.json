@@ -8,7 +8,7 @@
     "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
     "start": "cross-env NODE_ENV=production CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
     "lint": "eslint \"**/*.ts\"",
-    "test": "cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 jest --runInBand",
+    "test": "cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 jest",
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
@@ -53,6 +53,9 @@
     "odata": {
       "urlPath": "/odata/v4"
     },
+    "employeeNotifications": {
+      "employeeCreatedDestination": "employee-service-destination"
+    },
     "requires": {
       "db": {
         "kind": "sqlite",
@@ -60,57 +63,6 @@
           "filename": "../db/sqlite.db"
         },
         "multiTenant": true
-      },
-      "auth": {
-        "kind": "mocked",
-        "users": {
-          "dev": {
-            "password": "dev",
-            "roles": [
-              "HRViewer",
-              "HREditor",
-              "HRAdmin"
-            ],
-            "attributes": {
-              "companyCodes": [
-                "COMP-001",
-                "COMP-002"
-              ],
-              "CompanyCode": [
-                "COMP-001",
-                "COMP-002"
-              ]
-            }
-          },
-          "hrviewer": {
-            "password": "hrviewer",
-            "roles": [
-              "HRViewer"
-            ],
-            "attributes": {
-              "companyCodes": [
-                "COMP-001"
-              ],
-              "CompanyCode": [
-                "COMP-001"
-              ]
-            }
-          },
-          "hreditor": {
-            "password": "hreditor",
-            "roles": [
-              "HREditor"
-            ],
-            "attributes": {
-              "companyCodes": [
-                "COMP-001"
-              ],
-              "CompanyCode": [
-                "COMP-001"
-              ]
-            }
-          }
-        }
       },
       "ams": {
         "kind": "ams-local",
@@ -120,6 +72,61 @@
           "dclGenerationPackage": "cap",
           "generateDcl": true,
           "generatePoliciesDeployer": false
+        }
+      }
+    },
+    "[development]": {
+      "requires": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "dev": {
+              "password": "dev",
+              "roles": [
+                "HRViewer",
+                "HREditor",
+                "HRAdmin"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001",
+                  "COMP-002"
+                ],
+                "CompanyCode": [
+                  "COMP-001",
+                  "COMP-002"
+                ]
+              }
+            },
+            "hrviewer": {
+              "password": "hrviewer",
+              "roles": [
+                "HRViewer"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
+              }
+            },
+            "hreditor": {
+              "password": "hreditor",
+              "roles": [
+                "HREditor"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -144,6 +151,57 @@
           "kind": "sqlite",
           "credentials": {
             "filename": "../db/test.db"
+          }
+        },
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "dev": {
+              "password": "dev",
+              "roles": [
+                "HRViewer",
+                "HREditor",
+                "HRAdmin"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001",
+                  "COMP-002"
+                ],
+                "CompanyCode": [
+                  "COMP-001",
+                  "COMP-002"
+                ]
+              }
+            },
+            "hrviewer": {
+              "password": "hrviewer",
+              "roles": [
+                "HRViewer"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
+              }
+            },
+            "hreditor": {
+              "password": "hreditor",
+              "roles": [
+                "HREditor"
+              ],
+              "attributes": {
+                "companyCodes": [
+                  "COMP-001"
+                ],
+                "CompanyCode": [
+                  "COMP-001"
+                ]
+              }
+            }
           }
         },
         "ams": false

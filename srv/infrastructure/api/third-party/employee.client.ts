@@ -20,10 +20,11 @@ export interface NotificationRequest {
   payload: string;
   secret?: string;
   timeoutMs: number;
+  headers?: Record<string, string>;
 }
 
-const buildHeaders = (payload: string, secret?: string): Record<string, string> => {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+const buildHeaders = (payload: string, secret?: string, additional?: Record<string, string>): Record<string, string> => {
+  const headers: Record<string, string> = { 'content-type': 'application/json', ...(additional ?? {}) };
   if (secret) {
     const signature = createHmac('sha256', secret).update(String(payload ?? '')).digest('hex');
     headers['x-signature-sha256'] = signature;
@@ -36,12 +37,13 @@ export const postEmployeeNotification = async ({
   payload,
   secret,
   timeoutMs,
+  headers,
 }: NotificationRequest): Promise<void> => {
-  const headers = buildHeaders(payload, secret);
+  const mergedHeaders = buildHeaders(payload, secret, headers);
   const request: HttpRequestConfig = {
     method: 'post',
     data: payload,
-    headers,
+    headers: mergedHeaders,
     timeout: timeoutMs,
   };
 

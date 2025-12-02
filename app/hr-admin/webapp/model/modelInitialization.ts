@@ -28,7 +28,6 @@ export function createInitialClientDialogData(): ClientDialogModelData {
     client: {
       companyId: "",
       name: "",
-      notificationEndpoint: "",
     },
   };
 }

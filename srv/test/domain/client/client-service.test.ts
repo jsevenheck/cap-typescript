@@ -671,9 +671,7 @@ describe('Client name validation', () => {
         );
 
         await tx.run(
-          UPDATE(tx.entities.Clients)
-            .set({ notificationEndpoint: 'https://example.com', modifiedAt: created.modifiedAt })
-            .where({ ID: clientId }),
+          UPDATE(tx.entities.Clients).set({ name: 'Original Name', modifiedAt: created.modifiedAt }).where({ ID: clientId }),
         );
 
         const updated = await tx.run(
@@ -820,7 +818,7 @@ describe('Employee business rules', () => {
 
   const createClientRecord = async (
     tx: any,
-    options: { companyId: string; name?: string; notificationEndpoint?: string },
+    options: { companyId: string; name?: string },
   ): Promise<{ ID: string; companyId: string }> => {
     const clientId = randomUUID();
 
@@ -830,7 +828,6 @@ describe('Employee business rules', () => {
         ID: clientId,
         companyId: options.companyId,
         name: options.name ?? `Client ${options.companyId}`,
-        notificationEndpoint: options.notificationEndpoint ?? null,
       }),
     );
 

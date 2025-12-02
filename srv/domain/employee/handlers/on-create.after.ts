@@ -42,12 +42,12 @@ export const onCreateEvent = async (
       const persistedRows = Array.isArray(response) ? (response as any[]) : [response];
 
       const notification = await notifier.prepareEmployeesCreated(requestEntries, persistedRows);
-      if (notification.payloadsByEndpoint.size) {
-        for (const [endpoint, envelopes] of notification.payloadsByEndpoint.entries()) {
+      if (notification.payloadsByDestination.size) {
+        for (const [destinationName, envelopes] of notification.payloadsByDestination.entries()) {
           for (const envelope of envelopes) {
             await enqueueOutboxEntry(
               tx,
-              { eventType: notification.eventType, endpoint, payload: envelope },
+              { eventType: notification.eventType, destinationName, payload: envelope },
               outboxConfig,
               outboxMetrics,
             );
