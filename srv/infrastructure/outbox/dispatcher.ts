@@ -95,8 +95,13 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
 };
 
 const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
+  const tenant = entry.tenant ?? resolveTenant();
+  if (!tenant) {
+    logger.error({ entryId: entry.ID }, 'Cannot move entry to DLQ without tenant context');
+    return;
+  }
+
   try {
-    const tenant = entry.tenant ?? resolveTenant();
     await db.run(
       ql.INSERT.into(DLQ_TABLE).entries({
         originalID: entry.ID,
@@ -138,7 +143,6 @@ export class ParallelDispatcher {
     const now = new Date();
     await this.releaseExpiredClaims(db, now);
 
-    const tenant = resolveTenant();
     const candidates = (await db.run(
       ql.SELECT.from(OUTBOX_TABLE)
         .columns(
@@ -154,7 +158,7 @@ export class ParallelDispatcher {
           'lastError',
           'tenant',
         )
-        .where({ status: 'PENDING', tenant })
+        .where({ status: 'PENDING' })
         .orderBy('nextAttemptAt')
         .limit(this.config.batchSize),
     )) as OutboxEntry[];
@@ -188,6 +192,12 @@ export class ParallelDispatcher {
     const claimed: OutboxEntry[] = [];
 
     for (const entry of claimable) {
+      const tenant = entry.tenant ?? resolveTenant();
+      if (!tenant) {
+        logger.warn({ entryId: entry.ID }, 'Skipping claim for entry without tenant');
+        continue;
+      }
+
       const where: Record<string, unknown> = {
         ID: entry.ID,
         tenant,
@@ -282,6 +292,12 @@ export class ParallelDispatcher {
     try {
       await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
+      const tenant = entry.tenant ?? resolveTenant();
+      if (!tenant) {
+        logger.warn({ entryId: entry.ID }, 'Skipping completion update without tenant');
+        return;
+      }
+
       await db.run(
         ql.UPDATE(OUTBOX_TABLE)
           .set({
@@ -292,7 +308,7 @@ export class ParallelDispatcher {
             nextAttemptAt: null,
             lastError: null,
           })
-          .where({ ID: entry.ID, tenant: entry.tenant ?? resolveTenant() }),
+          .where({ ID: entry.ID, tenant }),
       );
 
       const duration = Date.now() - startTime;
@@ -308,6 +324,12 @@ export class ParallelDispatcher {
   private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
     const attempts = (entry.attempts ?? 0) + 1;
     const errorMessage = error?.message ?? 'Unknown error';
+    const tenant = entry.tenant ?? resolveTenant();
+
+    if (!tenant) {
+      logger.warn({ entryId: entry.ID }, 'Skipping failure handling without tenant');
+      return;
+    }
 
     logger.warn(
       { err: error, entryId: entry.ID, destination: entry.destinationName, attempts },
@@ -333,7 +355,7 @@ export class ParallelDispatcher {
           claimedBy: null,
           lastError: errorMessage,
         })
-        .where({ ID: entry.ID, tenant: entry.tenant ?? resolveTenant() }),
+        .where({ ID: entry.ID, tenant }),
     );
 
     this.metrics.recordFailed();
@@ -341,21 +363,18 @@ export class ParallelDispatcher {
 
   private async releaseExpiredClaims(db: any, now: Date): Promise<void> {
     const expiry = new Date(now.getTime() - this.config.claimTtl);
-    const tenant = resolveTenant();
-
     await db.run(
       ql.UPDATE(OUTBOX_TABLE)
         .set({ status: 'PENDING', claimedAt: null, claimedBy: null })
-        .where({ status: 'PROCESSING', claimedAt: { '<': expiry }, tenant }),
+        .where({ status: 'PROCESSING', claimedAt: { '<': expiry } }),
     );
   }
 
   private async updatePendingGauge(db: any): Promise<void> {
-    const tenant = resolveTenant();
     const result = await db.run(
       ql.SELECT.from(OUTBOX_TABLE)
         .columns('count(1) as pendingCount')
-        .where({ status: { in: ['PENDING', 'PROCESSING'] }, tenant }),
+        .where({ status: { in: ['PENDING', 'PROCESSING'] } }),
     );
 
     const rows = Array.isArray(result) ? result : [result];
