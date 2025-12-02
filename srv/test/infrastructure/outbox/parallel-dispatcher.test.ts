@@ -11,6 +11,7 @@ cds.test(path.join(__dirname, '..', '..', '..'));
 
 const OUTBOX_TABLE = 'clientmgmt.EmployeeNotificationOutbox';
 const DLQ_TABLE = 'clientmgmt.EmployeeNotificationDLQ';
+const TEST_TENANT = process.env.CDS_DEFAULT_TENANT ?? 't0';
 
 class StubNotifier {
   constructor(private readonly handler: jest.Mock) {}
@@ -59,6 +60,7 @@ describe('ParallelDispatcher', () => {
         status: 'PENDING',
         attempts: 0,
         nextAttemptAt: new Date(Date.now() - 1000),
+        tenant: TEST_TENANT,
       }),
     );
 
@@ -93,6 +95,7 @@ describe('ParallelDispatcher', () => {
         status: 'PENDING',
         attempts: 0,
         nextAttemptAt: new Date(Date.now() - 1000),
+        tenant: TEST_TENANT,
       }),
     );
 
@@ -123,6 +126,7 @@ describe('ParallelDispatcher', () => {
         status: 'PENDING',
         attempts: 0,
         nextAttemptAt: new Date(Date.now() - 1000),
+        tenant: TEST_TENANT,
       }),
     );
 
@@ -150,6 +154,7 @@ describe('ParallelDispatcher', () => {
         status: 'PENDING',
         attempts: 1,
         nextAttemptAt: new Date(Date.now() - 1000),
+        tenant: TEST_TENANT,
       }),
     );
 
@@ -182,6 +187,7 @@ describe('ParallelDispatcher', () => {
         claimedAt: new Date(Date.now() - 6000),
         claimedBy: 'other-worker',
         nextAttemptAt: new Date(Date.now() - 6000),
+        tenant: TEST_TENANT,
       }),
     );
 
@@ -220,6 +226,7 @@ describe('ParallelDispatcher', () => {
           status: 'PENDING',
           attempts: 0,
           nextAttemptAt: new Date(now - 1000),
+          tenant: TEST_TENANT,
         },
         {
           ID: 'sequential-2',
@@ -229,6 +236,7 @@ describe('ParallelDispatcher', () => {
           status: 'PENDING',
           attempts: 0,
           nextAttemptAt: new Date(now - 1000),
+          tenant: TEST_TENANT,
         },
       ]),
     );
@@ -308,6 +316,7 @@ describe('ParallelDispatcher', () => {
         attempts: 1,
         nextAttemptAt: null,
         modifiedAt: new Date(Date.now() - 1000),
+        tenant: TEST_TENANT,
       }),
     );
 
