@@ -8,7 +8,7 @@
     "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
     "start": "cross-env NODE_ENV=production CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
     "lint": "eslint \"**/*.ts\"",
-    "test": "cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 jest --runInBand",
+    "test": "cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 jest",
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
