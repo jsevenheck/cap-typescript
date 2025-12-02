@@ -362,6 +362,9 @@ export default class ClientHandler {
           dialog.close();
           this.guard.markClean(ClientHandler.DIALOG_ID);
           MessageToast.show(i18n.getText("clientSaved"));
+          // Refresh the list to pick up backend-normalized values (e.g., companyId casing)
+          // and ensure related bindings like cost centers reflect the latest client data.
+          this.getClientsBinding().refresh();
         })
         .catch((error: Error) => {
           console.error("Error updating client:", error);
