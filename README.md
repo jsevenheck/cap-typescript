@@ -46,6 +46,13 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 - **Logging:** @sap/logging with correlation IDs
 - **Scheduling:** node-cron for outbox cleanup
 
+### Tenant Handling (IAS + CAP MTX)
+
+- **Tenant source:** The `tenant` column comes from the CAP request context (`cds.context.tenant`) provided by IAS/MTX; the service never generates new tenant IDs per record.
+- **Create flows:** Every CREATE request stamps the active tenant on all tenant-scoped entities (Clients, Employees, Locations, CostCenters, Assignments, Outbox/DLQ). Incoming payload tenants are ignored/overwritten to prevent cross-tenant injection.
+- **Read/update/delete flows:** All queries are automatically constrained to the active tenant via middleware guards to keep data isolated per subscribing IAS tenant.
+- **Local/dev runs:** Set `CDS_DEFAULT_TENANT` (default `t0`) when using mocked auth to simulate a tenant; production IAS tokens supply the tenant automatically.
+
 ### Frontend (SAPUI5)
 - **Framework:** SAPUI5 1.126.1 (OpenUI5)
 - **Language:** TypeScript 5.6.3

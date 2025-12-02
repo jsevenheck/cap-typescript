@@ -49,11 +49,11 @@ export const registerTenantIsolation = (srv: any): void => {
   srv.before('CREATE', TENANT_SCOPED_ENTITIES, (req: Request) => {
     const tenant = resolveTenantFromReq(req);
     if (Array.isArray(req.data)) {
-      req.data = (req.data as any[]).map((entry) => ({ tenant, ...entry }));
+      req.data = (req.data as any[]).map((entry) => ({ ...entry, tenant }));
       return;
     }
     if (req.data && typeof req.data === 'object') {
-      (req.data as Record<string, unknown>).tenant ??= tenant;
+      (req.data as Record<string, unknown>).tenant = tenant;
     }
   });
 
