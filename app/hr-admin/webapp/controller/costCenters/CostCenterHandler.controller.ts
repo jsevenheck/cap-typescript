@@ -265,6 +265,8 @@ export default class CostCenterHandler {
           this.guard.markClean(CostCenterHandler.DIALOG_ID);
           dialog.close();
           MessageToast.show(i18n.getText("costCenterUpdated"));
+          // Refresh the list to ensure any backend-normalized values (e.g., codes) are displayed consistently
+          this.getCostCentersBinding()?.refresh();
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
