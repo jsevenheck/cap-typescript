@@ -55,20 +55,18 @@ export default UIComponent.extend("hr.admin.Component", {
         });
       };
 
-      // Attach to supported request events (v4 models expose requestCompleted instead of requestFailed)
-      if ((odataModel as ODataModel).attachRequestCompleted) {
-        (odataModel as ODataModel).attachRequestCompleted((event: any) => {
-          if (event.getParameter("success")) {
-            return;
-          }
+      // Attach to request failure events supported by the active model
+      const attachRequestFailed = (model: any) => {
+        model.attachRequestFailed((event: any) => {
+          const response = event.getParameter?.("response") ?? event.getParameters()?.response;
+          handleError(response);
+        });
+      };
 
-          handleError(event.getParameter("response"));
-        });
+      if (odataModel instanceof ODataModel && (odataModel as any).attachRequestFailed) {
+        attachRequestFailed(odataModel);
       } else if ((odataModel as any).attachRequestFailed) {
-        (odataModel as any).attachRequestFailed((event: any) => {
-          const params = event.getParameters();
-          handleError(params.response);
-        });
+        attachRequestFailed(odataModel);
       }
     }
 
