@@ -1,6 +1,7 @@
 import UIComponent from "sap/ui/core/UIComponent";
 import MessageBox from "sap/m/MessageBox";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import Log from "sap/base/Log";
 
 export default UIComponent.extend("hr.admin.Component", {
   metadata: {
@@ -63,8 +64,9 @@ export default UIComponent.extend("hr.admin.Component", {
         });
       };
 
-      if (odataModel instanceof ODataModel && (odataModel as any).attachRequestFailed) {
-        attachRequestFailed(odataModel);
+      // The v4 ODataModel does not support requestFailed; avoid attaching to prevent runtime errors
+      if (odataModel instanceof ODataModel) {
+        Log.info("Skipping requestFailed handler for v4 ODataModel (event unsupported)");
       } else if ((odataModel as any).attachRequestFailed) {
         attachRequestFailed(odataModel);
       }
