@@ -22,7 +22,6 @@ interface ClientRow {
   ID: string;
   companyId: string;
   name?: string;
-  notificationEndpoint?: string | null;
 }
 
 interface EmployeeSnapshot {
@@ -49,6 +48,7 @@ export class EmployeeThirdPartyNotifier {
   constructor(private readonly tx?: Transaction) {}
 
   private defaultSecretPromise: Promise<string | undefined> | null = null;
+  private destinationName: string | null = null;
 
   private async getDefaultSecret(): Promise<string | undefined> {
     if (!this.defaultSecretPromise) {
@@ -96,9 +96,7 @@ export class EmployeeThirdPartyNotifier {
     }
 
     const clients = (await tx.run(
-      ql.SELECT.from('clientmgmt.Clients')
-        .columns('ID', 'companyId', 'name', 'notificationEndpoint')
-        .where({ ID: { in: clientIds } }),
+      ql.SELECT.from('clientmgmt.Clients').columns('ID', 'companyId', 'name').where({ ID: { in: clientIds } }),
     )) as ClientRow[];
 
     const clientsById = new Map<string, ClientRow>();
@@ -108,11 +106,11 @@ export class EmployeeThirdPartyNotifier {
 
     const defaultSecret = await this.getDefaultSecret();
     const timestamp = new Date().toISOString();
+    const destinationName = this.getEmployeeCreatedDestination();
 
     for (const [clientId, employees] of byClient.entries()) {
       const client = clientsById.get(clientId);
-      const destinationName = client?.notificationEndpoint ?? undefined;
-      if (!client || !destinationName) {
+      if (!client) {
         continue;
       }
 
@@ -217,6 +215,25 @@ export class EmployeeThirdPartyNotifier {
     }
 
     return destination;
+  }
+
+  private getEmployeeCreatedDestination(): string {
+    if (this.destinationName) {
+      return this.destinationName;
+    }
+
+    const destinationName =
+      (cds.env as Record<string, any>)?.employeeNotifications?.employeeCreatedDestination ??
+      process.env.EMPLOYEE_CREATED_DESTINATION;
+
+    if (!destinationName || typeof destinationName !== 'string') {
+      throw new Error(
+        'Employee created notification destination is not configured. Set cds.employeeNotifications.employeeCreatedDestination or EMPLOYEE_CREATED_DESTINATION.',
+      );
+    }
+
+    this.destinationName = destinationName;
+    return destinationName;
   }
 }
 

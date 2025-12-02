@@ -53,6 +53,9 @@
     "odata": {
       "urlPath": "/odata/v4"
     },
+    "employeeNotifications": {
+      "employeeCreatedDestination": "employee-service-destination"
+    },
     "requires": {
       "db": {
         "kind": "sqlite",

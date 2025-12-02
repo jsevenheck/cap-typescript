@@ -24,6 +24,7 @@ const mockPostEmployeeNotification = postEmployeeNotification as unknown as jest
 
 describe('EmployeeThirdPartyNotifier', () => {
   let db: any;
+  const destinationName = 'employee-service-destination';
 
   beforeAll(async () => {
     db = await cds.connect.to('db');
@@ -41,10 +42,11 @@ describe('EmployeeThirdPartyNotifier', () => {
   });
 
   afterEach(() => {
+    delete process.env.EMPLOYEE_CREATED_DESTINATION;
     delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
   });
 
-  it('groups employees by client destination when preparing notifications', async () => {
+  it('groups employees by client while using a single service destination', async () => {
     const notifier = new EmployeeThirdPartyNotifier(db);
 
     const notification = await notifier.prepareEmployeesCreated(
@@ -73,20 +75,19 @@ describe('EmployeeThirdPartyNotifier', () => {
     );
 
     expect(notification.eventType).toBe('EMPLOYEE_CREATED');
-    expect(notification.payloadsByDestination.size).toBe(2);
+    expect(notification.payloadsByDestination.size).toBe(1);
 
-    const alpha = notification.payloadsByDestination.get('client-alpha-dest');
-    const beta = notification.payloadsByDestination.get('client-beta-dest');
+    const destinationPayloads = notification.payloadsByDestination.get(destinationName);
 
-    expect(alpha).toBeDefined();
-    expect(beta).toBeDefined();
+    expect(destinationPayloads).toBeDefined();
+    expect(destinationPayloads?.length).toBe(2);
 
-    expect(alpha?.[0].body).toMatchObject({
+    expect(destinationPayloads?.[0].body).toMatchObject({
       client: expect.objectContaining({ companyId: 'COMP-001' }),
       employees: [expect.objectContaining({ employeeId: 'EMP-001' })],
     });
 
-    expect(beta?.[0].body).toMatchObject({
+    expect(destinationPayloads?.[1].body).toMatchObject({
       client: expect.objectContaining({ companyId: 'COMP-002' }),
       employees: [expect.objectContaining({ employeeId: 'EMP-002' })],
     });
@@ -94,20 +95,21 @@ describe('EmployeeThirdPartyNotifier', () => {
 
   it('dispatches notifications through configured destinations with signing secret', async () => {
     mockGetDestination.mockResolvedValue({
-      name: 'client-alpha-dest',
+      name: destinationName,
       url: 'https://alpha.example.com/webhook',
       authentication: 'NoAuthentication',
     });
     mockIsHttpDestination.mockReturnValue(true);
 
     const notifier = new EmployeeThirdPartyNotifier();
+    process.env.EMPLOYEE_CREATED_DESTINATION = destinationName;
     process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'super-secret';
 
     const payload = {
       eventType: 'EMPLOYEE_CREATED',
       payloadsByDestination: new Map([
         [
-          'client-alpha-dest',
+          destinationName,
           [
             {
               body: {
@@ -123,12 +125,12 @@ describe('EmployeeThirdPartyNotifier', () => {
 
     await notifier.dispatch(payload);
 
-    expect(mockGetDestination).toHaveBeenCalledWith({ destinationName: 'client-alpha-dest' });
+    expect(mockGetDestination).toHaveBeenCalledWith({ destinationName });
     expect(mockIsHttpDestination).toHaveBeenCalled();
     expect(mockPostEmployeeNotification).toHaveBeenCalledTimes(1);
 
     const [{ destination, payload: body, secret }] = mockPostEmployeeNotification.mock.calls[0];
-    expect(destination.name).toBe('client-alpha-dest');
+    expect(destination.name).toBe(destinationName);
     expect(body).toContain('EMP-100');
     expect(secret).toBe('super-secret');
   });
