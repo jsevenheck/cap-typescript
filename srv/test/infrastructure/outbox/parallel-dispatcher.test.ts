@@ -25,8 +25,16 @@ class StubNotifier {
 describe('ParallelDispatcher', () => {
   let db: any;
 
-  const insertEntries = async (entries: any | any[], tenant = TEST_TENANT) => {
-    await db.run((cds.ql as any).INSERT.into(OUTBOX_TABLE).entries(entries));
+  const insertEntries = async (
+    entries: Record<string, unknown> | Record<string, unknown>[],
+    tenant = TEST_TENANT,
+  ) => {
+    const normalized = (Array.isArray(entries) ? entries : [entries]).map((entry) => ({
+      ...entry,
+      tenant: (entry as { tenant?: string }).tenant ?? tenant,
+    }));
+
+    await db.run((cds.ql as any).INSERT.into(OUTBOX_TABLE).entries(normalized));
   };
 
   const deleteEntries = async () => {
