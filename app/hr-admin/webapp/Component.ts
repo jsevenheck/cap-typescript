@@ -1,5 +1,6 @@
 import UIComponent from "sap/ui/core/UIComponent";
 import MessageBox from "sap/m/MessageBox";
+import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 
 export default UIComponent.extend("hr.admin.Component", {
   metadata: {
@@ -13,9 +14,10 @@ export default UIComponent.extend("hr.admin.Component", {
     // Set up global error handler for OData model
     const odataModel = this.getModel();
     if (odataModel) {
-      odataModel.attachRequestFailed((event: any) => {
-        const params = event.getParameters();
-        const response = params.response;
+      const handleError = (response: any) => {
+        if (!response) {
+          return;
+        }
 
         // Don't show error for aborted requests (user navigation)
         if (response && response.statusCode === 0) {
@@ -51,7 +53,23 @@ export default UIComponent.extend("hr.admin.Component", {
           title: "Error",
           actions: [MessageBox.Action.CLOSE],
         });
-      });
+      };
+
+      // Attach to supported request events (v4 models expose requestCompleted instead of requestFailed)
+      if ((odataModel as ODataModel).attachRequestCompleted) {
+        (odataModel as ODataModel).attachRequestCompleted((event: any) => {
+          if (event.getParameter("success")) {
+            return;
+          }
+
+          handleError(event.getParameter("response"));
+        });
+      } else if ((odataModel as any).attachRequestFailed) {
+        (odataModel as any).attachRequestFailed((event: any) => {
+          const params = event.getParameters();
+          handleError(params.response);
+        });
+      }
     }
 
     // Set up global handler for unhandled promise rejections
