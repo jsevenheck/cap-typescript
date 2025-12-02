@@ -1,6 +1,7 @@
 import UIComponent from "sap/ui/core/UIComponent";
 import MessageBox from "sap/m/MessageBox";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import Log from "sap/base/Log";
 
 export default UIComponent.extend("hr.admin.Component", {
   metadata: {
@@ -55,20 +56,19 @@ export default UIComponent.extend("hr.admin.Component", {
         });
       };
 
-      // Attach to supported request events (v4 models expose requestCompleted instead of requestFailed)
-      if ((odataModel as ODataModel).attachRequestCompleted) {
-        (odataModel as ODataModel).attachRequestCompleted((event: any) => {
-          if (event.getParameter("success")) {
-            return;
-          }
+      // Attach to request failure events supported by the active model
+      const attachRequestFailed = (model: any) => {
+        model.attachRequestFailed((event: any) => {
+          const response = event.getParameter?.("response") ?? event.getParameters()?.response;
+          handleError(response);
+        });
+      };
 
-          handleError(event.getParameter("response"));
-        });
+      // The v4 ODataModel does not support requestFailed; avoid attaching to prevent runtime errors
+      if (odataModel instanceof ODataModel) {
+        Log.info("Skipping requestFailed handler for v4 ODataModel (event unsupported)");
       } else if ((odataModel as any).attachRequestFailed) {
-        (odataModel as any).attachRequestFailed((event: any) => {
-          const params = event.getParameters();
-          handleError(params.response);
-        });
+        attachRequestFailed(odataModel);
       }
     }
 
