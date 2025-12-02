@@ -5,6 +5,7 @@ import type { OutboxConfig } from './config';
 import { OutboxMetrics } from './metrics';
 import { EmployeeThirdPartyNotifier, type NotificationEnvelope } from '../api/third-party/employee-notifier';
 import { getLogger } from '../../shared/utils/logger';
+import { resolveTenantFromTx } from '../../shared/utils/tenant';
 
 const ql = cds.ql as any;
 
@@ -24,6 +25,7 @@ export interface OutboxEntry {
   claimedAt?: Date | null;
   claimedBy?: string | null;
   lastError?: string | null;
+  tenant?: string | null;
 }
 
 interface ParsedPayload extends NotificationEnvelope {
@@ -93,6 +95,12 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
 };
 
 const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
+  const tenant = entry.tenant;
+  if (!tenant) {
+    logger.error({ entryId: entry.ID }, 'Cannot move entry to DLQ without tenant context');
+    return;
+  }
+
   try {
     await db.run(
       ql.INSERT.into(DLQ_TABLE).entries({
@@ -103,10 +111,11 @@ const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastErro
         attempts,
         lastError,
         failedAt: new Date(),
+        tenant,
       }),
     );
 
-    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID }));
+    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
   } catch (error) {
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
   }
@@ -147,6 +156,7 @@ export class ParallelDispatcher {
           'claimedAt',
           'claimedBy',
           'lastError',
+          'tenant',
         )
         .where({ status: 'PENDING' })
         .orderBy('nextAttemptAt')
@@ -182,8 +192,15 @@ export class ParallelDispatcher {
     const claimed: OutboxEntry[] = [];
 
     for (const entry of claimable) {
+      const tenant = entry.tenant;
+      if (!tenant) {
+        logger.warn({ entryId: entry.ID }, 'Skipping claim for entry without tenant');
+        continue;
+      }
+
       const where: Record<string, unknown> = {
         ID: entry.ID,
+        tenant,
       };
 
       const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
@@ -275,6 +292,12 @@ export class ParallelDispatcher {
     try {
       await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
+      const tenant = entry.tenant;
+      if (!tenant) {
+        logger.warn({ entryId: entry.ID }, 'Skipping completion update without tenant');
+        return;
+      }
+
       await db.run(
         ql.UPDATE(OUTBOX_TABLE)
           .set({
@@ -285,7 +308,7 @@ export class ParallelDispatcher {
             nextAttemptAt: null,
             lastError: null,
           })
-          .where({ ID: entry.ID }),
+          .where({ ID: entry.ID, tenant }),
       );
 
       const duration = Date.now() - startTime;
@@ -301,6 +324,12 @@ export class ParallelDispatcher {
   private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
     const attempts = (entry.attempts ?? 0) + 1;
     const errorMessage = error?.message ?? 'Unknown error';
+    const tenant = entry.tenant;
+
+    if (!tenant) {
+      logger.warn({ entryId: entry.ID }, 'Skipping failure handling without tenant');
+      return;
+    }
 
     logger.warn(
       { err: error, entryId: entry.ID, destination: entry.destinationName, attempts },
@@ -313,8 +342,8 @@ export class ParallelDispatcher {
       return;
     }
 
-    const delay = Math.pow(2, attempts - 1) * this.config.retryDelay;
-    const nextAttemptAt = new Date(Date.now() + delay);
+    const delay = Math.max(1, Math.pow(2, attempts - 1) * this.config.retryDelay);
+    const nextAttemptAt = new Date(Date.now() + delay + 1);
 
     await db.run(
       ql.UPDATE(OUTBOX_TABLE)
@@ -326,7 +355,7 @@ export class ParallelDispatcher {
           claimedBy: null,
           lastError: errorMessage,
         })
-        .where({ ID: entry.ID }),
+        .where({ ID: entry.ID, tenant }),
     );
 
     this.metrics.recordFailed();
@@ -334,7 +363,6 @@ export class ParallelDispatcher {
 
   private async releaseExpiredClaims(db: any, now: Date): Promise<void> {
     const expiry = new Date(now.getTime() - this.config.claimTtl);
-
     await db.run(
       ql.UPDATE(OUTBOX_TABLE)
         .set({ status: 'PENDING', claimedAt: null, claimedBy: null })
@@ -401,6 +429,7 @@ export const enqueueOutboxEntry = async (
           status: 'PENDING',
           attempts: 0,
           nextAttemptAt: new Date(),
+          tenant: resolveTenantFromTx(tx),
         }),
       );
 

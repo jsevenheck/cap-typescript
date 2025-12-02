@@ -44,6 +44,7 @@ const CLIENT_ID = '11111111-1111-1111-1111-111111111111';
 const BETA_CLIENT_ID = '22222222-2222-2222-2222-222222222222';
 const ALPHA_LOCATION_ID = 'aaaa1111-1111-1111-1111-111111111111';
 const BETA_LOCATION_ID = 'aaaa2222-2222-2222-2222-222222222222';
+const TEST_TENANT = process.env.CDS_DEFAULT_TENANT ?? 't0';
 
 let db: any;
 
@@ -335,6 +336,7 @@ describe('ClientService authorization', () => {
       service.tx({ user }, (tx: any) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Ias',
             lastName: 'Function',
             email: 'ias.function@example.com',
@@ -350,6 +352,7 @@ describe('ClientService authorization', () => {
       service.tx({ user }, (tx: any) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Ias',
             lastName: 'BlockedFn',
             email: 'ias.blocked.fn@example.com',
@@ -373,6 +376,7 @@ describe('ClientService authorization', () => {
       service.tx({ user }, (tx: any) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Ias',
             lastName: 'Array',
             email: 'ias.array@example.com',
@@ -388,6 +392,7 @@ describe('ClientService authorization', () => {
       service.tx({ user }, (tx: any) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Ias',
             lastName: 'BlockedArray',
             email: 'ias.blocked.array@example.com',
@@ -406,6 +411,7 @@ describe('ClientService authorization', () => {
       async (tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Unauthorized',
             lastName: 'User',
             email: 'unauth@example.com',
@@ -473,6 +479,7 @@ describe('Client name validation', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             companyId: 'TEST-001',
             name: '',
           }),
@@ -486,6 +493,7 @@ describe('Client name validation', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             companyId: 'TEST-002',
             name: '   ',
           }),
@@ -499,6 +507,7 @@ describe('Client name validation', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             companyId: 'TEST-003',
           }),
         ),
@@ -512,6 +521,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-004',
             name: 'Valid Client Name',
@@ -535,6 +545,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-005',
             name: '  Trimmed Name  ',
@@ -558,6 +569,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-006',
             name: 'Original Name',
@@ -587,6 +599,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-007',
             name: 'Original Name',
@@ -616,6 +629,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-007B',
             name: 'Original Name',
@@ -645,6 +659,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-008',
             name: 'Original Name',
@@ -678,6 +693,7 @@ describe('Client name validation', () => {
       await runAsAdmin(async (tx) => {
         await tx.run(
           INSERT.into(tx.entities.Clients).entries({
+            tenant: TEST_TENANT,
             ID: clientId,
             companyId: 'TEST-009',
             name: 'Original Name',
@@ -758,6 +774,7 @@ describe('Employee business rules', () => {
       entryDate: '2024-01-01',
       client_ID: clientId,
       location_ID: locationId,
+      tenant: TEST_TENANT,
       ...overrides,
     };
 
@@ -781,6 +798,7 @@ describe('Employee business rules', () => {
     const code = options.code ?? `CC-${randomUUID().slice(0, 8)}`;
     await tx.run(
       INSERT.into(tx.entities.CostCenters).entries({
+        tenant: TEST_TENANT,
         code,
         name: options.name ?? 'Validation Cost Center',
         client_ID: options.clientId ?? CLIENT_ID,
@@ -808,6 +826,7 @@ describe('Employee business rules', () => {
 
     await tx.run(
       INSERT.into(tx.entities.Clients).entries({
+        tenant: TEST_TENANT,
         ID: clientId,
         companyId: options.companyId,
         name: options.name ?? `Client ${options.companyId}`,
@@ -828,6 +847,7 @@ describe('Employee business rules', () => {
 
     await tx.run(
       INSERT.into(tx.entities.Locations).entries({
+        tenant: TEST_TENANT,
         ID: locationId,
         city: options.city ?? 'Test City',
         country_code: options.countryCode ?? 'DE',
@@ -876,6 +896,7 @@ describe('Employee business rules', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Missing',
             lastName: 'Entry',
             email: `validation+${randomUUID()}@example.com`,
@@ -891,6 +912,7 @@ describe('Employee business rules', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Timing',
             lastName: 'Error',
             email: `validation+${randomUUID()}@example.com`,
@@ -908,6 +930,7 @@ describe('Employee business rules', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Inactive',
             lastName: 'WithoutExit',
             email: `validation+${randomUUID()}@example.com`,
@@ -925,6 +948,7 @@ describe('Employee business rules', () => {
       runAsAdmin((tx) =>
         tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Active',
             lastName: 'WithExit',
             email: `validation+${randomUUID()}@example.com`,
@@ -1007,6 +1031,7 @@ describe('Employee business rules', () => {
 
         await tx.run(
           INSERT.into(tx.entities.Employees).entries({
+            tenant: TEST_TENANT,
             firstName: 'Mismatch',
             lastName: 'Manager',
             email: `validation+${randomUUID()}@example.com`,
@@ -1125,7 +1150,13 @@ describe('Employee business rules', () => {
       const client = await createClientRecord(tx, { companyId: 'CounterCo' });
       const location = await createLocationRecord(tx, { clientId: client.ID });
 
-      await db.run(INSERT.into('clientmgmt.EmployeeIdCounters').entries({ client_ID: client.ID, lastCounter: 5 }));
+      await db.run(
+        INSERT.into('clientmgmt.EmployeeIdCounters').entries({
+          client_ID: client.ID,
+          lastCounter: 5,
+          tenant: TEST_TENANT,
+        }),
+      );
 
       const employee = await createEmployeeRecord(tx, {
         client_ID: client.ID,

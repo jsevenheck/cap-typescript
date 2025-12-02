@@ -11,6 +11,8 @@ cds.test(path.join(__dirname, '..', '..', '..'));
 
 const OUTBOX_TABLE = 'clientmgmt.EmployeeNotificationOutbox';
 const DLQ_TABLE = 'clientmgmt.EmployeeNotificationDLQ';
+const TEST_TENANT = process.env.CDS_DEFAULT_TENANT ?? 't0';
+const OTHER_TENANT = 't1';
 
 class StubNotifier {
   constructor(private readonly handler: jest.Mock) {}
@@ -23,6 +25,23 @@ class StubNotifier {
 describe('ParallelDispatcher', () => {
   let db: any;
 
+  const insertEntries = async (
+    entries: Record<string, unknown> | Record<string, unknown>[],
+    tenant = TEST_TENANT,
+  ) => {
+    const normalized = (Array.isArray(entries) ? entries : [entries]).map((entry) => ({
+      ...entry,
+      tenant: (entry as { tenant?: string }).tenant ?? tenant,
+    }));
+
+    await db.run((cds.ql as any).INSERT.into(OUTBOX_TABLE).entries(normalized));
+  };
+
+  const deleteEntries = async () => {
+    await db.run((cds.ql as any).DELETE.from(OUTBOX_TABLE));
+    await db.run((cds.ql as any).DELETE.from(DLQ_TABLE));
+  };
+
   beforeAll(async () => {
     db = await cds.connect.to('db');
     try {
@@ -33,8 +52,7 @@ describe('ParallelDispatcher', () => {
   });
 
   afterEach(async () => {
-    await db.run((cds.ql as any).DELETE.from(OUTBOX_TABLE));
-    await db.run((cds.ql as any).DELETE.from(DLQ_TABLE));
+    await deleteEntries();
     jest.clearAllMocks();
   });
 
@@ -50,17 +68,16 @@ describe('ParallelDispatcher', () => {
     const handler = jest.fn().mockResolvedValue(undefined);
     const dispatcher = buildDispatcher({ dispatcherWorkers: 2 }, handler);
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'notif-1',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/hook',
-        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(Date.now() - 1000),
-      }),
-    );
+    await insertEntries({
+      ID: 'notif-1',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/hook',
+      payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+      status: 'PENDING',
+      attempts: 0,
+      nextAttemptAt: new Date(Date.now() - 1000),
+      tenant: TEST_TENANT,
+    });
 
     await dispatcher.dispatchPending();
 
@@ -84,17 +101,16 @@ describe('ParallelDispatcher', () => {
       headers: { 'x-extra': 'value', 'x-numeric': 42 as any },
     };
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'legacy-1',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/legacy',
-        payload: JSON.stringify(legacyPayload),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(Date.now() - 1000),
-      }),
-    );
+    await insertEntries({
+      ID: 'legacy-1',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/legacy',
+      payload: JSON.stringify(legacyPayload),
+      status: 'PENDING',
+      attempts: 0,
+      nextAttemptAt: new Date(Date.now() - 1000),
+      tenant: TEST_TENANT,
+    });
 
     await dispatcher.dispatchPending();
 
@@ -114,17 +130,16 @@ describe('ParallelDispatcher', () => {
     const handler = jest.fn().mockRejectedValue(new Error('network failure'));
     const dispatcher = buildDispatcher({ retryDelay: 10, maxAttempts: 3 }, handler);
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'notif-retry',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/retry',
-        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-        status: 'PENDING',
-        attempts: 0,
-        nextAttemptAt: new Date(Date.now() - 1000),
-      }),
-    );
+    await insertEntries({
+      ID: 'notif-retry',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/retry',
+      payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+      status: 'PENDING',
+      attempts: 0,
+      nextAttemptAt: new Date(Date.now() - 1000),
+      tenant: TEST_TENANT,
+    });
 
     await dispatcher.dispatchPending();
 
@@ -141,17 +156,16 @@ describe('ParallelDispatcher', () => {
     const handler = jest.fn().mockRejectedValue(new Error('permanent failure'));
     const dispatcher = buildDispatcher({ retryDelay: 10, maxAttempts: 2 }, handler);
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'notif-dlq',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/dlq',
-        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-        status: 'PENDING',
-        attempts: 1,
-        nextAttemptAt: new Date(Date.now() - 1000),
-      }),
-    );
+    await insertEntries({
+      ID: 'notif-dlq',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/dlq',
+      payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+      status: 'PENDING',
+      attempts: 1,
+      nextAttemptAt: new Date(Date.now() - 1000),
+      tenant: TEST_TENANT,
+    });
 
     await dispatcher.dispatchPending();
 
@@ -171,19 +185,18 @@ describe('ParallelDispatcher', () => {
     const handler = jest.fn().mockResolvedValue(undefined);
     const dispatcher = buildDispatcher({ claimTtl: 5, dispatcherWorkers: 1 }, handler);
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'notif-claimed',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/claimed',
-        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-        status: 'PROCESSING',
-        attempts: 0,
-        claimedAt: new Date(Date.now() - 6000),
-        claimedBy: 'other-worker',
-        nextAttemptAt: new Date(Date.now() - 6000),
-      }),
-    );
+    await insertEntries({
+      ID: 'notif-claimed',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/claimed',
+      payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+      status: 'PROCESSING',
+      attempts: 0,
+      claimedAt: new Date(Date.now() - 6000),
+      claimedBy: 'other-worker',
+      nextAttemptAt: new Date(Date.now() - 6000),
+      tenant: TEST_TENANT,
+    });
 
     await dispatcher.dispatchPending();
 
@@ -192,6 +205,55 @@ describe('ParallelDispatcher', () => {
     );
     expect(updated.status).toBe('COMPLETED');
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('processes pending entries across tenants and keeps tenant-scoped updates', async () => {
+    const handler = jest.fn().mockResolvedValue(undefined);
+    const dispatcher = buildDispatcher({ dispatcherWorkers: 2 }, handler);
+    const now = new Date(Date.now() - 5000);
+
+    await insertEntries(
+      {
+        ID: 'multi-t0',
+        eventType: 'EMPLOYEE_CREATED',
+        destinationName: 'https://example.com/multi-t0',
+        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: now,
+        tenant: TEST_TENANT,
+      },
+      TEST_TENANT,
+    );
+
+    await insertEntries(
+      {
+        ID: 'multi-t1',
+        eventType: 'EMPLOYEE_CREATED',
+        destinationName: 'https://example.com/multi-t1',
+        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: now,
+        tenant: OTHER_TENANT,
+      },
+      OTHER_TENANT,
+    );
+
+    await dispatcher.dispatchPending();
+
+    const tenant0Entry = await db.run(
+      (cds.ql as any).SELECT.one.from(OUTBOX_TABLE).where({ ID: 'multi-t0' }),
+    );
+    const tenant1Entry = await db.run(
+      (cds.ql as any).SELECT.one.from(OUTBOX_TABLE).where({ ID: 'multi-t1' }),
+    );
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(tenant0Entry.status).toBe('COMPLETED');
+    expect(tenant0Entry.tenant).toBe(TEST_TENANT);
+    expect(tenant1Entry.status).toBe('COMPLETED');
+    expect(tenant1Entry.tenant).toBe(OTHER_TENANT);
   });
 
   it('honors the parallel dispatch flag to disable concurrency', async () => {
@@ -210,28 +272,28 @@ describe('ParallelDispatcher', () => {
     );
 
     const now = Date.now();
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries([
-        {
-          ID: 'sequential-1',
-          eventType: 'EMPLOYEE_CREATED',
-          destinationName: 'https://example.com/sequential-1',
-          payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-          status: 'PENDING',
-          attempts: 0,
-          nextAttemptAt: new Date(now - 1000),
-        },
-        {
-          ID: 'sequential-2',
-          eventType: 'EMPLOYEE_CREATED',
-          destinationName: 'https://example.com/sequential-2',
-          payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-          status: 'PENDING',
-          attempts: 0,
-          nextAttemptAt: new Date(now - 1000),
-        },
-      ]),
-    );
+    await insertEntries([
+      {
+        ID: 'sequential-1',
+        eventType: 'EMPLOYEE_CREATED',
+        destinationName: 'https://example.com/sequential-1',
+        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(now - 1000),
+        tenant: TEST_TENANT,
+      },
+      {
+        ID: 'sequential-2',
+        eventType: 'EMPLOYEE_CREATED',
+        destinationName: 'https://example.com/sequential-2',
+        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+        status: 'PENDING',
+        attempts: 0,
+        nextAttemptAt: new Date(now - 1000),
+        tenant: TEST_TENANT,
+      },
+    ]);
 
     await dispatcher.dispatchPending();
 
@@ -298,18 +360,17 @@ describe('ParallelDispatcher', () => {
   it('cleans up processed entries after retention period', async () => {
     const cleanup = new OutboxCleanup({ ...defaultOutboxConfig(), cleanupRetention: 10 });
 
-    await db.run(
-      (cds.ql as any).INSERT.into(OUTBOX_TABLE).entries({
-        ID: 'notif-clean',
-        eventType: 'EMPLOYEE_CREATED',
-        destinationName: 'https://example.com/clean',
-        payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
-        status: 'COMPLETED',
-        attempts: 1,
-        nextAttemptAt: null,
-        modifiedAt: new Date(Date.now() - 1000),
-      }),
-    );
+    await insertEntries({
+      ID: 'notif-clean',
+      eventType: 'EMPLOYEE_CREATED',
+      destinationName: 'https://example.com/clean',
+      payload: JSON.stringify({ body: { eventType: 'EMPLOYEE_CREATED', employees: [] } }),
+      status: 'COMPLETED',
+      attempts: 1,
+      nextAttemptAt: null,
+      modifiedAt: new Date(Date.now() - 1000),
+      tenant: TEST_TENANT,
+    });
 
     await cleanup.run();
 

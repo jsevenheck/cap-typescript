@@ -57,7 +57,8 @@
         "kind": "sqlite",
         "credentials": {
           "filename": "./db/sqlite.db"
-        }
+        },
+        "multiTenant": true
       },
       "auth": {
         "kind": "mocked",
