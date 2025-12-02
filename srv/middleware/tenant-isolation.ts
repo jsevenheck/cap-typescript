@@ -49,7 +49,7 @@ export const registerTenantIsolation = (srv: any): void => {
   srv.before('CREATE', TENANT_SCOPED_ENTITIES, (req: Request) => {
     const tenant = resolveTenantFromReq(req);
     if (Array.isArray(req.data)) {
-      req.data = (req.data as any[]).map((entry) => ({ ...entry, tenant }));
+      (req as any).data = (req.data as Record<string, unknown>[]).map((entry) => ({ ...entry, tenant }));
       return;
     }
     if (req.data && typeof req.data === 'object') {
@@ -59,7 +59,7 @@ export const registerTenantIsolation = (srv: any): void => {
 
   srv.before(['READ', 'UPDATE', 'DELETE'], TENANT_SCOPED_ENTITIES, (req: Request) => {
     const tenant = resolveTenantFromReq(req);
-    appendTenantCondition(req.query, tenant);
+    appendTenantCondition((req as any).query, tenant);
   });
 };
 

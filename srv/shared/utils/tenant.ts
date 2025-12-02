@@ -17,12 +17,13 @@ const normalizeTenant = (value?: string | null): string => {
 };
 
 export const resolveTenant = (context?: TenantContext | null): string => {
+  const cdsContext = (cds as any)?.context;
   if (!context) {
-    return normalizeTenant((cds.context as any)?.tenant ?? process.env.CDS_DEFAULT_TENANT);
+    return normalizeTenant(cdsContext?.tenant ?? process.env.CDS_DEFAULT_TENANT);
   }
 
   const fromContext = (context as any).tenant ?? (context as any)?.user?.tenant;
-  return normalizeTenant(fromContext ?? (cds.context as any)?.tenant ?? process.env.CDS_DEFAULT_TENANT);
+  return normalizeTenant(fromContext ?? cdsContext?.tenant ?? process.env.CDS_DEFAULT_TENANT);
 };
 
 export const resolveTenantFromReq = (req: Request): string =>
