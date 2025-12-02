@@ -269,6 +269,8 @@ export default class LocationHandler {
           this.guard.markClean(LocationHandler.DIALOG_ID);
           dialog.close();
           MessageToast.show(i18n.getText("locationUpdated"));
+          // Refresh the list to ensure backend-normalized values are reflected (e.g., country formatting)
+          this.getLocationsBinding()?.refresh();
         })
         .catch((error: Error) => {
           dialog.setBusy(false);
