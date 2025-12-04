@@ -1,7 +1,10 @@
+import type { CapUserLike } from '../srv/shared/utils/auth';
+
 declare module '@sap/cds' {
   export interface Request {
     readonly event: string;
     data: Record<string, unknown>;
+    user?: CapUserLike;
     error(status: number, message: string): void;
     reject(status: number, message?: string): never;
   }

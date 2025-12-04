@@ -40,7 +40,7 @@ const registerHandlers = (srv: Service): void => {
       return req.reject(403, 'Missing required role: authenticated-user');
     }
 
-    const userContext = buildUserContext((req as any).user);
+    const userContext = buildUserContext(req.user);
 
     return {
       roles: Array.from(userContext.roles),
