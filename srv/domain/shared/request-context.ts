@@ -9,10 +9,10 @@ import {
 import { createServiceError } from '../../shared/utils/errors';
 import type { CapUserLike } from '../../shared/utils/auth';
 
-export const getHeaders = (req: Request): HeaderMap => (req as Request & { headers?: HeaderMap }).headers;
+export const getHeaders = (req: Request): HeaderMap => (req as { headers?: HeaderMap }).headers;
 
 export const extractRequestParams = (req: Request): Array<Record<string, unknown>> | undefined =>
-  (req as Request & { params?: Array<Record<string, unknown>> }).params;
+  (req as { params?: Array<Record<string, unknown>> }).params;
 
 const isCapUserLike = (user: unknown): user is CapUserLike => {
   if (!user || typeof user !== 'object') {
@@ -34,12 +34,8 @@ const isCapUserLike = (user: unknown): user is CapUserLike => {
   return true;
 };
 
-interface RequestWithUser extends Request {
-  user?: unknown;
-}
-
 export const requireRequestUser = (req: Request): CapUserLike => {
-  const candidate = (req as RequestWithUser).user;
+  const candidate = (req as { user?: unknown }).user;
   if (!candidate) {
     throw createServiceError(401, 'User context is required.');
   }
@@ -59,7 +55,7 @@ export const buildConcurrencyContext = (req: Request, entityName: string) => {
   let payloadValue: unknown;
   if (field) {
     const updatePayload = (req as { query?: { UPDATE?: { data?: Record<string, unknown> } } }).query?.UPDATE?.data;
-    const httpBody = (req as Request & { req?: { body?: unknown } }).req?.body;
+    const httpBody = (req as { req?: { body?: unknown } }).req?.body;
     const bodyValue =
       httpBody && typeof httpBody === 'object' ? (httpBody as Record<string, unknown>)[field] : undefined;
     payloadValue = (req.data as Record<string, unknown> | undefined)?.[field] ?? updatePayload?.[field] ?? bodyValue;

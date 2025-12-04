@@ -10,7 +10,7 @@ export const onAnonymizeFormerEmployees = async (req: Request): Promise<unknown>
   const tx = cds.transaction(req);
   const count = await anonymizeFormerEmployees(tx, user, (req.data as { before?: unknown })?.before);
   const result = { value: count };
-  const requestWithReply = req as Request & {
+  const requestWithReply = req as {
     reply?: (data: unknown) => unknown;
     http?: { res?: { json?: (body: unknown) => void } };
   };

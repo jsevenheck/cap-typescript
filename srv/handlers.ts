@@ -15,14 +15,6 @@ import {
 import { buildUserContext, getAttributeValues } from './shared/utils/auth';
 import { registerTenantIsolation } from './middleware/tenant-isolation';
 
-type ServiceWithOn = Service & {
-  on: (
-    event: string | string[],
-    entityOrHandler: string | ((...args: any[]) => unknown),
-    maybeHandler?: (...args: any[]) => unknown,
-  ) => unknown;
-};
-
 const registerHandlers = (srv: Service): void => {
   registerTenantIsolation(srv);
 
@@ -35,7 +27,9 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE', 'DELETE'], 'EmployeeCostCenterAssignments', authorizeEmployeeCostCenterAssignments);
 
   // Register userInfo function handler
-  (srv as ServiceWithOn).on('userInfo', (req: Request) => {
+  const srvWithOn = srv as { on: Service['on'] };
+
+  srvWithOn.on('userInfo', (req: Request) => {
     if (!req.user?.is?.('authenticated-user')) {
       return req.reject(403, 'Missing required role: authenticated-user');
     }

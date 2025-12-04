@@ -25,22 +25,15 @@ const validateEmployeeIntegrity = async (req: Request): Promise<void> => {
   await validator.validateEmployeeRelations(entries);
 };
 
-type ServiceWithOn = Service & {
-  on: (
-    event: string | string[],
-    entityOrHandler: string | ((...args: any[]) => unknown),
-    maybeHandler?: (...args: any[]) => unknown,
-  ) => unknown;
-};
-
 export const registerEmployeeHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE'], 'Employees', validateEmployeeIntegrity);
   srv.before('CREATE', 'Employees', onCreate);
   srv.before('UPDATE', 'Employees', onUpdate);
   srv.before('DELETE', 'Employees', onDelete);
 
-  (srv as ServiceWithOn).on('CREATE', 'Employees', onCreateEvent);
-  (srv as ServiceWithOn).on('anonymizeFormerEmployees', onAnonymizeFormerEmployees);
+  const srvWithOn = srv as { on: Service['on'] };
+  srvWithOn.on('CREATE', 'Employees', onCreateEvent);
+  srvWithOn.on('anonymizeFormerEmployees', onAnonymizeFormerEmployees);
 };
 
 export default registerEmployeeHandlers;
