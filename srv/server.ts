@@ -101,26 +101,28 @@ cds.on('bootstrap', (app: Application) => {
 
 // CAP framework supports async event handlers and waits for them to complete.
 // This is essential for proper initialization before the server accepts requests.
-cds.on('served', async () => {
-  try {
-    const authLogger = getLogger('auth');
-    authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
+cds.on('served', () => {
+  void (async () => {
+    try {
+      const authLogger = getLogger('auth');
+      authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
-    // Load API key from Credential Store or environment before accepting requests
-    await loadApiKey();
+      // Load API key from Credential Store or environment before accepting requests
+      await loadApiKey();
 
-    if (process.env.NODE_ENV === 'test') {
-      return;
+      if (process.env.NODE_ENV === 'test') {
+        return;
+      }
+
+      outboxScheduler.start();
+      ensureShutdownHooks();
+
+      logger.info('All services started successfully');
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to complete service initialization');
+      throw error; // Re-throw to signal initialization failure to CAP
     }
-
-    outboxScheduler.start();
-    ensureShutdownHooks();
-
-    logger.info('All services started successfully');
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to complete service initialization');
-    throw error; // Re-throw to signal initialization failure to CAP
-  }
+  })();
 });
 
 export const dispatchOutboxOnce = (): Promise<void> => outboxDispatcher.dispatchPending();
