@@ -101,7 +101,6 @@ cds.on('bootstrap', (app: Application) => {
 
 // CAP framework supports async event handlers and waits for them to complete.
 // This is essential for proper initialization before the server accepts requests.
-// eslint-disable-next-line @typescript-eslint/no-misused-promises
 cds.on('served', async () => {
   try {
     const authLogger = getLogger('auth');
