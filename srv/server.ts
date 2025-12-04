@@ -15,6 +15,8 @@ import { resolveAuthProviderName } from './shared/utils/authProvider';
 import { initializeLogger, getLogger, extractOrGenerateCorrelationId, setCorrelationId } from './shared/utils/logger';
 
 let shutdownHooksRegistered = false;
+let activeEmployeesEndpointRegistered = false;
+let expressAppInstance: Application | undefined;
 const ensureShutdownHooks = (): void => {
   if (shutdownHooksRegistered) {
     return;
@@ -31,6 +33,16 @@ const ensureShutdownHooks = (): void => {
 initializeLogger();
 const logger = getLogger('server');
 
+const registerActiveEmployeesEndpoint = (app: Application): void => {
+  if (activeEmployeesEndpointRegistered) {
+    return;
+  }
+
+  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
+  activeEmployeesEndpointRegistered = true;
+  logger.info('Registered /api/employees/active endpoint with API key protection');
+};
+
 /**
  * Correlation ID middleware - adds x-correlation-id to all requests
  */
@@ -43,6 +55,8 @@ const correlationIdMiddleware = (req: Request, res: Response, next: NextFunction
 };
 
 cds.on('bootstrap', (app: Application) => {
+  expressAppInstance = app;
+
   // Respect X-Forwarded-* headers when behind a reverse proxy (e.g., approuter)
   app.set('trust proxy', true);
 
@@ -92,10 +106,6 @@ cds.on('bootstrap', (app: Application) => {
     })();
   });
 
-  // Public API endpoint with rate limiting and API key authentication
-  // Rate limiter runs first to prevent brute-force API key attacks
-  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
-
   logger.info('Application bootstrap complete');
 });
 
@@ -108,7 +118,17 @@ cds.on('served', async () => {
     authLogger.info(`Authentication provider: ${resolveAuthProviderName()}`);
 
     // Load API key from Credential Store or environment before accepting requests
-    await loadApiKey();
+    const apiKeyLoaded = await loadApiKey();
+
+    if (!apiKeyLoaded) {
+      logger.error(
+        'EMPLOYEE_EXPORT_API_KEY missing - skipping /api/employees/active endpoint registration. Bind Credential Store or set the environment variable before starting the service.',
+      );
+    } else if (expressAppInstance) {
+      registerActiveEmployeesEndpoint(expressAppInstance);
+    } else {
+      logger.warn('Express application instance not available; cannot register /api/employees/active endpoint');
+    }
 
     if (process.env.NODE_ENV === 'test') {
       return;

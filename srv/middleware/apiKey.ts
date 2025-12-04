@@ -13,17 +13,24 @@ let cachedApiKey: string | undefined;
  * Load API key from Credential Store or environment variable.
  * Should be called once during application startup.
  */
-export const loadApiKey = async (): Promise<void> => {
+export const loadApiKey = async (): Promise<boolean> => {
   try {
     cachedApiKey = await getEmployeeExportApiKey();
 
     if (cachedApiKey) {
       logger.info('Employee export API key loaded successfully');
+      return true;
     } else {
-      logger.warn('No employee export API key configured');
+      cachedApiKey = undefined;
+      logger.error(
+        'Employee export API key not configured. Set EMPLOYEE_EXPORT_API_KEY or bind the Credential Store secret employee-export/api-key.',
+      );
+      return false;
     }
   } catch (error) {
+    cachedApiKey = undefined;
     logger.error({ err: error }, 'Failed to load employee export API key');
+    throw error;
   }
 };
 
