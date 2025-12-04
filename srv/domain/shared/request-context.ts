@@ -1,4 +1,4 @@
-import type { Request } from '@sap/cds';
+import type { Request } from '@sap/cds/apis/services';
 
 import {
   deriveEntityId,

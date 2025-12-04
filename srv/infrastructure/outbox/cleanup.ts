@@ -1,7 +1,8 @@
 import cds from '@sap/cds';
 
 import type { OutboxConfig } from './config';
-const ql = cds.ql as typeof cds.ql & { DELETE: typeof cds.ql.SELECT };
+const ql = cds.ql;
+const DELETE = cds.ql.SELECT as typeof cds.ql.SELECT;
 
 const REMOVABLE_STATUSES = ['COMPLETED', 'DELIVERED', 'FAILED'];
 
@@ -22,7 +23,7 @@ export class OutboxCleanup {
     const cutoff = new Date(Date.now() - retention);
 
     await db.run(
-      (ql.DELETE as any).from('clientmgmt.EmployeeNotificationOutbox').where({
+      DELETE.from('clientmgmt.EmployeeNotificationOutbox').where({
         status: { in: REMOVABLE_STATUSES },
         modifiedAt: { '<': cutoff },
       }),

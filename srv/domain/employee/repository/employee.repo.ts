@@ -1,5 +1,5 @@
 import cds from '@sap/cds';
-import type { Transaction } from '@sap/cds';
+import type { Transaction } from '@sap/cds/apis/services';
 
 import type { CostCenterEntity, EmployeeEntity, LocationEntity } from '../dto/employee.dto';
 import { resolveTenantFromTx } from '../../../shared/utils/tenant';

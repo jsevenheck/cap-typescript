@@ -1,5 +1,5 @@
 import cds from '@sap/cds';
-import type { Request } from '@sap/cds';
+import type { Request } from '@sap/cds/apis/services';
 
 import { anonymizeFormerEmployees } from '../services/retention.service';
 import { buildUserContext } from '../../../shared/utils/auth';
