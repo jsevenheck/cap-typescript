@@ -6,7 +6,9 @@
     "types": ["@sap__cds", "@sap__cds__apis", "node", "jest"],
     "baseUrl": "./",
     "paths": {
-      "@types/*": ["types/*"]
+      "@types/*": ["types/*"],
+      "@sap/cds": ["../types/@sap__cds"],
+      "@sap/cds/apis": ["../types/@sap__cds__apis"]
     },
     "typeRoots": ["../types", "../node_modules/@types", "./node_modules/@types"]
   },
