@@ -36,6 +36,10 @@ const registerHandlers = (srv: Service): void => {
 
   // Register userInfo function handler
   (srv as ServiceWithOn).on('userInfo', (req: Request) => {
+    if (!req.user?.is?.('authenticated-user')) {
+      return req.reject(403, 'Missing required role: authenticated-user');
+    }
+
     const userContext = buildUserContext((req as any).user);
 
     return {

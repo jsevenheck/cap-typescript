@@ -330,7 +330,7 @@ Base URL: `/odata/v4/clients/`
   - Roles: HREditor, HRAdmin
 
 #### Utility Endpoints
-- `GET /userInfo` - Get current user's roles and authorization attributes
+- `GET /userInfo` - Get current user's roles and authorization attributes (requires `authenticated-user` role)
   - Returns: `{ roles: string[], attributes: { CompanyCode, companyCodes } }`
   - Used by frontend for authorization checks
 
