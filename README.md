@@ -8,6 +8,15 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 **npm Version:** >=10.0.0
 **TypeScript Version:** 5.6.3
 
+### Employee Export API Key
+
+The `/api/employees/active` endpoint requires an API key for access. Configure it by either:
+
+- Binding a **Credential Store** instance that provides the `employee-export/api-key` secret, or
+- Setting the `EMPLOYEE_EXPORT_API_KEY` environment variable (used for local development or as a fallback).
+
+If no key is available at startup, the service skips registering the endpoint and logs an error.
+
 ## 🎯 Key Features
 
 - **Multi-tenant Client Management** - Manage multiple company clients with isolated data
