@@ -8,6 +8,7 @@ declare module '@sap/cds' {
     params?: unknown;
     target?: unknown;
     query?: unknown;
+    event?: string;
     user?: CapUserLike;
     reject: (code: number, message?: string) => never | void | Promise<never | void>;
   }
