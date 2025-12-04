@@ -28,8 +28,16 @@ declare module '@sap/cds' {
     to(target: string): Promise<void>;
   }
 
+  export interface CDSQL {
+    SELECT: unknown;
+    INSERT?: unknown;
+    UPDATE?: unknown;
+    DELETE?: unknown;
+    [key: string]: unknown;
+  }
+
   export interface CDSInstance {
-    ql: unknown;
+    ql: CDSQL;
     env: { features: Record<string, unknown> };
     service: { impl(handler: (service: Service) => void | Promise<void>): unknown };
     transaction(req: Request): Transaction;
