@@ -5,7 +5,7 @@ import { getDestination, isHttpDestination, type HttpDestination } from '@sap-cl
 import { getThirdPartyEmployeeSecret } from '../../../shared/utils/secrets';
 import { postEmployeeNotification } from './employee.client';
 
-const ql = cds.ql as typeof cds.ql & { SELECT: typeof cds.ql.SELECT };
+const ql = cds.ql;
 
 export interface NotificationEnvelope {
   body: Record<string, unknown>;

@@ -10,10 +10,7 @@ import {
   selectColumns,
 } from '../../cost-center/repository/cost-center.repo';
 
-const ql = cds.ql as typeof cds.ql & {
-  UPDATE: typeof cds.ql.UPDATE;
-  INSERT: typeof cds.ql.INSERT;
-};
+const ql = cds.ql;
 
 export const findEmployeeById = async (
   tx: Transaction,

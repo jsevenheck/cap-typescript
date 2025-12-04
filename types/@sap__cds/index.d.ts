@@ -1,65 +1,42 @@
 import type { Application } from 'express';
+import type { CapUserLike } from '../../srv/shared/utils/auth';
 
-export namespace CDSQL {
-  interface BaseQuery<T = unknown> {
-    columns(...columns: string[]): BaseQuery<T>;
-    where(condition: Record<string, unknown>): BaseQuery<T>;
+declare module '@sap/cds' {
+  export interface Request {
+    data?: unknown;
+    headers?: Record<string, unknown>;
+    params?: unknown;
+    target?: unknown;
+    query?: unknown;
+    user?: CapUserLike;
+    reject: (code: number, message?: string) => never | void | Promise<never | void>;
   }
 
-  interface SelectBuilder {
-    from(entity: string): BaseQuery;
+  export interface Service {
+    on(event: string | string[], entity: string | ((req: Request) => unknown), handler?: (req: Request) => unknown): void;
+    before(event: string | string[], entity: string | ((req: Request) => unknown), handler?: (req: Request) => unknown): void;
+    after(event: string | string[], entity: string | ((req: Request) => unknown), handler?: (req: Request) => unknown): void;
+    transaction(req: Request): Transaction;
   }
 
-  interface InsertBuilder {
-    entries(entity: Record<string, unknown>): Promise<unknown>;
-  }
-
-  interface UpdateBuilder {
-    set(values: Record<string, unknown>): BaseQuery;
-  }
-
-  interface QL {
-    SELECT: {
-      from(entity: string): BaseQuery;
-      one: {
-        from(entity: string): BaseQuery;
-      };
-    };
-    INSERT: {
-      into(entity: string): InsertBuilder;
-    };
-    UPDATE(entity: string): UpdateBuilder;
-  }
-}
-
-export namespace CDS {
-  interface Service {
-    before(
-      events: string | string[],
-      entity: string,
-      handler: (req: import('@sap/cds').Request) => void | Promise<void>,
-    ): void;
-  }
-
-  interface Transaction {
+  export interface Transaction {
     run<T = unknown>(query: unknown): Promise<T>;
   }
 
-  interface DeployResult {
+  export interface DeployResult {
     to(target: string): Promise<void>;
   }
 
-  interface CDSInstance {
-    ql: CDSQL.QL;
-    env: {
-      features: Record<string, unknown>;
-    };
-    service: {
-      impl(handler: (service: Service) => void | Promise<void>): unknown;
-    };
-    transaction(req: import('@sap/cds').Request): Transaction;
+  export interface CDSInstance {
+    ql: unknown;
+    env: { features: Record<string, unknown> };
+    service: { impl(handler: (service: Service) => void | Promise<void>): unknown };
+    transaction(req: Request): Transaction;
     deploy(model: string | string[]): DeployResult;
     readonly server: Promise<Application>;
     on(event: string, listener: (app: Application) => void): void;
   }
+
+  const cds: CDSInstance;
+  export = cds;
 }

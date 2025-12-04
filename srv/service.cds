@@ -98,6 +98,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
    * Get current user information including roles and attributes.
    * Used by frontend to adapt UI based on user permissions.
    */
+  @requires: ['authenticated-user']
   @readonly
   function userInfo() returns {
     roles: array of String;
