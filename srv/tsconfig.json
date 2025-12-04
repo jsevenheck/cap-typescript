@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./dist",
-    "types": ["node", "jest"],
+    "types": ["node", "jest", "@sap/cds/apis/cds", "@sap/cds/apis/services"],
     "baseUrl": "./",
     "paths": {
       "@types/*": ["types/*"]
