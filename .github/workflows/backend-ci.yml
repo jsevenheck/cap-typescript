@@ -31,3 +31,10 @@ jobs:
 
       - name: Test (srv)
         run: npm run test --workspace srv
+
+      - name: Upload coverage report (srv)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: srv/dist/coverage

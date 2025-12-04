@@ -202,6 +202,23 @@ describe('CompanyAuthorization', () => {
     ).rejects.toThrow('Forbidden: not authorized to modify employee emp2 for company COMP-002.');
   });
 
+  it('rejects employee operations when referenced clients are missing', async () => {
+    const user = createUser(['HREditor'], ['COMP-001']);
+    const req = createMockRequest(user, {
+      [EMPLOYEES_ENTITY]: {
+        emp3: { ID: 'emp3', client_ID: 'missing-client' },
+      },
+    });
+
+    const authorization = new CompanyAuthorization(req);
+
+    await expect(
+      authorization.validateEmployeeAccess([
+        { ID: 'emp3', client_ID: 'missing-client' },
+      ]),
+    ).rejects.toThrow('Client missing-client not found.');
+  });
+
   it('enforces cost center authorization based on client company assignments', async () => {
     const user = createUser(['HRViewer', 'HREditor'], ['COMP-001']);
     const req = createMockRequest(user, {
