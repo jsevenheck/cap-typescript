@@ -1,5 +1,5 @@
 import cds from '@sap/cds';
-import type { Transaction } from '@sap/cds/apis/services';
+import type { Transaction } from '@sap/cds';
 import { getDestination, isHttpDestination, type HttpDestination } from '@sap-cloud-sdk/connectivity';
 
 import { getThirdPartyEmployeeSecret } from '../../../shared/utils/secrets';

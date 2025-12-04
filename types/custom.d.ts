@@ -1,5 +1,4 @@
-import '@sap/cds/apis/cds';
-import '@sap/cds/apis/services';
+import '@sap/cds';
 import type { CapUserLike } from '../srv/shared/utils/auth';
 
 declare module '@sap/cds' {

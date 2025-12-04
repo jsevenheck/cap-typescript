@@ -1,7 +1,6 @@
 import cds from '@sap/cds';
 
 import type { OutboxConfig } from './config';
-const ql = cds.ql;
 const DELETE = cds.ql.SELECT as typeof cds.ql.SELECT;
 
 const REMOVABLE_STATUSES = ['COMPLETED', 'DELIVERED', 'FAILED'];

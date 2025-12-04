@@ -1,4 +1,4 @@
-import type { Request, Service } from '@sap/cds/apis/services';
+import type { Request, Service } from '@sap/cds';
 
 import { onCreate } from './handlers/on-create';
 import { onUpdate } from './handlers/on-update';

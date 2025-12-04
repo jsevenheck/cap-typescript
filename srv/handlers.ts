@@ -1,4 +1,4 @@
-import type { Request, Service } from '@sap/cds/apis/services';
+import type { Request, Service } from '@sap/cds';
 
 import { registerClientHandlers } from './domain/client';
 import { registerEmployeeHandlers } from './domain/employee';
