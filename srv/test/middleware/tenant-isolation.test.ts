@@ -31,7 +31,7 @@ describe('Tenant isolation middleware', () => {
 
   it('appends tenant filter for read/update/delete queries without duplicating existing conditions', () => {
     const handlers = captureHandlers();
-    const [_, guardHandler] = handlers['READ'];
+    const [, guardHandler] = handlers['READ'];
 
     const selectQuery: any = {
       SELECT: {
