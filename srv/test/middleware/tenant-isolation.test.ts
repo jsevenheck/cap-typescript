@@ -6,9 +6,12 @@ describe('Tenant isolation middleware', () => {
   const captureHandlers = () => {
     const handlers: Record<string, ((req: any) => void)[]> = {};
     const srv = {
-      before: (event: string, _entities: string[], handler: (req: any) => void) => {
-        handlers[event] = handlers[event] ?? [];
-        handlers[event].push(handler);
+      before: (event: string | string[], _entities: string[], handler: (req: any) => void) => {
+        const events = Array.isArray(event) ? event : [event];
+        events.forEach((entry) => {
+          handlers[entry] = handlers[entry] ?? [];
+          handlers[entry].push(handler);
+        });
       },
     } as any;
 
