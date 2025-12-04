@@ -16,6 +16,7 @@ import { initializeLogger, getLogger, extractOrGenerateCorrelationId, setCorrela
 
 let shutdownHooksRegistered = false;
 let activeEmployeesEndpointRegistered = false;
+let expressAppInstance: Application | undefined;
 const ensureShutdownHooks = (): void => {
   if (shutdownHooksRegistered) {
     return;
@@ -54,6 +55,8 @@ const correlationIdMiddleware = (req: Request, res: Response, next: NextFunction
 };
 
 cds.on('bootstrap', (app: Application) => {
+  expressAppInstance = app;
+
   // Respect X-Forwarded-* headers when behind a reverse proxy (e.g., approuter)
   app.set('trust proxy', true);
 
@@ -121,8 +124,10 @@ cds.on('served', async () => {
       logger.error(
         'EMPLOYEE_EXPORT_API_KEY missing - skipping /api/employees/active endpoint registration. Bind Credential Store or set the environment variable before starting the service.',
       );
-    } else if (cds.app) {
-      registerActiveEmployeesEndpoint(cds.app as Application);
+    } else if (expressAppInstance) {
+      registerActiveEmployeesEndpoint(expressAppInstance);
+    } else {
+      logger.warn('Express application instance not available; cannot register /api/employees/active endpoint');
     }
 
     if (process.env.NODE_ENV === 'test') {
