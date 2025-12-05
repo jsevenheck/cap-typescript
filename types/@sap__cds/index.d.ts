@@ -11,6 +11,7 @@ declare module '@sap/cds' {
     event?: string;
     user?: CapUserLike;
     reject: (code: number, message?: string) => never | void | Promise<never | void>;
+    error: (code: number, message?: string) => never | void | Promise<never | void>;
   }
 
   export interface Service {
