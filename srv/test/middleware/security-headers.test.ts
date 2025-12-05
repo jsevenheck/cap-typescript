@@ -2,21 +2,25 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { securityHeadersMiddleware } from '../../middleware/securityHeaders';
 
-type MockResponse = Partial<Response> & {
+type MockResponse = Pick<Response, 'setHeader' | 'getHeader'> & {
   headers: Record<string, string>;
+  locals: Record<string, unknown>;
 };
 
 const createResponse = (): MockResponse => {
   const headers: Record<string, string> = {};
 
-  return {
+  const response: MockResponse = {
     headers,
     locals: {},
-    setHeader: (name: string, value: string): void => {
-      headers[name] = value;
+    setHeader: (name: string, value: string | number | readonly string[]) => {
+      headers[name] = Array.isArray(value) ? value.join(',') : String(value);
+      return response as unknown as Response;
     },
-    getHeader: (name: string): string | undefined => headers[name],
+    getHeader: (name: string) => headers[name],
   };
+
+  return response;
 };
 
 describe('securityHeadersMiddleware', () => {
