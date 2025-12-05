@@ -44,7 +44,6 @@ export const findEmployeeByEmployeeId = async (
   const whereClause: Record<string, unknown> = {
     employeeId: employeeIdentifier,
     client_ID: clientId,
-    tenant,
   };
 
   if (excludeUuid) {
