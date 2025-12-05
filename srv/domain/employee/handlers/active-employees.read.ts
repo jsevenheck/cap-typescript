@@ -310,7 +310,7 @@ const executeActiveEmployeesQuery = async (
 
   // Cast to any since this is an Express handler that uses CAP transaction API
   // At runtime, the Express request is augmented by CAP middleware with necessary properties
-  const transaction = cds.tx({ tenant: consumerContext.tenant });
+  const transaction = (cds as any).tx({ tenant: consumerContext.tenant });
   if (!transaction || typeof transaction.run !== 'function') {
     throw createServiceError(500, 'Failed to acquire transaction for request.');
   }
