@@ -29,11 +29,11 @@ declare module '@sap/cds' {
   }
 
   export interface CDSQL {
-    SELECT: unknown;
-    INSERT?: unknown;
-    UPDATE?: unknown;
-    DELETE?: unknown;
-    [key: string]: unknown;
+    SELECT: any;
+    INSERT?: any;
+    UPDATE?: any;
+    DELETE?: any;
+    [key: string]: any;
   }
 
   export interface CDSInstance {
