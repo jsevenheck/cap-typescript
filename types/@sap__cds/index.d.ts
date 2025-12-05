@@ -3,7 +3,7 @@ import type { CapUserLike } from '../../srv/shared/utils/auth';
 
 declare module '@sap/cds' {
   export interface Request {
-    data?: unknown;
+    data?: any;
     headers?: Record<string, unknown>;
     params?: unknown;
     target?: unknown;
