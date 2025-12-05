@@ -13,27 +13,28 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
     throw createServiceError(400, 'Request data is required.');
   }
 
+  const data = req.data as Partial<EmployeeEntity>;
   const user = buildUserContext(requireRequestUser(req));
   const result = await prepareEmployeeContext(req, user);
-  Object.assign(req.data, result.updates);
+  Object.assign(data, result.updates);
 
   // Validate manually provided employee IDs
-  if (req.event === 'CREATE' && req.data.employeeId) {
+  if (req.event === 'CREATE' && data.employeeId) {
     // User manually provided an employeeId during CREATE - validate uniqueness
     await ensureEmployeeIdentifier(
       cds.transaction(req),
-      req.data as Partial<EmployeeEntity>,
+      data,
       result.client,
       undefined,
       undefined,
     );
-  } else if (req.event === 'UPDATE' && req.data.employeeId &&
-      req.data.employeeId !== result.existingEmployee?.employeeId) {
+  } else if (req.event === 'UPDATE' && data.employeeId &&
+      data.employeeId !== result.existingEmployee?.employeeId) {
     // Employee ID changed during UPDATE - validate uniqueness
     // Pass the employee UUID to exclude them from the uniqueness check
     await ensureEmployeeIdentifier(
       cds.transaction(req),
-      req.data as Partial<EmployeeEntity>,
+      data,
       result.client,
       result.existingEmployee?.employeeId ?? undefined,
       result.existingEmployee?.ID,
