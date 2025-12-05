@@ -12,7 +12,7 @@ import {
   authorizeLocations,
   authorizeEmployeeCostCenterAssignments,
 } from './middleware/company-authorization';
-import { buildUserContext, getAttributeValues } from './shared/utils/auth';
+import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
 import { registerTenantIsolation } from './middleware/tenant-isolation';
 
 type ServiceWithOn = Service & {
@@ -37,6 +37,12 @@ const registerHandlers = (srv: Service): void => {
   // Register userInfo function handler
   (srv as ServiceWithOn).on('userInfo', (req: Request) => {
     const userContext = buildUserContext((req as any).user);
+
+    const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
+    const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));
+    if (!hasRequiredRole) {
+      return req.reject(403, 'User is not authorized to access userInfo');
+    }
 
     return {
       roles: Array.from(userContext.roles),
