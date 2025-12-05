@@ -41,8 +41,8 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     },
   } = config;
 
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    void (async () => {
       const key = `rate-limit:${keyGenerator(req)}`;
       const { count, ttlMs } = await incrementRequestCount(key, windowMs);
       const retryAfterSeconds = Math.max(1, Math.ceil(ttlMs / 1000));
@@ -67,10 +67,10 @@ export const createRateLimiter = (config: RateLimitConfig) => {
       }
 
       next();
-    } catch (error) {
+    })().catch((error) => {
       logger.error({ err: error }, 'Rate limiter unavailable, allowing request');
       next();
-    }
+    });
   };
 };
 
