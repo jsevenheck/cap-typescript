@@ -10,6 +10,20 @@
       "csrfProtection": true
     },
     {
+      "source": "^/api/(.*)$",
+      "target": "/api/$1",
+      "destination": "srv-api",
+      "authenticationType": "ias",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/health$",
+      "target": "/health",
+      "destination": "srv-api",
+      "authenticationType": "ias",
+      "csrfProtection": false
+    },
+    {
       "source": "^/(.*)$",
       "target": "$1",
       "service": "html5-apps-repo-rt",
