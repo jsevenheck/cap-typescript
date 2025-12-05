@@ -175,30 +175,11 @@ type EmployeeEntityInfo = {
 };
 
 type ConsumerContext = {
-  tenant: string;
   clientId?: string;
   companyId?: string;
 };
 
-const resolveTenant = (req: Request): string => {
-  const headerTenant = req.header('x-tenant-id')?.trim();
-  const requestTenant = (req as any).tenant ?? headerTenant ?? (req as any)?.authInfo?.tenant;
-  const contextTenant = (cds as any)?.context?.tenant;
-  const tenant = (requestTenant ?? contextTenant ?? process.env.CDS_DEFAULT_TENANT)?.toString().trim();
-
-  if (!tenant) {
-    throw createServiceError(403, 'Missing tenant information for the request.');
-  }
-
-  if (contextTenant && tenant !== contextTenant) {
-    throw createServiceError(403, 'Tenant mismatch detected for the request.');
-  }
-
-  return tenant;
-};
-
 const resolveConsumerContext = (req: Request): ConsumerContext => {
-  const tenant = resolveTenant(req);
   const headerClientId = req.header('x-client-id')?.trim();
   const headerCompanyId = req.header('x-company-id') ?? req.header('x-company-code');
   const normalizedCompany = normalizeCompanyId(
@@ -212,7 +193,7 @@ const resolveConsumerContext = (req: Request): ConsumerContext => {
     throw createServiceError(403, 'Company context is required to fetch employees.');
   }
 
-  return { tenant, clientId: clientId ?? undefined, companyId: normalizedCompany ?? undefined };
+  return { clientId: clientId ?? undefined, companyId: normalizedCompany ?? undefined };
 };
 
 const resolveEmployeeEntity = (): EmployeeEntityInfo | undefined => {
@@ -238,10 +219,6 @@ const addTenantAndCompanyFilters = (
   elements: Record<string, unknown>,
   consumerContext: ConsumerContext,
 ): void => {
-  if ('tenant' in elements) {
-    conditions.push({ tenant: consumerContext.tenant });
-  }
-
   if (consumerContext.clientId && 'client_ID' in elements) {
     conditions.push({ client_ID: consumerContext.clientId });
   } else if (consumerContext.companyId && 'companyId' in elements) {
@@ -310,7 +287,7 @@ const executeActiveEmployeesQuery = async (
 
   // Cast to any since this is an Express handler that uses CAP transaction API
   // At runtime, the Express request is augmented by CAP middleware with necessary properties
-  const transaction = (cds as any).tx({ tenant: consumerContext.tenant });
+  const transaction = (cds as any).tx(req);
   if (!transaction || typeof transaction.run !== 'function') {
     throw createServiceError(500, 'Failed to acquire transaction for request.');
   }
