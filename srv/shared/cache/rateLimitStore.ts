@@ -1,4 +1,10 @@
-import { createClient, RedisClientType } from 'redis';
+import {
+  createClient,
+  RedisClientType,
+  RedisDefaultFunctions,
+  RedisDefaultModules,
+  RedisDefaultScripts,
+} from 'redis';
 
 import { getLogger } from '../utils/logger';
 
@@ -94,7 +100,7 @@ const resolveFromSapCacheBinding = (): string | undefined => {
   }
 };
 
-type RateLimitClient = RedisClientType<Record<string, never>, Record<string, never>, Record<string, never>>;
+type RateLimitClient = RedisClientType<RedisDefaultModules, RedisDefaultFunctions, RedisDefaultScripts>;
 
 let clientPromise: Promise<RateLimitClient> | null = null;
 
@@ -127,7 +133,12 @@ const getClient = async (): Promise<RateLimitClient> => {
     });
   }
 
-  return clientPromise;
+  const currentClient = clientPromise;
+  if (!currentClient) {
+    throw new Error('Rate limit cache client unavailable');
+  }
+
+  return currentClient;
 };
 
 export interface RateLimitState {
