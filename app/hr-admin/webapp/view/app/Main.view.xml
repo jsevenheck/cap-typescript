@@ -10,31 +10,7 @@
             <Page id="mainPage" title="{i18n>clientManagement}">
                 <content>
                     <VBox class="sapUiSmallMargin">
-                        <IconTabBar
-                                id="clientsTabBar"
-                                selectedKey="{view>/selectedTabKey}"
-                                select=".onTabSelect"
-                                expandable="false"
-                                upperCase="false">
-                            <items>
-                                <IconTabFilter key="clients" text="{i18n>clients}" icon="sap-icon://customer"/>
-                                <IconTabFilter
-                                        key="employees"
-                                        text="{i18n>employees}"
-                                        icon="sap-icon://group"
-                                        enabled="{= !!${view>/selectedClientId}}"/>
-                                <IconTabFilter
-                                        key="costCenters"
-                                        text="{i18n>costCenters}"
-                                        icon="sap-icon://collections-management"
-                                        enabled="{= !!${view>/selectedClientId}}"/>
-                                <IconTabFilter
-                                        key="locations"
-                                        text="{i18n>locations}"
-                                        icon="sap-icon://map"
-                                        enabled="{= !!${view>/selectedClientId}}"/>
-                            </items>
-                        </IconTabBar>
+
                         <Title text="{i18n>manageClients}" level="H2"/>
                         <Text text="{i18n>manageClientsDesc}"/>
                         <List

@@ -2,9 +2,9 @@
  * User roles for the HR Admin application
  */
 export enum UserRole {
-  HRAdmin = "HRAdmin",
-  HRViewer = "HRViewer",
-  HREditor = "HREditor",
+  HRAdmin = 'HRAdmin',
+  HRViewer = 'HRViewer',
+  HREditor = 'HREditor',
 }
 
 /**
@@ -47,7 +47,7 @@ export class AuthorizationService {
       const response = await fetch('/odata/v4/clients/userInfo()', {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Include authentication cookies
@@ -84,7 +84,10 @@ export class AuthorizationService {
 
       return userInfoCache;
     } catch (error) {
-      console.error('AuthorizationService: Error fetching user info, defaulting to read-only', error);
+      console.error(
+        'AuthorizationService: Error fetching user info, defaulting to read-only',
+        error,
+      );
 
       // Fall back to least-privileged (viewer-only) on error, but do not cache
       // the degraded state so that a subsequent successful call can restore the

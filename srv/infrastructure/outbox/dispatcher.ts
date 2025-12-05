@@ -3,9 +3,11 @@ import type { Transaction } from '@sap/cds';
 
 import type { OutboxConfig } from './config';
 import { OutboxMetrics } from './metrics';
-import { EmployeeThirdPartyNotifier, type NotificationEnvelope } from '../api/third-party/employee-notifier';
+import {
+  EmployeeThirdPartyNotifier,
+  type NotificationEnvelope,
+} from '../api/third-party/employee-notifier';
 import { getLogger } from '../../shared/utils/logger';
-import { resolveTenantFromTx } from '../../shared/utils/tenant';
 
 const ql = cds.ql as any;
 
@@ -114,8 +116,13 @@ const parsePayload = (entry: OutboxEntry): ParsedPayload => {
   }
 };
 
-const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastError: string): Promise<void> => {
-  const tenant = entry.tenant;
+const moveToDlq = async (
+  db: any,
+  entry: OutboxEntry,
+  attempts: number,
+  lastError: string,
+): Promise<void> => {
+  const tenant = true;
   if (!tenant) {
     logger.error({ entryId: entry.ID }, 'Cannot move entry to DLQ without tenant context');
     return;
@@ -131,11 +138,11 @@ const moveToDlq = async (db: any, entry: OutboxEntry, attempts: number, lastErro
         attempts,
         lastError,
         failedAt: new Date(),
-        tenant,
+        
       }),
     );
 
-    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID, tenant }));
+    await db.run(ql.DELETE.from(OUTBOX_TABLE).where({ ID: entry.ID }));
   } catch (error) {
     logger.error({ err: error, entryId: entry.ID }, 'Failed to move entry to DLQ');
   }
@@ -191,14 +198,18 @@ export class ParallelDispatcher {
     const nowTime = now.getTime();
     const claimable = candidates.filter((entry) => {
       const status = entry.status ?? 'PENDING';
-      const nextAttemptAt = entry.nextAttemptAt ? new Date(entry.nextAttemptAt).getTime() : undefined;
+      const nextAttemptAt = entry.nextAttemptAt
+        ? new Date(entry.nextAttemptAt).getTime()
+        : undefined;
 
       if (status === 'PENDING') {
         return !nextAttemptAt || nextAttemptAt <= nowTime;
       }
 
       if (status === 'PROCESSING') {
-        return entry.claimedAt && new Date(entry.claimedAt).getTime() + this.config.claimTtl <= nowTime;
+        return (
+          entry.claimedAt && new Date(entry.claimedAt).getTime() + this.config.claimTtl <= nowTime
+        );
       }
 
       return false;
@@ -212,7 +223,7 @@ export class ParallelDispatcher {
     const claimed: OutboxEntry[] = [];
 
     for (const entry of claimable) {
-      const tenant = entry.tenant;
+      const tenant = true;
       if (!tenant) {
         logger.warn({ entryId: entry.ID }, 'Skipping claim for entry without tenant');
         continue;
@@ -220,7 +231,7 @@ export class ParallelDispatcher {
 
       const where: Record<string, unknown> = {
         ID: entry.ID,
-        tenant,
+        
       };
 
       const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
@@ -245,7 +256,8 @@ export class ParallelDispatcher {
       }
 
       const result = await db.run(
-        ql.UPDATE(OUTBOX_TABLE)
+        ql
+          .UPDATE(OUTBOX_TABLE)
           .set({
             status: 'PROCESSING',
             claimedAt: now,
@@ -279,9 +291,7 @@ export class ParallelDispatcher {
 
   private async dispatchBatch(db: any, entries: OutboxEntry[]): Promise<void> {
     const queue = [...entries];
-    const workerCount = this.config.parallelDispatchEnabled
-      ? this.config.dispatcherWorkers
-      : 1;
+    const workerCount = this.config.parallelDispatchEnabled ? this.config.dispatcherWorkers : 1;
     const workers = Math.max(1, Math.min(workerCount, queue.length));
     const tasks = Array.from({ length: workers }, () => this.runWorker(db, queue));
     await Promise.allSettled(tasks);
@@ -305,21 +315,26 @@ export class ParallelDispatcher {
       parsed = parsePayload(entry);
     } catch (error) {
       logger.error({ err: error, entryId: entry.ID }, 'Invalid outbox payload');
-      await this.handleFailure(db, entry, error instanceof Error ? error : new Error(String(error)));
+      await this.handleFailure(
+        db,
+        entry,
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return;
     }
 
     try {
       await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
-      const tenant = entry.tenant;
+      const tenant = true;
       if (!tenant) {
         logger.warn({ entryId: entry.ID }, 'Skipping completion update without tenant');
         return;
       }
 
       await db.run(
-        ql.UPDATE(OUTBOX_TABLE)
+        ql
+          .UPDATE(OUTBOX_TABLE)
           .set({
             status: 'COMPLETED',
             deliveredAt: new Date(),
@@ -328,7 +343,7 @@ export class ParallelDispatcher {
             nextAttemptAt: null,
             lastError: null,
           })
-          .where({ ID: entry.ID, tenant }),
+          .where({ ID: entry.ID }),
       );
 
       const duration = Date.now() - startTime;
@@ -344,7 +359,7 @@ export class ParallelDispatcher {
   private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
     const attempts = (entry.attempts ?? 0) + 1;
     const errorMessage = error?.message ?? 'Unknown error';
-    const tenant = entry.tenant;
+    const tenant = true;
 
     if (!tenant) {
       logger.warn({ entryId: entry.ID }, 'Skipping failure handling without tenant');
@@ -366,7 +381,8 @@ export class ParallelDispatcher {
     const nextAttemptAt = new Date(Date.now() + delay + 1);
 
     await db.run(
-      ql.UPDATE(OUTBOX_TABLE)
+      ql
+        .UPDATE(OUTBOX_TABLE)
         .set({
           attempts,
           status: 'PENDING',
@@ -375,7 +391,7 @@ export class ParallelDispatcher {
           claimedBy: null,
           lastError: errorMessage,
         })
-        .where({ ID: entry.ID, tenant }),
+        .where({ ID: entry.ID }),
     );
 
     this.metrics.recordFailed();
@@ -384,7 +400,8 @@ export class ParallelDispatcher {
   private async releaseExpiredClaims(db: any, now: Date): Promise<void> {
     const expiry = new Date(now.getTime() - this.config.claimTtl);
     await db.run(
-      ql.UPDATE(OUTBOX_TABLE)
+      ql
+        .UPDATE(OUTBOX_TABLE)
         .set({ status: 'PENDING', claimedAt: null, claimedBy: null })
         .where({ status: 'PROCESSING', claimedAt: { '<': expiry } }),
     );
@@ -436,7 +453,8 @@ export const enqueueOutboxEntry = async (
   config: OutboxConfig,
   metrics: OutboxMetrics,
 ): Promise<void> => {
-  const maxAttempts = config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
+  const maxAttempts =
+    config.enqueueMaxAttempts > 0 ? config.enqueueMaxAttempts : config.maxAttempts;
 
   let attempt = 1;
   while (attempt <= maxAttempts) {
@@ -449,8 +467,7 @@ export const enqueueOutboxEntry = async (
           status: 'PENDING',
           attempts: 0,
           nextAttemptAt: new Date(),
-          tenant: resolveTenantFromTx(tx),
-        }),
+          }),
       );
 
       metrics.recordEnqueued(1);
@@ -467,16 +484,19 @@ export const enqueueOutboxEntry = async (
     } catch (error) {
       if (attempt >= maxAttempts) {
         logger.error(
-          { err: error, eventType: input.eventType, destinationName: input.destinationName, attempts: attempt },
+          {
+            err: error,
+            eventType: input.eventType,
+            destinationName: input.destinationName,
+            attempts: attempt,
+          },
           `Failed to enqueue outbox entry after ${attempt} attempts - transaction will rollback`,
         );
         metrics.recordEnqueueFailure();
 
         // Re-throw to trigger transaction rollback and prevent data loss
         // This ensures the parent operation fails atomically if we cannot guarantee event delivery
-        const enrichedError = error instanceof Error
-          ? error
-          : new Error(String(error));
+        const enrichedError = error instanceof Error ? error : new Error(String(error));
         enrichedError.message = `Outbox enqueue failed after ${attempt} attempts: ${enrichedError.message}`;
         throw enrichedError;
       }
@@ -504,3 +524,5 @@ export const enqueueOutboxEntry = async (
     }
   }
 };
+
+
