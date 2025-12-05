@@ -1,7 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 
-const DEFAULT_BOOT_NONCE = process.env.UI5_BOOT_NONCE ?? 'ui5-bootstrap';
-const DEFAULT_STYLE_NONCE = process.env.UI5_STYLE_NONCE ?? DEFAULT_BOOT_NONCE;
 const normalizeSource = (value?: string): string | undefined => value?.trim() || undefined;
 
 /**
@@ -36,8 +34,8 @@ export const securityHeadersMiddleware = (
   );
 
   const isProduction = process.env.NODE_ENV === 'production';
-  const scriptNonce = DEFAULT_BOOT_NONCE;
-  const styleNonce = DEFAULT_STYLE_NONCE;
+  const scriptNonce = process.env.UI5_BOOT_NONCE ?? 'ui5-bootstrap';
+  const styleNonce = process.env.UI5_STYLE_NONCE ?? scriptNonce;
 
   res.locals.cspScriptNonce = scriptNonce;
   res.locals.cspStyleNonce = styleNonce;
