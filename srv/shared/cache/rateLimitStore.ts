@@ -133,12 +133,11 @@ const getClient = async (): Promise<RateLimitClient> => {
     });
   }
 
-  const currentClient = clientPromise;
-  if (!currentClient) {
+  if (clientPromise === null) {
     throw new Error('Rate limit cache client unavailable');
   }
 
-  return currentClient;
+  return clientPromise;
 };
 
 export interface RateLimitState {
