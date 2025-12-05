@@ -29,6 +29,16 @@ server:
       afterMiddleware: compression
     - name: ui5-middleware-simpleproxy
       afterMiddleware: compression
-      mountPath: /odata
+      mountPath: /odata/v4
       configuration:
-        baseUri: 'http://localhost:4004/odata'
+        baseUri: 'http://localhost:4004/odata/v4'
+    - name: ui5-middleware-simpleproxy
+      afterMiddleware: compression
+      mountPath: /api
+      configuration:
+        baseUri: 'http://localhost:4004/api'
+    - name: ui5-middleware-simpleproxy
+      afterMiddleware: compression
+      mountPath: /health
+      configuration:
+        baseUri: 'http://localhost:4004/health'

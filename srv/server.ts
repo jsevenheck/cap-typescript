@@ -147,3 +147,6 @@ cds.on('served', async () => {
 export const dispatchOutboxOnce = (): Promise<void> => outboxDispatcher.dispatchPending();
 export const cleanupOutboxOnce = (): Promise<void> => outboxCleanup.run();
 export default cds.server;
+
+// Ensure CAP runtime can detect the server when loaded via CommonJS
+module.exports = cds.server;
