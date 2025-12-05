@@ -2,7 +2,8 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { securityHeadersMiddleware } from '../../middleware/securityHeaders';
 
-type MockResponse = Pick<Response, 'setHeader' | 'getHeader'> & {
+type ResponseHeaderValue = Parameters<Response['setHeader']>[1];
+type MockResponse = Response & {
   headers: Record<string, string>;
   locals: Record<string, unknown>;
 };
@@ -10,15 +11,15 @@ type MockResponse = Pick<Response, 'setHeader' | 'getHeader'> & {
 const createResponse = (): MockResponse => {
   const headers: Record<string, string> = {};
 
-  const response: MockResponse = {
+  const response = {
     headers,
     locals: {},
-    setHeader: (name: string, value: string | number | readonly string[]) => {
+    setHeader: (name: string, value: ResponseHeaderValue) => {
       headers[name] = Array.isArray(value) ? value.join(',') : String(value);
-      return response as unknown as Response;
+      return response;
     },
     getHeader: (name: string) => headers[name],
-  };
+  } as unknown as MockResponse;
 
   return response;
 };
@@ -40,7 +41,7 @@ describe('securityHeadersMiddleware', () => {
     process.env.NODE_ENV = 'development';
     const res = createResponse();
 
-    securityHeadersMiddleware({} as Request, res as Response, jest.fn() as NextFunction);
+    securityHeadersMiddleware({} as Request, res, jest.fn() as NextFunction);
 
     const csp = res.headers['Content-Security-Policy'];
     expect(csp).toContain("'unsafe-inline'");
@@ -56,7 +57,7 @@ describe('securityHeadersMiddleware', () => {
     const res = createResponse();
     const next = jest.fn();
 
-    securityHeadersMiddleware({} as Request, res as Response, next as NextFunction);
+    securityHeadersMiddleware({} as Request, res, next as NextFunction);
 
     const csp = res.headers['Content-Security-Policy'];
 
