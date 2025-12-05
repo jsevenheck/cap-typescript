@@ -11,6 +11,7 @@ describe('GET /api/employees/active', () => {
   const originalModel = cdsAny.model;
   const originalRun = cdsAny.run;
   const originalTx = cdsAny.tx;
+  const originalContext = cdsAny.context;
 
   const buildApp = () => {
     const app = express();
@@ -24,12 +25,14 @@ describe('GET /api/employees/active', () => {
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
     cdsAny.tx = originalTx;
+    cdsAny.context = originalContext;
   });
 
   afterEach(() => {
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
     cdsAny.tx = originalTx;
+    cdsAny.context = originalContext;
   });
 
   afterAll(() => {
@@ -37,6 +40,7 @@ describe('GET /api/employees/active', () => {
     cdsAny.model = originalModel;
     cdsAny.run = originalRun;
     cdsAny.tx = originalTx;
+    cdsAny.context = originalContext;
   });
 
   it('responds with 401 when the API key is missing', async () => {
@@ -82,11 +86,14 @@ describe('GET /api/employees/active', () => {
         },
       },
     ]);
-    cdsAny.transaction = jest.fn().mockReturnValue({ run: runSpy });
+    cdsAny.tx = jest.fn().mockReturnValue({ run: runSpy });
+    cdsAny.context = { tenant: 't1' };
 
     await request(app)
       .get('/api/employees/active')
       .set('x-api-key', 'test-key')
+      .set('x-tenant-id', 't1')
+      .set('x-client-id', 'client-123')
       .expect(200)
       .expect([
         {
@@ -112,6 +119,47 @@ describe('GET /api/employees/active', () => {
         },
       ]);
     expect(runSpy).toHaveBeenCalledTimes(1);
-    expect(cdsAny.transaction).toHaveBeenCalledTimes(1);
+    expect(cdsAny.tx).toHaveBeenCalledWith({ tenant: 't1' });
+  });
+
+  it('returns 403 when tenant is missing or mismatched', async () => {
+    const app = buildApp();
+
+    cdsAny.model = {
+      definitions: {
+        'ClientService.Employees': { elements: { entryDate: {}, exitDate: {} } },
+      },
+    };
+
+    cdsAny.context = { tenant: 'tenant-a' };
+    cdsAny.tx = jest.fn().mockReturnValue({ run: jest.fn() });
+
+    await request(app)
+      .get('/api/employees/active')
+      .set('x-api-key', 'test-key')
+      .set('x-tenant-id', 'tenant-b')
+      .set('x-client-id', 'client-123')
+      .expect(403)
+      .expect({ error: 'forbidden', message: 'Tenant mismatch detected for the request.' });
+  });
+
+  it('rejects requests without company context', async () => {
+    const app = buildApp();
+
+    cdsAny.model = {
+      definitions: {
+        'ClientService.Employees': { elements: { entryDate: {}, exitDate: {} } },
+      },
+    };
+
+    cdsAny.context = { tenant: 'tenant-a' };
+    cdsAny.tx = jest.fn().mockReturnValue({ run: jest.fn() });
+
+    await request(app)
+      .get('/api/employees/active')
+      .set('x-api-key', 'test-key')
+      .set('x-tenant-id', 'tenant-a')
+      .expect(403)
+      .expect({ error: 'forbidden', message: 'Company context is required to fetch employees.' });
   });
 });

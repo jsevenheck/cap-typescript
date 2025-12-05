@@ -1,6 +1,7 @@
 import cds from '@sap/cds';
 import type { NextFunction, Request, Response, RequestHandler } from 'express';
 import { createServiceError } from '../../../shared/utils/errors';
+import { normalizeCompanyId } from '../../../shared/utils/normalization';
 
 type EmployeeEntityDefinition = {
   elements?: Record<string, unknown>;
@@ -173,6 +174,47 @@ type EmployeeEntityInfo = {
   definition: EmployeeEntityDefinition;
 };
 
+type ConsumerContext = {
+  tenant: string;
+  clientId?: string;
+  companyId?: string;
+};
+
+const resolveTenant = (req: Request): string => {
+  const headerTenant = req.header('x-tenant-id')?.trim();
+  const requestTenant = (req as any).tenant ?? headerTenant ?? (req as any)?.authInfo?.tenant;
+  const contextTenant = (cds as any)?.context?.tenant;
+  const tenant = (requestTenant ?? contextTenant ?? process.env.CDS_DEFAULT_TENANT)?.toString().trim();
+
+  if (!tenant) {
+    throw createServiceError(403, 'Missing tenant information for the request.');
+  }
+
+  if (contextTenant && tenant !== contextTenant) {
+    throw createServiceError(403, 'Tenant mismatch detected for the request.');
+  }
+
+  return tenant;
+};
+
+const resolveConsumerContext = (req: Request): ConsumerContext => {
+  const tenant = resolveTenant(req);
+  const headerClientId = req.header('x-client-id')?.trim();
+  const headerCompanyId = req.header('x-company-id') ?? req.header('x-company-code');
+  const normalizedCompany = normalizeCompanyId(
+    (headerCompanyId ?? (req as any).companyId ?? (req as any).consumer?.companyId ?? process.env.EMPLOYEE_EXPORT_COMPANY_ID) as
+      | string
+      | undefined,
+  );
+  const clientId = headerClientId ?? (req as any).clientId ?? (req as any).consumer?.clientId;
+
+  if (!clientId && !normalizedCompany) {
+    throw createServiceError(403, 'Company context is required to fetch employees.');
+  }
+
+  return { tenant, clientId: clientId ?? undefined, companyId: normalizedCompany ?? undefined };
+};
+
 const resolveEmployeeEntity = (): EmployeeEntityInfo | undefined => {
   const cdsAny = cds as any;
   const model = cdsAny.model as { definitions?: Record<string, EmployeeEntityDefinition> } | undefined;
@@ -191,12 +233,31 @@ const resolveEmployeeEntity = (): EmployeeEntityInfo | undefined => {
   return undefined;
 };
 
+const addTenantAndCompanyFilters = (
+  conditions: any[],
+  elements: Record<string, unknown>,
+  consumerContext: ConsumerContext,
+): void => {
+  if ('tenant' in elements) {
+    conditions.push({ tenant: consumerContext.tenant });
+  }
+
+  if (consumerContext.clientId && 'client_ID' in elements) {
+    conditions.push({ client_ID: consumerContext.clientId });
+  } else if (consumerContext.companyId && 'companyId' in elements) {
+    conditions.push({ companyId: consumerContext.companyId });
+  } else if (!consumerContext.clientId && !consumerContext.companyId) {
+    throw createServiceError(403, 'Company context is required to fetch employees.');
+  }
+};
+
 const executeActiveEmployeesQuery = async (
   req: Request,
   selectFields: Set<string> | undefined,
   top: number | undefined,
   skip: number | undefined
 ): Promise<ActiveEmployee[]> => {
+  const consumerContext = resolveConsumerContext(req);
   const entityInfo = resolveEmployeeEntity();
   if (!entityInfo) {
     throw createServiceError(500, 'Employees entity definition not found.');
@@ -215,9 +276,10 @@ const executeActiveEmployeesQuery = async (
       'status'
     );
 
+  const conditions: any[] = [];
   const elements = entityInfo.definition.elements ?? {};
   if ('isActive' in elements) {
-    (query as any).where({ isActive: true });
+    conditions.push({ isActive: true });
   } else {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -231,7 +293,15 @@ const executeActiveEmployeesQuery = async (
       predicates.push({ status: { '=': 'active' } });
     }
 
-    (query as any).where({ and: predicates });
+    conditions.push({ and: predicates });
+  }
+
+  addTenantAndCompanyFilters(conditions, elements, consumerContext);
+
+  if (conditions.length === 1) {
+    (query as any).where(conditions[0]);
+  } else if (conditions.length > 1) {
+    (query as any).where({ and: conditions });
   }
 
   if (top !== undefined) {
@@ -240,7 +310,7 @@ const executeActiveEmployeesQuery = async (
 
   // Cast to any since this is an Express handler that uses CAP transaction API
   // At runtime, the Express request is augmented by CAP middleware with necessary properties
-  const transaction = cds.transaction(req as any);
+  const transaction = cds.tx({ tenant: consumerContext.tenant });
   if (!transaction || typeof transaction.run !== 'function') {
     throw createServiceError(500, 'Failed to acquire transaction for request.');
   }
@@ -278,8 +348,9 @@ const handleActiveEmployees = async (req: Request, res: Response): Promise<void>
 export const activeEmployeesHandler: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {
   handleActiveEmployees(req, res).catch((error) => {
     if (!res.headersSent) {
+      const status = (error as { status?: number })?.status ?? 500;
       const message = error instanceof Error ? error.message : 'Unexpected error';
-      res.status(500).json({ error: 'internal_error', message });
+      res.status(status).json({ error: status === 403 ? 'forbidden' : 'internal_error', message });
     }
 
     if (typeof next === 'function') {
