@@ -59,8 +59,7 @@
         "kind": "sqlite",
         "credentials": {
           "filename": "./db/sqlite.db"
-        },
-        "multiTenant": true
+        }
       },
       "ams": {
         "kind": "ams-local",

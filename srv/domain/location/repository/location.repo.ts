@@ -2,7 +2,6 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import type { ClientEntity, LocationEntity } from '../dto/location.dto';
-import { resolveTenantFromTx } from '../../../shared/utils/tenant';
 
 const ql = cds.ql as typeof cds.ql;
 
@@ -47,7 +46,7 @@ export const findLocationById = async (
     ql.SELECT.one
       .from('clientmgmt.Locations')
       .columns(...(selection as string[]))
-      .where({ ID: id, tenant: resolveTenantFromTx(tx) }),
+      .where({ ID: id }),
   );
 
   if (!isRecord(row) || !hasRequiredFields<LocationEntity>(row, required)) {
@@ -68,7 +67,7 @@ export const findClientById = async (
     ql.SELECT.one
       .from('clientmgmt.Clients')
       .columns(...(selection as string[]))
-      .where({ ID: clientId, tenant: resolveTenantFromTx(tx) }),
+      .where({ ID: clientId }),
   );
 
   if (!isRecord(row) || !hasRequiredFields<ClientEntity>(row, required)) {
@@ -85,7 +84,7 @@ export const findEmployeesByLocation = async (
   const result = await tx.run(
     ql.SELECT.from('clientmgmt.Employees')
       .columns('count(*) as count')
-      .where({ location_ID: locationId, tenant: resolveTenantFromTx(tx) }),
+      .where({ location_ID: locationId }),
   );
 
   if (Array.isArray(result) && result.length > 0 && isRecord(result[0])) {
@@ -94,3 +93,4 @@ export const findEmployeesByLocation = async (
 
   return 0;
 };
+

@@ -7,10 +7,13 @@
       }
     },
     "auth": {
-      "kind": "mocked"
+      "kind": "mocked",
+      "users": {
+        "*": {
+          "roles": ["HRAdmin", "HREditor", "HRViewer"]
+        }
+      }
     },
-    "ams": {
-      "kind": "ams-local"
-    }
+    "ams": false
   }
 }

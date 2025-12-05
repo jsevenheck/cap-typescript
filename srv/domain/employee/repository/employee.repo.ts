@@ -2,7 +2,6 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import type { CostCenterEntity, EmployeeEntity, LocationEntity } from '../dto/employee.dto';
-import { resolveTenantFromTx } from '../../../shared/utils/tenant';
 import {
   hasRequiredFields,
   isRecord,
@@ -22,12 +21,11 @@ export const findEmployeeById = async (
 ): Promise<EmployeeEntity | undefined> => {
   const required: Array<keyof EmployeeEntity> = ['ID', 'client_ID'];
   const selection = selectColumns<EmployeeEntity>(columns, required);
-  const tenant = resolveTenantFromTx(tx);
   const row = await tx.run(
     ql.SELECT.one
       .from('clientmgmt.Employees')
       .columns(...(selection as string[]))
-      .where({ ID: employeeId, tenant }),
+      .where({ ID: employeeId}),
   );
 
   if (!isRecord(row) || !hasRequiredFields<EmployeeEntity>(row, required)) {
@@ -43,11 +41,9 @@ export const findEmployeeByEmployeeId = async (
   employeeIdentifier: string,
   excludeUuid?: string,
 ): Promise<Pick<EmployeeEntity, 'ID' | 'employeeId'> | undefined> => {
-  const tenant = resolveTenantFromTx(tx);
   const whereClause: Record<string, unknown> = {
     employeeId: employeeIdentifier,
     client_ID: clientId,
-    tenant,
   };
 
   if (excludeUuid) {
@@ -70,7 +66,7 @@ export const findEmployeeIdCounter = async (
     ql.SELECT.one
       .from('clientmgmt.EmployeeIdCounters')
       .columns('lastCounter')
-      .where({ client_ID: clientId, tenant: resolveTenantFromTx(tx) }),
+      .where({ client_ID: clientId }),
   )) as { lastCounter?: number } | undefined;
 
 export const findEmployeeIdCounterForUpdate = async (
@@ -82,7 +78,7 @@ export const findEmployeeIdCounterForUpdate = async (
       ql.SELECT.one
         .from('clientmgmt.EmployeeIdCounters')
         .columns('lastCounter')
-        .where({ client_ID: clientId, tenant: resolveTenantFromTx(tx) }) as unknown as Record<string, unknown>,
+        .where({ client_ID: clientId }) as unknown as Record<string, unknown>,
     ),
   )) as { lastCounter?: number } | undefined;
 
@@ -94,7 +90,7 @@ export const updateEmployeeIdCounter = async (
   await tx.run(
     ql.UPDATE('clientmgmt.EmployeeIdCounters')
       .set({ lastCounter: nextCounter })
-      .where({ client_ID: clientId, tenant: resolveTenantFromTx(tx) }),
+      .where({ client_ID: clientId }),
   );
 };
 
@@ -107,8 +103,7 @@ export const insertEmployeeIdCounter = async (
     ql.INSERT.into('clientmgmt.EmployeeIdCounters').entries({
       client_ID: clientId,
       lastCounter: counter,
-      tenant: resolveTenantFromTx(tx),
-    }),
+      }),
   );
 };
 
@@ -119,7 +114,6 @@ export const findCostCenterById = async <K extends keyof CostCenterEntity = 'res
   costCenterId: string,
   columns?: K[],
 ): Promise<Pick<CostCenterEntity, K | CostCenterRequiredFields> | undefined> => {
-  const tenant = resolveTenantFromTx(tx);
   const required: CostCenterRequiredFields[] = ['ID', 'client_ID'];
   const requested = columns ?? (['responsible_ID'] as K[]);
   const selection = selectColumns<CostCenterEntity>(requested, required) as Array<
@@ -130,7 +124,7 @@ export const findCostCenterById = async <K extends keyof CostCenterEntity = 'res
     ql.SELECT.one
       .from('clientmgmt.CostCenters')
       .columns(...(selection as string[]))
-      .where({ ID: costCenterId, tenant }),
+      .where({ ID: costCenterId}),
   );
 
   if (!isRecord(row) || !hasRequiredFields<CostCenterEntity>(row, required)) {
@@ -147,7 +141,6 @@ export const findLocationById = async <K extends keyof LocationEntity = 'ID' | '
   locationId: string,
   columns?: K[],
 ): Promise<Pick<LocationEntity, K | LocationRequiredFields> | undefined> => {
-  const tenant = resolveTenantFromTx(tx);
   const required: LocationRequiredFields[] = ['ID', 'client_ID'];
   const requested = columns ?? (['ID', 'client_ID'] as K[]);
   const selection = selectColumns<LocationEntity>(requested, required) as Array<
@@ -158,7 +151,7 @@ export const findLocationById = async <K extends keyof LocationEntity = 'ID' | '
     ql.SELECT.one
       .from('clientmgmt.Locations')
       .columns(...(selection as string[]))
-      .where({ ID: locationId, tenant }),
+      .where({ ID: locationId}),
   );
 
   if (!isRecord(row) || !hasRequiredFields<LocationEntity>(row, required)) {
@@ -183,7 +176,7 @@ export const listEmployeesForAnonymization = async (
   (await tx.run(
     ql.SELECT.from('clientmgmt.Employees')
       .columns('ID', 'employeeId')
-      .where({ ...whereClause, tenant: resolveTenantFromTx(tx) }),
+      .where({ ...whereClause }),
   )) as Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>;
 
 export const anonymizeEmployeeRecord = async (
@@ -201,6 +194,7 @@ export const anonymizeEmployeeRecord = async (
         positionLevel: null,
         status: 'inactive',
       })
-      .where({ ID: employeeId, tenant: resolveTenantFromTx(tx) }),
+      .where({ ID: employeeId }),
   );
 };
+

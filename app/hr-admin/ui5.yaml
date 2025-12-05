@@ -1,11 +1,11 @@
-specVersion: "4.0"
+specVersion: '4.0'
 type: application
 metadata:
   name: hr.admin
 
 framework:
   name: OpenUI5
-  version: "1.126.1"
+  version: '1.126.1'
   libraries:
     - name: sap.ui.core
     - name: sap.m
@@ -31,6 +31,4 @@ server:
       afterMiddleware: compression
       mountPath: /odata
       configuration:
-        baseUri: "http://localhost:4004/odata"
-        username: dev
-        password: dev
+        baseUri: 'http://localhost:4004/odata'

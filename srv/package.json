@@ -5,10 +5,10 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && npm run ams:generate && tsc --project tsconfig.json",
-    "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
-    "start": "cross-env NODE_ENV=production CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
+    "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
+    "start": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
     "lint": "eslint \"**/*.ts\"",
-    "test": "cross-env CDS_DEFAULT_TENANT=t0 TS_NODE_TRANSPILE_ONLY=1 jest --coverage",
+    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --coverage",
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
@@ -61,8 +61,7 @@
         "kind": "sqlite",
         "credentials": {
           "filename": "../db/sqlite.db"
-        },
-        "multiTenant": true
+        }
       },
       "ams": {
         "kind": "ams-local",
@@ -80,6 +79,13 @@
         "auth": {
           "kind": "mocked",
           "users": {
+            "*": {
+              "roles": ["HRAdmin", "HREditor", "HRViewer"],
+              "attr": {
+                "companyCodes": ["*"],
+                "CompanyCode": ["*"]
+              }
+            },
             "dev": {
               "password": "dev",
               "roles": [
@@ -127,7 +133,8 @@
               }
             }
           }
-        }
+        },
+        "ams": false
       }
     },
     "[production]": {

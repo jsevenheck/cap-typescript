@@ -2,7 +2,6 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
 import type { ClientEntity } from '../../../shared/types/models';
-import { resolveTenantFromTx } from '../../../shared/utils/tenant';
 
 const { SELECT } = cds.ql;
 
@@ -15,7 +14,7 @@ export const findClientById = async (
     SELECT.one
       .from('clientmgmt.Clients')
       .columns(...(columns as string[]))
-      .where({ ID: id, tenant: resolveTenantFromTx(tx) }),
+      .where({ ID: id }),
   )) as ClientEntity | undefined;
 
 export const findClientByCompanyId = async (
@@ -23,11 +22,11 @@ export const findClientByCompanyId = async (
   companyId: string,
   excludeId?: string,
 ): Promise<ClientEntity | undefined> => {
-  const whereClause: Record<string, unknown> = { companyId, tenant: resolveTenantFromTx(tx) };
+  const whereClause: Record<string, unknown> = { companyId };
   if (excludeId) {
     whereClause.ID = { '!=': excludeId };
   }
-  return (await tx.run(
-    SELECT.one.from('clientmgmt.Clients').columns('ID').where(whereClause),
-  )) as ClientEntity | undefined;
+  return (await tx.run(SELECT.one.from('clientmgmt.Clients').columns('ID').where(whereClause))) as
+    | ClientEntity
+    | undefined;
 };
