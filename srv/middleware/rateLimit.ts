@@ -1,12 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
+import { incrementRequestCount } from '../shared/cache/rateLimitStore';
 import { getLogger } from '../shared/utils/logger';
 
 const logger = getLogger('rate-limiter');
-
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
 
 interface RateLimitConfig {
   windowMs: number;
@@ -17,8 +13,7 @@ interface RateLimitConfig {
 }
 
 /**
- * Simple in-memory rate limiter middleware.
- * For production with multiple instances, consider using Redis-backed rate limiting.
+ * Distributed rate limiter middleware backed by a shared SAP-managed cache service.
  *
  * @param config - Rate limit configuration
  * @returns Express middleware function
@@ -46,59 +41,36 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     },
   } = config;
 
-  const store = new Map<string, RateLimitEntry>();
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const key = `rate-limit:${keyGenerator(req)}`;
+      const { count, ttlMs } = await incrementRequestCount(key, windowMs);
+      const retryAfterSeconds = Math.max(1, Math.ceil(ttlMs / 1000));
 
-  // Periodic cleanup to prevent memory leaks
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-      if (entry.resetTime < now) {
-        store.delete(key);
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - count));
+      res.setHeader('X-RateLimit-Reset', new Date(Date.now() + ttlMs).toISOString());
+
+      if (count > maxRequests) {
+        logger.warn(
+          { key, count, limit: maxRequests },
+          'Rate limit exceeded',
+        );
+
+        res.setHeader('Retry-After', retryAfterSeconds);
+        res.status(statusCode).json({
+          error: 'rate_limit_exceeded',
+          message,
+          retryAfter: retryAfterSeconds,
+        });
+        return;
       }
+
+      next();
+    } catch (error) {
+      logger.error({ err: error }, 'Rate limiter unavailable, allowing request');
+      next();
     }
-  }, windowMs);
-
-  // Allow cleanup on process termination
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
-  }
-
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const key = keyGenerator(req);
-    const now = Date.now();
-    let entry = store.get(key);
-
-    // Reset if window has expired
-    if (!entry || entry.resetTime < now) {
-      entry = {
-        count: 0,
-        resetTime: now + windowMs,
-      };
-      store.set(key, entry);
-    }
-
-    entry.count += 1;
-
-    // Set rate limit headers
-    res.setHeader('X-RateLimit-Limit', maxRequests);
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - entry.count));
-    res.setHeader('X-RateLimit-Reset', new Date(entry.resetTime).toISOString());
-
-    if (entry.count > maxRequests) {
-      logger.warn(
-        { key, count: entry.count, limit: maxRequests },
-        'Rate limit exceeded',
-      );
-
-      res.status(statusCode).json({
-        error: 'rate_limit_exceeded',
-        message,
-        retryAfter: Math.ceil((entry.resetTime - now) / 1000),
-      });
-      return;
-    }
-
-    next();
   };
 };
 

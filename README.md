@@ -373,6 +373,10 @@ CDS_DB=sqlite  # or hana for production
 # Authentication
 CDS_AUTH_KIND=mocked  # or jwt for production
 
+# Distributed rate limiting cache (SAP BTP Cache service; Redis protocol)
+# Only needed when not using bound service credentials
+RATE_LIMIT_CACHE_URL=
+
 # Outbox Configuration
 OUTBOX_BATCH_SIZE=50
 OUTBOX_MAX_ATTEMPTS=5
@@ -392,7 +396,7 @@ This application is configured for deployment to SAP Business Technology Platfor
 4. **cap-ts-app-hr-admin** - HTML5 frontend application
 5. **cap-ts-approuter** - Application Router (256MB)
 
-#### Required BTP Services (8)
+#### Required BTP Services (9)
 1. **cap-ts-db** - SAP HANA HDI Container (schema-based isolation)
 2. **cap-ts-ias** - Identity Authentication Service (user authentication)
 3. **cap-ts-ams** - Authorization Management Service (role & attribute management)
@@ -401,6 +405,9 @@ This application is configured for deployment to SAP Business Technology Platfor
 6. **cap-ts-html5-repo-host** - HTML5 Application Repository (hosting)
 7. **cap-ts-html5-repo-runtime** - HTML5 Application Repository (runtime)
 8. **cap-ts-logging** - Application Logging Service (centralized logging)
+9. **cap-ts-cache** - SAP BTP Cache service for distributed rate limiting (Redis protocol backend)
+
+Bind the cache service (tagged `cache`) so that rate limiting state is shared across application instances. The rate limiter uses the service binding by default and only reads `RATE_LIMIT_CACHE_URL` when you explicitly provide a managed cache endpoint (do not point this to self-hosted Redis).
 
 #### Deployment Commands
 ```bash
