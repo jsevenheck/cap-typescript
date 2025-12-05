@@ -99,6 +99,7 @@ service ClientService @(path:'/odata/v4/clients', impl:'./handlers.ts') {
    * Used by frontend to adapt UI based on user permissions.
    */
   @readonly
+  @requires: ['HRAdmin', 'HREditor', 'HRViewer']
   function userInfo() returns {
     roles: array of String;
     attributes: {
