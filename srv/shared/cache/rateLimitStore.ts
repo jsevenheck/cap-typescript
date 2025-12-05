@@ -94,7 +94,9 @@ const resolveFromSapCacheBinding = (): string | undefined => {
   }
 };
 
-let clientPromise: Promise<RedisClientType> | null = null;
+type RateLimitClient = RedisClientType<Record<string, never>, Record<string, never>, Record<string, never>>;
+
+let clientPromise: Promise<RateLimitClient> | null = null;
 
 export const resolveRateLimitCacheUrl = (): string => {
   const url = resolveFromSapCacheBinding() || process.env.RATE_LIMIT_CACHE_URL;
@@ -105,7 +107,7 @@ export const resolveRateLimitCacheUrl = (): string => {
   return url;
 };
 
-const getClient = async (): Promise<RedisClientType> => {
+const getClient = async (): Promise<RateLimitClient> => {
   if (!clientPromise) {
     clientPromise = (async () => {
       const url = resolveRateLimitCacheUrl();
