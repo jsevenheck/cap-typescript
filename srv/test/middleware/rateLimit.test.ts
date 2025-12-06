@@ -16,7 +16,8 @@ const createResponse = (): MockResponse => {
 
 describe('createRateLimiter', () => {
   const keyGenerator = (req: Request) => (req as Request & { key: string }).key;
-  const createRequest = (key: string) => ({ key } as Request);
+  const createRequest = (key: string): Request & { key: string } =>
+    ({ key } as unknown as Request & { key: string });
 
   afterEach(() => {
     jest.useRealTimers();
