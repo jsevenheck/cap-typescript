@@ -5,6 +5,9 @@ const logger = getLogger('secrets');
 // Track warnings that were already emitted to avoid noisy logs when secrets are missing
 const missingSecretWarnings = new Set<string>();
 
+// Maximum time to wait for Credential Store responses before falling back to environment variables
+const CREDSTORE_REQUEST_TIMEOUT_MS = 5000;
+
 // Type declarations for @sap/xsenv (doesn't have TypeScript definitions)
 interface XsenvServices {
   [serviceName: string]: {
@@ -112,27 +115,38 @@ export const getSecret = async (
         headers['Authorization'] = `Basic ${authString}`;
       }
 
-      // Make the HTTP request to Credential Store
-      const response = await fetch(apiUrl.toString(), {
-        method: 'GET',
-        headers,
-      });
+      const abortController = new AbortController();
+      const timeout = setTimeout(
+        () => abortController.abort(new Error('Credential Store request timed out')),
+        CREDSTORE_REQUEST_TIMEOUT_MS,
+      );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug({ namespace, name }, 'Secret not found in Credential Store');
+      try {
+        // Make the HTTP request to Credential Store
+        const response = await fetch(apiUrl.toString(), {
+          method: 'GET',
+          headers,
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            logger.debug({ namespace, name }, 'Secret not found in Credential Store');
+          } else {
+            logger.warn(
+              { namespace, name, status: response.status, statusText: response.statusText },
+              'Failed to fetch secret from Credential Store'
+            );
+          }
         } else {
-          logger.warn(
-            { namespace, name, status: response.status, statusText: response.statusText },
-            'Failed to fetch secret from Credential Store'
-          );
+          const data = await response.json() as { value?: string };
+          if (data.value) {
+            logger.debug({ namespace, name }, 'Successfully retrieved secret from Credential Store');
+            return data.value;
+          }
         }
-      } else {
-        const data = await response.json() as { value?: string };
-        if (data.value) {
-          logger.debug({ namespace, name }, 'Successfully retrieved secret from Credential Store');
-          return data.value;
-        }
+      } finally {
+        clearTimeout(timeout);
       }
     } catch (error) {
       logger.warn({ err: error, namespace, name }, 'Error fetching secret from Credential Store, using fallback');
