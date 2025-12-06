@@ -1,4 +1,3 @@
-// @ts-nocheck
 import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
 
