@@ -85,8 +85,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     const now = Date.now();
     let entry = store.get(key);
 
-    // Reset if window has expired
-    if (!entry || entry.resetTime < now) {
+    if (!entry) {
       if (store.size >= effectiveMaxKeys) {
         evictOldestKey();
       }
@@ -96,6 +95,9 @@ export const createRateLimiter = (config: RateLimitConfig) => {
         resetTime: now + windowMs,
       };
       store.set(key, entry);
+    } else if (entry.resetTime < now) {
+      entry.count = 0;
+      entry.resetTime = now + windowMs;
     }
 
     entry.count += 1;
