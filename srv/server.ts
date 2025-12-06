@@ -33,6 +33,8 @@ const ensureShutdownHooks = (): void => {
 initializeLogger();
 const logger = getLogger('server');
 
+logger.info({ odataUrlPath: (cds as any).env?.odata?.urlPath }, 'Effective CDS OData base path');
+
 const registerActiveEmployeesEndpoint = (app: Application): void => {
   if (activeEmployeesEndpointRegistered) {
     return;
@@ -59,6 +61,37 @@ cds.on('bootstrap', (app: Application) => {
 
   // Respect X-Forwarded-* headers when behind a reverse proxy (e.g., approuter)
   app.set('trust proxy', true);
+
+  const odataUrlPath = (cds.env as any)?.odata?.urlPath as string | undefined;
+
+  // Alias the service under the configured OData base path (e.g., /odata/v4) so
+  // consumers hitting the documented URL continue to work even if cds-serve falls
+  // back to mounting services at the root path.
+  if (odataUrlPath && odataUrlPath !== '/') {
+    const normalizedPath = odataUrlPath.endsWith('/') && odataUrlPath.length > 1
+      ? odataUrlPath.slice(0, -1)
+      : odataUrlPath;
+
+    logger.info({ path: normalizedPath }, 'Configuring OData base path alias');
+
+    app.use(normalizedPath, (req, res, next) => {
+      if ((req as any)._odataAliasApplied) {
+        next();
+        return;
+      }
+
+      const suffix = req.originalUrl.substring(normalizedPath.length);
+      (req as any)._odataAliasApplied = true;
+      req.url = suffix.startsWith('/') ? suffix : `/${suffix}`;
+
+      // Debug log to verify aliasing in case the framework mounts services without the configured base path
+      logger.debug({ originalUrl: req.originalUrl, rewrittenUrl: req.url }, 'Rewriting OData request to base path');
+
+      (app as any).handle(req, res, next);
+    });
+
+    logger.info({ path: normalizedPath }, 'Mounted OData alias');
+  }
 
   // Add security headers to all responses
   app.use(securityHeadersMiddleware);
