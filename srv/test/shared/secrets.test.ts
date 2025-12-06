@@ -7,6 +7,7 @@ describe('getSecret', () => {
     jest.resetModules();
     jest.restoreAllMocks();
     delete process.env.THIRD_PARTY_EMPLOYEE_SECRET;
+    delete process.env.CREDSTORE_URL;
     global.fetch = originalFetch;
     jest.useRealTimers();
   });
@@ -29,6 +30,7 @@ describe('getSecret', () => {
       getServices: () => ({ credstore: { credentials: { url: 'https://credstore.example.local' } } }),
     }), { virtual: true });
 
+    process.env.CREDSTORE_URL = 'https://credstore.example.local';
     process.env.THIRD_PARTY_EMPLOYEE_SECRET = 'env-fallback-secret';
 
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
