@@ -5,7 +5,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "npm run clean && npm run ams:generate && tsc --project tsconfig.json",
-    "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
+    "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
     "start": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
     "lint": "eslint \"**/*.ts\"",
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --coverage",
@@ -58,10 +58,7 @@
     },
     "requires": {
       "db": {
-        "kind": "sqlite",
-        "credentials": {
-          "filename": "../db/sqlite.db"
-        }
+        "kind": "hana"
       },
       "ams": {
         "kind": "ams-local",
@@ -76,6 +73,12 @@
     },
     "[development]": {
       "requires": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "filename": "../db/sqlite.db"
+          }
+        },
         "auth": {
           "kind": "mocked",
           "users": {

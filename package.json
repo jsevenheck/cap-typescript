@@ -57,10 +57,7 @@
     },
     "requires": {
       "db": {
-        "kind": "sqlite",
-        "credentials": {
-          "filename": "./db/sqlite.db"
-        }
+        "kind": "hana"
       },
       "ams": {
         "kind": "ams-local",
@@ -89,6 +86,12 @@
     },
     "[development]": {
       "requires": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "filename": "./db/sqlite.db"
+          }
+        },
         "auth": {
           "kind": "mocked",
           "users": {
