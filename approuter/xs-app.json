@@ -14,7 +14,7 @@
       "target": "/api/$1",
       "destination": "srv-api",
       "authenticationType": "ias",
-      "csrfProtection": false
+      "csrfProtection": true
     },
     {
       "source": "^/health$",

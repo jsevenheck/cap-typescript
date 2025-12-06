@@ -183,3 +183,16 @@ export default cds.server;
 
 // Ensure CAP runtime can detect the server when loaded via CommonJS
 module.exports = cds.server;
+
+// When executed directly (e.g., via `node dist/server.js`), start the CAP server
+if (require.main === module) {
+  void (async () => {
+    try {
+      await cds.server;
+      logger.info('CAP server started via direct execution');
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to start CAP server');
+      process.exitCode = 1;
+    }
+  })();
+}

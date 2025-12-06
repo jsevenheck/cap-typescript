@@ -19,7 +19,7 @@ If no key is available at startup, the service skips registering the endpoint an
 
 ## 🎯 Key Features
 
-- **Multi-tenant Client Management** - Manage multiple company clients with isolated data
+- **Client Management** - Manage multiple company clients
 - **Employee Management** - Complete lifecycle management with auto-generated employee IDs
   - Auto-generated employee IDs: 8-character prefix + 6-digit counter per client
   - Manager hierarchy with self-referencing relationships
@@ -55,12 +55,9 @@ If no key is available at startup, the service skips registering the endpoint an
 - **Logging:** @sap/logging with correlation IDs
 - **Scheduling:** node-cron for outbox cleanup
 
-### Tenant Handling (IAS + CAP MTX)
+### Tenant Model
 
-- **Tenant source:** The `tenant` column comes from the CAP request context (`cds.context.tenant`) provided by IAS/MTX; the service never generates new tenant IDs per record.
-- **Create flows:** Every CREATE request stamps the active tenant on all tenant-scoped entities (Clients, Employees, Locations, CostCenters, Assignments, Outbox/DLQ). Incoming payload tenants are ignored/overwritten to prevent cross-tenant injection.
-- **Read/update/delete flows:** All queries are automatically constrained to the active tenant via middleware guards to keep data isolated per subscribing IAS tenant.
-- **Local/dev runs:** Set `CDS_DEFAULT_TENANT` (default `t0`) when using mocked auth to simulate a tenant; production IAS tokens supply the tenant automatically.
+This solution is deployed as **single-tenant** on BTP. MTX/tenant-host routing has been removed (including `TENANT_HOST_PATTERN` in `mta.yaml`), and the application assumes one dedicated tenant per space.
 
 ### Frontend (SAPUI5)
 - **Framework:** SAPUI5 1.126.1 (OpenUI5)
@@ -136,7 +133,7 @@ The application is a **Single Page Application (SPA)** with a tab-based interfac
 ### Database Schema
 
 **Core Entities:**
-- **Clients** - Multi-tenant client records (UUID key, unique companyId)
+- **Clients** - Client records (UUID key, unique companyId)
 - **Employees** - Employee records with auto-generated employeeId (8-char prefix + 6-digit counter)
 - **CostCenters** - Cost center definitions with time-based validity
 - **Locations** - Office locations with country associations
