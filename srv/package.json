@@ -6,7 +6,7 @@
     "clean": "rimraf dist",
     "build": "npm run clean && npm run ams:generate && tsc --project tsconfig.json",
     "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
-    "start": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds-serve",
+    "start": "cross-env NODE_ENV=production node dist/server.js",
     "lint": "eslint \"**/*.ts\"",
     "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --coverage",
     "ams:generate": "node ./scripts/generate-ams.mjs"

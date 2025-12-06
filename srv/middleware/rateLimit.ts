@@ -14,6 +14,11 @@ interface RateLimitConfig {
   message?: string;
   statusCode?: number;
   keyGenerator?: (req: Request) => string;
+  /**
+   * Maximum distinct keys to keep in memory to avoid unbounded growth.
+   * Oldest entries are evicted when the limit is reached.
+   */
+  maxKeys?: number;
 }
 
 /**
@@ -44,9 +49,21 @@ export const createRateLimiter = (config: RateLimitConfig) => {
       // Prefer API key when present to avoid grouping all clients behind a proxy
       return apiKey ? `api-key:${apiKey}` : `ip:${clientIp}`;
     },
+    maxKeys = 10_000,
   } = config;
 
   const store = new Map<string, RateLimitEntry>();
+  const effectiveMaxKeys = maxKeys > 0 ? maxKeys : Number.POSITIVE_INFINITY;
+
+  const evictOldestKey = (): void => {
+    const oldestKey = store.keys().next().value as string | undefined;
+    if (!oldestKey) {
+      return;
+    }
+
+    store.delete(oldestKey);
+    logger.debug({ oldestKey, maxKeys: effectiveMaxKeys }, 'Evicted oldest rate limit entry to enforce maxKeys');
+  };
 
   // Periodic cleanup to prevent memory leaks
   const cleanupInterval = setInterval(() => {
@@ -70,6 +87,10 @@ export const createRateLimiter = (config: RateLimitConfig) => {
 
     // Reset if window has expired
     if (!entry || entry.resetTime < now) {
+      if (store.size >= effectiveMaxKeys) {
+        evictOldestKey();
+      }
+
       entry = {
         count: 0,
         resetTime: now + windowMs,
@@ -90,6 +111,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
         'Rate limit exceeded',
       );
 
+      res.setHeader('Retry-After', Math.ceil((entry.resetTime - now) / 1000));
       res.status(statusCode).json({
         error: 'rate_limit_exceeded',
         message,

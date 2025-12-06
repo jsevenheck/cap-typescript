@@ -136,8 +136,6 @@ modules:
       disk-quota: 256M
       memory: 256M
       keep-existing-routes: true
-    properties:
-      TENANT_HOST_PATTERN: "^(.*)-${default-uri}"
     requires:
       - name: cap-ts-html5-repo-runtime
       - name: cap-ts-ias
