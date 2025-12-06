@@ -5,6 +5,9 @@ const logger = getLogger('secrets');
 // Track warnings that were already emitted to avoid noisy logs when secrets are missing
 const missingSecretWarnings = new Set<string>();
 
+// Maximum time to wait for Credential Store responses before falling back to environment variables
+const CREDSTORE_REQUEST_TIMEOUT_MS = 5000;
+
 // Type declarations for @sap/xsenv (doesn't have TypeScript definitions)
 interface XsenvServices {
   [serviceName: string]: {
@@ -13,17 +16,36 @@ interface XsenvServices {
   };
 }
 
-type GetServicesFunc = () => XsenvServices;
+type GetServicesFunc = (filter?: unknown) => XsenvServices;
 
-let getServicesFunc: GetServicesFunc | null = null;
+let getServicesFunc: GetServicesFunc | null | undefined = undefined;
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const xsenv = require('@sap/xsenv') as { getServices: GetServicesFunc };
-  getServicesFunc = xsenv.getServices;
-} catch {
-  getServicesFunc = null;
-}
+const getEnvCredentialStoreCredentials = (): CredentialStoreCredentials | null => {
+  const url = process.env.CREDSTORE_URL;
+  if (!url) return null;
+
+  return {
+    url,
+    username: process.env.CREDSTORE_USERNAME,
+    password: process.env.CREDSTORE_PASSWORD,
+  };
+};
+
+const loadGetServices = (): GetServicesFunc | null => {
+  if (getServicesFunc !== undefined) {
+    return getServicesFunc;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const xsenv = require('@sap/xsenv') as { getServices: GetServicesFunc };
+    getServicesFunc = xsenv.getServices;
+  } catch {
+    getServicesFunc = null;
+  }
+
+  return getServicesFunc;
+};
 
 interface CredentialStoreCredentials {
   url: string;
@@ -45,13 +67,21 @@ const getCredentialStoreCredentials = (): CredentialStoreCredentials | null | un
     return credStoreCache;
   }
 
-  if (!getServicesFunc) {
+  const envCreds = getEnvCredentialStoreCredentials();
+  if (envCreds) {
+    credStoreCache = envCreds;
+    return credStoreCache;
+  }
+
+  const getServices = loadGetServices();
+
+  if (!getServices) {
     credStoreCache = null;
     return null;
   }
 
   try {
-    const services = getServicesFunc();
+    const services = getServices({ tag: 'credstore' });
     const credStore = services.credstore;
 
     if (!credStore || !credStore.credentials) {
@@ -62,15 +92,9 @@ const getCredentialStoreCredentials = (): CredentialStoreCredentials | null | un
     credStoreCache = credStore.credentials as unknown as CredentialStoreCredentials;
     return credStoreCache;
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ERR_ASSERTION') {
-      logger.debug({ err: error }, 'Credential Store service not bound; using fallbacks');
-      credStoreCache = null;
-      return null;
-    }
-
-    logger.warn({ err: error }, 'Failed to get Credential Store credentials');
-    credStoreCache = undefined;
-    return undefined;
+    logger.debug({ err: error }, 'Credential Store service not bound; using fallbacks');
+    credStoreCache = null;
+    return null;
   }
 };
 
@@ -112,26 +136,48 @@ export const getSecret = async (
         headers['Authorization'] = `Basic ${authString}`;
       }
 
-      // Make the HTTP request to Credential Store
-      const response = await fetch(apiUrl.toString(), {
-        method: 'GET',
-        headers,
+      const abortController = new AbortController();
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          abortController.abort();
+          reject(new Error('Credential Store request timed out'));
+        }, CREDSTORE_REQUEST_TIMEOUT_MS);
       });
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          logger.debug({ namespace, name }, 'Secret not found in Credential Store');
+      try {
+        // Make the HTTP request to Credential Store
+        const response = (await Promise.race([
+          fetch(apiUrl.toString(), {
+            method: 'GET',
+            headers,
+            signal: abortController.signal,
+          }),
+          timeoutPromise,
+        ])) as Response;
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            logger.debug({ namespace, name }, 'Secret not found in Credential Store');
+          } else {
+            logger.warn(
+              { namespace, name, status: response.status, statusText: response.statusText },
+              'Failed to fetch secret from Credential Store'
+            );
+          }
         } else {
-          logger.warn(
-            { namespace, name, status: response.status, statusText: response.statusText },
-            'Failed to fetch secret from Credential Store'
-          );
+          const data = await response.json() as { value?: string };
+          if (data.value) {
+            logger.debug({ namespace, name }, 'Successfully retrieved secret from Credential Store');
+            return data.value;
+          }
         }
-      } else {
-        const data = await response.json() as { value?: string };
-        if (data.value) {
-          logger.debug({ namespace, name }, 'Successfully retrieved secret from Credential Store');
-          return data.value;
+      } catch (error) {
+        logger.warn({ err: error, namespace, name }, 'Error fetching secret from Credential Store, using fallback');
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
         }
       }
     } catch (error) {
