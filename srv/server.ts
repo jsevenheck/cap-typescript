@@ -188,7 +188,7 @@ module.exports = cds.server;
 if (require.main === module) {
   void (async () => {
     try {
-      await cds.server();
+      await cds.server;
       logger.info('CAP server started via direct execution');
     } catch (error) {
       logger.error({ err: error }, 'Failed to start CAP server');
