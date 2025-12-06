@@ -59,7 +59,12 @@ export namespace CDS {
     };
     transaction(req: import('@sap/cds').Request): Transaction;
     deploy(model: string | string[]): DeployResult;
-    readonly server: Promise<Application>;
+    /**
+     * Starts the CAP server and resolves with the underlying Express application.
+     *
+     * The implementation is an async factory function, not a pre-resolved Promise.
+     */
+    server(): Promise<Application>;
     on(event: string, listener: (app: Application) => void): void;
   }
 }
