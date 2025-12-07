@@ -4,7 +4,7 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 
 ## 📋 Requirements
 
-**Node Version:** >=22.0.0
+**Node Version:** >=20.0.0 (tested with 20.19.6)
 **npm Version:** >=10.0.0
 **TypeScript Version:** 5.6.3
 
@@ -239,7 +239,7 @@ Reliable event delivery to third-party systems:
 
 ### Prerequisites
 ```bash
-node >= 22.0.0
+node >= 20.0.0
 npm >= 10.0.0
 ```
 
