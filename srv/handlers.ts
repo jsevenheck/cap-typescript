@@ -5,6 +5,13 @@ import { registerEmployeeHandlers } from './domain/employee';
 import { registerCostCenterHandlers } from './domain/cost-center';
 import { registerLocationHandlers } from './domain/location';
 import { registerEmployeeCostCenterAssignmentHandlers } from './domain/employee-cost-center';
+import {
+  authorizeClients,
+  authorizeCostCenters,
+  authorizeEmployees,
+  authorizeLocations,
+  authorizeEmployeeCostCenterAssignments,
+} from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
 
 type ServiceWithOn = Service & {
@@ -23,7 +30,17 @@ interface CAPUser {
 }
 
 const registerHandlers = (srv: Service): void => {
-  // Authorization is now handled via @restrict annotations in srv/service.cds
+  // Register company authorization middleware for all write operations
+  // Note: Individual handlers also perform authorization checks for additional validation
+  srv.before(['CREATE', 'UPDATE'], 'Clients', authorizeClients);
+  srv.before(['CREATE', 'UPDATE'], 'Employees', authorizeEmployees);
+  srv.before(['CREATE', 'UPDATE'], 'CostCenters', authorizeCostCenters);
+  srv.before(['CREATE', 'UPDATE'], 'Locations', authorizeLocations);
+  srv.before(
+    ['CREATE', 'UPDATE'],
+    'EmployeeCostCenterAssignments',
+    authorizeEmployeeCostCenterAssignments,
+  );
 
   // Register userInfo function handler
   (srv as ServiceWithOn).on('userInfo', (req: Request) => {
