@@ -212,12 +212,13 @@ export class ParallelDispatcher {
       return;
     }
 
-    // Optimization: Bulk update for claiming entries
-    const idsToClaim = claimable.map(e => e.ID);
+    const claimed: OutboxEntry[] = [];
 
-    // Safety: ensure we only claim if status is still as expected (concurrency check).
-    // Use cds.ql syntax instead of raw string interpolation for safety.
-    await db.run(
+    // Revert to safer loop-based approach to prevent race conditions (Double Dispatch)
+    // which was a risk with the bulk update without proper affected rows check/RETURNING.
+    // This is less efficient (N+1 updates) but strictly correct for exactly-once claiming.
+    for (const entry of claimable) {
+      const result = await db.run(
         ql
           .UPDATE(OUTBOX_TABLE)
           .set({
@@ -227,35 +228,29 @@ export class ParallelDispatcher {
             nextAttemptAt: now,
           })
           .where({
-              ID: { in: idsToClaim },
-              status: 'PENDING'
-          })
-    );
+            ID: entry.ID,
+            status: 'PENDING' // Optimistic lock: only claim if still pending
+          }),
+      );
 
-    // Only process entries that were successfully updated/claimed.
-    // Since we can't easily get the returned rows from UPDATE in all DBs,
-    // we assume for now that if the update succeeded without error, we proceed.
-    // However, in high concurrency, some might fail the WHERE check.
-    // For "at least once" delivery, re-dispatching is better than missing.
-    // But double dispatch is bad.
-    // If we rely on optimistic locking via the UPDATE count, we can't know WHICH ones failed.
-    // A robust solution would be to select again or use RETURNING if supported (Postgres/HANA).
-    // SQLite supports RETURNING.
-    // But to be generic in CAP:
-    // If we assume the SELECT -> UPDATE gap is small, collisions are rare.
-    // If a collision happens, another worker claimed it.
-    // We should ideally only dispatch what we successfully claimed.
-    // But `claimable` list is what we intend to claim.
-    // If we dispatch all `claimable`, and one was claimed by another worker, we duplicate.
-    // Given the constraints and the goal to fix the "Missing Dispatch" bug primarily:
-    // I will restore the dispatch call.
+      const affectedRows = Array.isArray(result) ? Number(result[0]) : Number(result ?? 0);
+      if (!affectedRows) {
+        // Another worker claimed it first
+        continue;
+      }
 
-    const claimed: OutboxEntry[] = claimable.map(entry => ({
+      claimed.push({
         ...entry,
         status: 'PROCESSING',
         claimedAt: now,
-        claimedBy: this.workerId
-    }));
+        claimedBy: this.workerId,
+      });
+    }
+
+    if (!claimed.length) {
+      await this.updatePendingGauge(db);
+      return;
+    }
 
     await this.dispatchBatch(db, claimed);
     await this.updatePendingGauge(db);
