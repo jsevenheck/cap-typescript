@@ -217,7 +217,7 @@ export class ParallelDispatcher {
 
     // Safety: ensure we only claim if status is still as expected (concurrency check).
     // Use cds.ql syntax instead of raw string interpolation for safety.
-    const result = await db.run(
+    await db.run(
         ql
           .UPDATE(OUTBOX_TABLE)
           .set({
