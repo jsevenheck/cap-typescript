@@ -43,10 +43,14 @@
     "tmp": "0.2.4"
   },
   "cds": {
-    "server": "./srv/server.js",
-    "features": {
-      "typescript": true
-    },
+    "server": {
+    "body_parser": {
+      "limit": "1mb"
+    }
+  },
+  "features": {
+    "typescript": true
+  },
     "security": {
       "identity": {
         "enabled": true
