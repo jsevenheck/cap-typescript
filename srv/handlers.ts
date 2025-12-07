@@ -22,13 +22,20 @@ type ServiceWithOn = Service & {
   ) => unknown;
 };
 
+// Define a minimal User interface if strict typing is required and standard types are insufficient
+interface CAPUser {
+  id: string;
+  roles: { [key: string]: any } | string[];
+  attr: { [key: string]: any };
+}
+
 const registerHandlers = (srv: Service): void => {
   // Register company authorization middleware for all write operations
   // Note: Individual handlers also perform authorization checks for additional validation
-  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Clients', authorizeClients);
-  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Employees', authorizeEmployees);
-  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'CostCenters', authorizeCostCenters);
-  srv.before(['CREATE', 'UPDATE', 'DELETE'], 'Locations', authorizeLocations);
+  srv.before(['CREATE', 'UPDATE'], 'Clients', authorizeClients);
+  srv.before(['CREATE', 'UPDATE'], 'Employees', authorizeEmployees);
+  srv.before(['CREATE', 'UPDATE'], 'CostCenters', authorizeCostCenters);
+  srv.before(['CREATE', 'UPDATE'], 'Locations', authorizeLocations);
   srv.before(
     ['CREATE', 'UPDATE', 'DELETE'],
     'EmployeeCostCenterAssignments',
@@ -37,7 +44,10 @@ const registerHandlers = (srv: Service): void => {
 
   // Register userInfo function handler
   (srv as ServiceWithOn).on('userInfo', (req: Request) => {
-    const userContext = buildUserContext((req as any).user);
+    // req.user is usually present but not strictly typed in older definitions
+    // We cast it to our expected shape or use 'any' if necessary
+    const user = (req as unknown as { user: CAPUser }).user;
+    const userContext = buildUserContext(user);
 
     const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
     const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));

@@ -99,7 +99,12 @@ export class CompanyAuthorization {
       const normalized = normalizeCompanyId(candidate ?? undefined);
 
       if (!normalized) {
-        throw createServiceError(400, 'Client must provide a companyId.');
+        // If creating, companyId is mandatory. If updating, it might not be in payload.
+        if (!existing) {
+             throw createServiceError(400, 'Client must provide a companyId.');
+        }
+        // If updating and not changing companyId, we already checked access to existing above.
+        continue;
       }
 
       this.ensureCompanyAllowed(normalized, `client ${clientId ?? '(new)'}`);
@@ -132,13 +137,21 @@ export class CompanyAuthorization {
     for (const employee of employees) {
       const employeeId = extractEntityId(employee);
       const existing = employeeId ? existingEmployees.get(employeeId) : undefined;
+
+      // Check access to the existing record (ownership)
       if (existing?.client_ID) {
         this.ensureClientAccess(existing.client_ID, `employee ${employeeId ?? '(new)'}`);
       }
+
+      // Check access to the new/target client (association target)
       const clientId = resolveAssociationId(employee, 'client', existing?.client_ID);
 
       if (!clientId) {
-        throw createServiceError(400, 'Employee must reference a client.');
+         // If we can't resolve a client ID (and none exists), it's invalid for CREATE
+         if (!existing) {
+             throw createServiceError(400, 'Employee must reference a client.');
+         }
+         continue;
       }
 
       this.ensureClientAccess(clientId, `employee ${employeeId ?? '(new)'}`);
@@ -177,7 +190,10 @@ export class CompanyAuthorization {
       const clientId = resolveAssociationId(costCenter, 'client', existing?.client_ID);
 
       if (!clientId) {
-        throw createServiceError(400, 'Cost center must reference a client.');
+        if (!existing) {
+            throw createServiceError(400, 'Cost center must reference a client.');
+        }
+        continue;
       }
 
       this.ensureClientAccess(clientId, `cost center ${costCenterId ?? '(new)'}`);
@@ -216,7 +232,10 @@ export class CompanyAuthorization {
       const clientId = resolveAssociationId(location, 'client', existing?.client_ID);
 
       if (!clientId) {
-        throw createServiceError(400, 'Location must reference a client.');
+        if (!existing) {
+            throw createServiceError(400, 'Location must reference a client.');
+        }
+        continue;
       }
 
       this.ensureClientAccess(clientId, `location ${locationId ?? '(new)'}`);
@@ -255,7 +274,10 @@ export class CompanyAuthorization {
       const clientId = resolveAssociationId(assignment, 'client', existing?.client_ID);
 
       if (!clientId) {
-        throw createServiceError(400, 'Employee cost center assignment must reference a client.');
+        if (!existing) {
+            throw createServiceError(400, 'Employee cost center assignment must reference a client.');
+        }
+        continue;
       }
 
       this.ensureClientAccess(clientId, `assignment ${assignmentId ?? '(new)'}`);
@@ -290,7 +312,16 @@ export class CompanyAuthorization {
   private ensureClientAccess(clientId: string, context: string): void {
     const companyId = this.clientCompanyCache.get(clientId);
     if (companyId == null) {
-      throw createServiceError(404, `Client ${clientId} not found.`);
+      // If we loaded it and it's null, the client doesn't exist or has no companyId.
+      // If it's not in the map at all, we failed to load it.
+      // Assuming load logic populates the map for all requested IDs.
+      if (this.clientCompanyCache.has(clientId)) {
+           // Client exists but maybe companyId is null? Should not happen based on schema.
+           // Or client ID was not found in DB.
+           throw createServiceError(404, `Client ${clientId} not found.`);
+      }
+      // If not in cache, we missed loading it.
+      throw createServiceError(500, `Internal Error: Client ${clientId} was not loaded for authorization check.`);
     }
 
     this.ensureCompanyAllowed(companyId, context);

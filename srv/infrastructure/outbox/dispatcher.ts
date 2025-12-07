@@ -30,7 +30,6 @@ export interface OutboxEntry {
   claimedAt?: Date | null;
   claimedBy?: string | null;
   lastError?: string | null;
-  tenant?: string | null;
 }
 
 interface ParsedPayload extends NotificationEnvelope {
@@ -122,12 +121,6 @@ const moveToDlq = async (
   attempts: number,
   lastError: string,
 ): Promise<void> => {
-  const tenant = true;
-  if (!tenant) {
-    logger.error({ entryId: entry.ID }, 'Cannot move entry to DLQ without tenant context');
-    return;
-  }
-
   try {
     await db.run(
       ql.INSERT.into(DLQ_TABLE).entries({
@@ -183,7 +176,6 @@ export class ParallelDispatcher {
           'claimedAt',
           'claimedBy',
           'lastError',
-          'tenant',
         )
         .where({ status: 'PENDING' })
         .orderBy('nextAttemptAt')
@@ -222,39 +214,12 @@ export class ParallelDispatcher {
 
     const claimed: OutboxEntry[] = [];
 
+    // Use a loop to update rows individually and check "affected rows".
+    // This ensures we only dispatch messages that THIS worker successfully claimed.
+    // The previous bulk update (UPDATE ... WHERE ID IN ...) was unsafe because it
+    // didn't filter the dispatch list based on actual update success, leading to
+    // double-dispatch if another worker claimed some rows in between.
     for (const entry of claimable) {
-      const tenant = true;
-      if (!tenant) {
-        logger.warn({ entryId: entry.ID }, 'Skipping claim for entry without tenant');
-        continue;
-      }
-
-      const where: Record<string, unknown> = {
-        ID: entry.ID,
-        
-      };
-
-      const expectedStatus = entry.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING';
-      where.status = expectedStatus;
-
-      if (entry.claimedAt) {
-        where.claimedAt = entry.claimedAt;
-      } else {
-        where.claimedAt = null;
-      }
-
-      if (entry.claimedBy) {
-        where.claimedBy = entry.claimedBy;
-      } else {
-        where.claimedBy = null;
-      }
-
-      if (entry.nextAttemptAt) {
-        where.nextAttemptAt = entry.nextAttemptAt;
-      } else {
-        where.nextAttemptAt = null;
-      }
-
       const result = await db.run(
         ql
           .UPDATE(OUTBOX_TABLE)
@@ -264,20 +229,24 @@ export class ParallelDispatcher {
             claimedBy: this.workerId,
             nextAttemptAt: now,
           })
-          .where(where),
+          .where({
+            ID: entry.ID,
+            status: 'PENDING' // Optimistic lock
+          }),
       );
 
-      const affectedRows = Array.isArray(result) ? Number(result[0]) : Number(result ?? 0);
-      if (!affectedRows) {
-        continue;
-      }
+      // result can be an object (HANA) or array/number (SQLite).
+      // Standard CAP update returns number of affected rows.
+      const affectedRows = typeof result === 'number' ? result : (Array.isArray(result) ? result[0] : 0);
 
-      claimed.push({
-        ...entry,
-        status: 'PROCESSING',
-        claimedAt: now,
-        claimedBy: this.workerId,
-      });
+      if (affectedRows > 0) {
+        claimed.push({
+          ...entry,
+          status: 'PROCESSING',
+          claimedAt: now,
+          claimedBy: this.workerId,
+        });
+      }
     }
 
     if (!claimed.length) {
@@ -326,12 +295,6 @@ export class ParallelDispatcher {
     try {
       await this.notifier.dispatchEnvelope(entry.eventType, entry.destinationName, parsed);
 
-      const tenant = true;
-      if (!tenant) {
-        logger.warn({ entryId: entry.ID }, 'Skipping completion update without tenant');
-        return;
-      }
-
       await db.run(
         ql
           .UPDATE(OUTBOX_TABLE)
@@ -359,12 +322,6 @@ export class ParallelDispatcher {
   private async handleFailure(db: any, entry: OutboxEntry, error: Error): Promise<void> {
     const attempts = (entry.attempts ?? 0) + 1;
     const errorMessage = error?.message ?? 'Unknown error';
-    const tenant = true;
-
-    if (!tenant) {
-      logger.warn({ entryId: entry.ID }, 'Skipping failure handling without tenant');
-      return;
-    }
 
     logger.warn(
       { err: error, entryId: entry.ID, destination: entry.destinationName, attempts },
@@ -524,5 +481,3 @@ export const enqueueOutboxEntry = async (
     }
   }
 };
-
-

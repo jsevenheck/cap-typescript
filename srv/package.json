@@ -12,12 +12,12 @@
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
+    "@cap-js/hana": "^2",
     "@sap-cloud-sdk/connectivity": "^3.23.0",
     "@sap-cloud-sdk/http-client": "^3.23.0",
     "@sap/ams": "^3",
     "@sap/audit-logging": "^6.9.0",
     "@sap/cds": "^9.4.0",
-    "@cap-js/hana": "^2",
     "@sap/logging": "^8.2.0",
     "@sap/xsenv": "^5.3.0",
     "axios": "^1.13.2",
@@ -84,10 +84,18 @@
           "kind": "mocked",
           "users": {
             "*": {
-              "roles": ["HRAdmin", "HREditor", "HRViewer"],
+              "roles": [
+                "HRAdmin",
+                "HREditor",
+                "HRViewer"
+              ],
               "attr": {
-                "companyCodes": ["*"],
-                "CompanyCode": ["*"]
+                "companyCodes": [
+                  "*"
+                ],
+                "CompanyCode": [
+                  "*"
+                ]
               }
             },
             "dev": {
