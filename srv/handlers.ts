@@ -37,7 +37,7 @@ const registerHandlers = (srv: Service): void => {
   srv.before(['CREATE', 'UPDATE'], 'CostCenters', authorizeCostCenters);
   srv.before(['CREATE', 'UPDATE'], 'Locations', authorizeLocations);
   srv.before(
-    ['CREATE', 'UPDATE'],
+    ['CREATE', 'UPDATE', 'DELETE'],
     'EmployeeCostCenterAssignments',
     authorizeEmployeeCostCenterAssignments,
   );
