@@ -32,7 +32,8 @@
   },
   "dependencies": {
     "@cap-js/hana": "^2",
-    "@ui5/cli": "^4.0.30"
+    "@ui5/cli": "^4.0.30",
+    "dotenv": "^17.2.3"
   },
   "overrides": {
     "axios": "^1.13.2",
@@ -44,13 +45,13 @@
   },
   "cds": {
     "server": {
-    "body_parser": {
-      "limit": "1mb"
-    }
-  },
-  "features": {
-    "typescript": true
-  },
+      "body_parser": {
+        "limit": "1mb"
+      }
+    },
+    "features": {
+      "typescript": true
+    },
     "security": {
       "identity": {
         "enabled": true

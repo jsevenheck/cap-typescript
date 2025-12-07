@@ -1,5 +1,6 @@
 import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
+import 'dotenv/config';
 
 import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
 import { apiRateLimiter } from './middleware/rateLimit';
