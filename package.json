@@ -58,7 +58,7 @@
         "enabled": false
       },
       "xsuaa": {
-        "enabled": true
+        "enabled": false
       }
     },
     "requires": {
@@ -143,6 +143,11 @@
       }
     },
     "[production]": {
+      "security": {
+        "xsuaa": {
+          "enabled": true
+        }
+      },
       "requires": {
         "auth": {
           "kind": "xsuaa"
@@ -151,6 +156,11 @@
       }
     },
     "[test]": {
+      "security": {
+        "xsuaa": {
+          "enabled": false
+        }
+      },
       "requires": {
         "db": {
           "kind": "sqlite",
