@@ -1,0 +1,16 @@
+{
+  "destinations": [
+    {
+      "name": "srv-api",
+      "url": "http://localhost:4004",
+      "forwardAuthToken": true,
+      "strictSSL": false
+    },
+    {
+      "name": "ui5-hr-admin",
+      "url": "http://localhost:8081",
+      "forwardAuthToken": false,
+      "strictSSL": false
+    }
+  ]
+}
