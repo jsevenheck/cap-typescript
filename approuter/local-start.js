@@ -10,12 +10,18 @@ if (!destinationsEnvExists && !hasVcapServices) {
     {
       name: 'srv-api',
       url: 'http://localhost:4004',
+      type: 'HTTP',
+      proxyType: 'Internet',
+      authentication: 'NoAuthentication',
       forwardAuthToken: true,
       strictSSL: false,
     },
     {
       name: 'ui5-hr-admin',
       url: 'http://localhost:8081',
+      type: 'HTTP',
+      proxyType: 'Internet',
+      authentication: 'NoAuthentication',
       forwardAuthToken: false,
       strictSSL: false,
     },
@@ -34,7 +40,7 @@ if (!destinationsEnvExists && !hasVcapServices) {
   }
 
   process.env.destinations = JSON.stringify(destinations);
-  console.info('[approuter] Using local destinations for development');
+  console.info('[approuter] Using local destinations for development:', destinations);
 } else {
   console.info('[approuter] Using destinations from environment');
 }
