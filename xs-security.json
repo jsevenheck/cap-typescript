@@ -1,0 +1,52 @@
+{
+  "xsappname": "cap-typescript",
+  "tenant-mode": "shared",
+  "description": "Security configuration for the CAP TypeScript HR application using XSUAA.",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.HRViewer",
+      "description": "Read access to HR data"
+    },
+    {
+      "name": "$XSAPPNAME.HREditor",
+      "description": "Edit access to HR data"
+    },
+    {
+      "name": "$XSAPPNAME.HRAdmin",
+      "description": "Administrative access to HR data"
+    },
+    {
+      "name": "$XSAPPNAME.Callback",
+      "description": "Technical scope for app-to-app communication",
+      "grant-as-authority-to-apps": [
+        "$XSAPPNAME(application,sap-approuter)"
+      ]
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "HRViewer",
+      "description": "Read-only access to HR entities",
+      "scope-references": [
+        "$XSAPPNAME.HRViewer"
+      ]
+    },
+    {
+      "name": "HREditor",
+      "description": "Edit access to HR entities",
+      "scope-references": [
+        "$XSAPPNAME.HREditor",
+        "$XSAPPNAME.HRViewer"
+      ]
+    },
+    {
+      "name": "HRAdmin",
+      "description": "Full administrative access to HR features",
+      "scope-references": [
+        "$XSAPPNAME.HRAdmin",
+        "$XSAPPNAME.HREditor",
+        "$XSAPPNAME.HRViewer"
+      ]
+    }
+  ]
+}

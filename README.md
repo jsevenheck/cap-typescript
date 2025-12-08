@@ -49,8 +49,8 @@ If no key is available at startup, the service skips registering the endpoint an
 - **Database:** SQLite (dev), SAP HANA (production via @cap-js/hana)
 - **OData Version:** v4
 - **Architecture Style:** Domain-Driven Design (DDD)
-- **Authentication:** Mocked users (dev), SAP IAS (production)
-- **Authorization:** SAP AMS (Authorization Management Service)
+- **Authentication:** Mocked users (dev), SAP XSUAA (production)
+- **Authorization:** Role collections managed in XSUAA
 - **Monitoring:** Prometheus metrics via prom-client
 - **Logging:** @sap/logging with correlation IDs
 - **Scheduling:** node-cron for outbox cleanup
@@ -357,7 +357,7 @@ Base URL: `/odata/v4/clients/`
 - **Counting:** `$count` to get total count
 
 ### Authorization
-- Production: JWT token from SAP IAS with appropriate roles
+- Production: JWT token from SAP XSUAA with appropriate roles
 - Development: Mocked users (`dev`, `hreditor`, `hrviewer`)
 
 ## 🔧 Configuration
@@ -382,22 +382,20 @@ OUTBOX_PARALLEL_WORKERS=4
 
 This application is configured for deployment to SAP Business Technology Platform (BTP) using Multi-Target Application (MTA) format.
 
-#### MTA Modules (5)
+#### MTA Modules (4)
 1. **cap-ts-srv** - Node.js backend service (512MB)
 2. **cap-ts-db-deployer** - HANA HDI deployer (256MB)
-3. **cap-ts-ams-deployer** - AMS DCL deployer (256MB)
-4. **cap-ts-app-hr-admin** - HTML5 frontend application
-5. **cap-ts-approuter** - Application Router (256MB)
+3. **cap-ts-app-hr-admin** - HTML5 frontend application
+4. **cap-ts-approuter** - Application Router (256MB)
 
-#### Required BTP Services (8)
+#### Required BTP Services (7)
 1. **cap-ts-db** - SAP HANA HDI Container (schema-based isolation)
-2. **cap-ts-ias** - Identity Authentication Service (user authentication)
-3. **cap-ts-ams** - Authorization Management Service (role & attribute management)
-4. **cap-ts-destination** - Destination Service (external system connectivity)
-5. **cap-ts-connectivity** - Connectivity Service (on-premise integration)
-6. **cap-ts-html5-repo-host** - HTML5 Application Repository (hosting)
-7. **cap-ts-html5-repo-runtime** - HTML5 Application Repository (runtime)
-8. **cap-ts-logging** - Application Logging Service (centralized logging)
+2. **cap-ts-xsuaa** - XSUAA instance for authentication and role management
+3. **cap-ts-destination** - Destination Service (external system connectivity)
+4. **cap-ts-connectivity** - Connectivity Service (on-premise integration)
+5. **cap-ts-html5-repo-host** - HTML5 Application Repository (hosting)
+6. **cap-ts-html5-repo-runtime** - HTML5 Application Repository (runtime)
+7. **cap-ts-logging** - Application Logging Service (centralized logging)
 
 #### Deployment Commands
 ```bash

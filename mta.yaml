@@ -39,8 +39,7 @@ modules:
           srv-url: ${default-url}
     requires:
       - name: cap-ts-db
-      - name: cap-ts-ias
-      - name: cap-ts-ams
+      - name: cap-ts-xsuaa
       - name: cap-ts-destination
       - name: cap-ts-connectivity
       - name: cap-ts-logging
@@ -58,32 +57,6 @@ modules:
       disk-quota: 512M
     requires:
       - name: cap-ts-db
-
-  # ===================================
-  # AMS DCL Deployer
-  # ===================================
-  - name: cap-ts-ams-deployer
-    type: javascript.nodejs
-    path: srv/ams
-    parameters:
-      buildpack: nodejs_buildpack
-      no-route: true
-      no-start: true
-      tasks:
-        - name: deploy-dcl
-          command: npm start
-          memory: 256M
-    build-parameters:
-      builder: custom
-      commands:
-        - npm ci --production
-    requires:
-      - name: cap-ts-ias
-        parameters:
-          config:
-            credential-type: X509_GENERATED
-            app-identifier: policy-deployer
-      - name: cap-ts-ams
 
   # ===================================
   # Frontend App (UI5/Fiori)
@@ -138,8 +111,7 @@ modules:
       keep-existing-routes: true
     requires:
       - name: cap-ts-html5-repo-runtime
-      - name: cap-ts-ias
-      - name: cap-ts-ams
+      - name: cap-ts-xsuaa
       - name: cap-ts-destination
       - name: srv-api
         group: destinations
@@ -166,20 +138,13 @@ resources:
     properties:
       hdi-service-name: ${service-name}
 
-  # IAS (Authentication)
-  - name: cap-ts-ias
+  # XSUAA (Authentication & Authorization)
+  - name: cap-ts-xsuaa
     type: org.cloudfoundry.managed-service
     parameters:
-      service: identity
+      service: xsuaa
       service-plan: application
       path: ./xs-security.json
-
-  # AMS (Authorization)
-  - name: cap-ts-ams
-    type: org.cloudfoundry.managed-service
-    parameters:
-      service: authorization
-      service-plan: application
 
   # Destination Service
   - name: cap-ts-destination

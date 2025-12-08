@@ -61,16 +61,7 @@
       "db": {
         "kind": "hana"
       },
-      "ams": {
-        "kind": "ams-local",
-        "credentials": {
-          "dclRoot": "ams",
-          "dcnRoot": "gen/ams/dcn",
-          "dclGenerationPackage": "cap",
-          "generateDcl": true,
-          "generatePoliciesDeployer": false
-        }
-      }
+      "ams": false
     },
     "[development]": {
       "requires": {
@@ -152,16 +143,9 @@
     "[production]": {
       "requires": {
         "auth": {
-          "kind": "ias"
+          "kind": "xsuaa"
         },
-        "ams": {
-          "kind": "authorization",
-          "vcap": {
-            "label": "authorization",
-            "service": "authorization",
-            "plan": "application"
-          }
-        }
+        "ams": false
       }
     },
     "[test]": {

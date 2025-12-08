@@ -16,8 +16,16 @@ export const resolveAuthProviderName = (): string => {
     return 'IAS';
   }
 
+  if (kind === 'xsuaa') {
+    return 'XSUAA';
+  }
+
   if (env?.security?.identity?.enabled) {
     return 'IAS';
+  }
+
+  if (env?.security?.xsuaa?.enabled) {
+    return 'XSUAA';
   }
 
   return kind ?? 'Unknown';

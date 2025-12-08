@@ -55,26 +55,17 @@
     },
     "security": {
       "identity": {
-        "enabled": true
+        "enabled": false
       },
       "xsuaa": {
-        "enabled": false
+        "enabled": true
       }
     },
     "requires": {
       "db": {
         "kind": "hana"
       },
-      "ams": {
-        "kind": "ams-local",
-        "credentials": {
-          "dclRoot": "srv/ams",
-          "dcnRoot": "srv/gen/ams/dcn",
-          "dclGenerationPackage": "cap",
-          "generateDcl": true,
-          "generatePoliciesDeployer": false
-        }
-      }
+      "ams": false
     },
     "serve": {
       "static": [
@@ -154,16 +145,9 @@
     "[production]": {
       "requires": {
         "auth": {
-          "kind": "ias"
+          "kind": "xsuaa"
         },
-        "ams": {
-          "kind": "authorization",
-          "vcap": {
-            "label": "authorization",
-            "service": "authorization",
-            "plan": "application"
-          }
-        }
+        "ams": false
       }
     },
     "[test]": {
