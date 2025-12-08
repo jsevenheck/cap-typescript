@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run watch --workspace srv\" \"npm run dev --workspace app/hr-admin\"",
+    "dev:approuter": "concurrently \"npm run watch --workspace srv\" \"npm run dev --workspace app/hr-admin\" \"cd approuter && npm start\"",
     "build": "npm run build --workspace srv && npm run build --workspace app/hr-admin",
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "npm run test --workspace srv",
