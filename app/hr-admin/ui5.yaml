@@ -32,18 +32,29 @@ server:
       mountPath: /odata/v4
       configuration:
         baseUri: 'http://localhost:4004/odata/v4'
+        httpHeaders:
+          # Provide default basic authentication for mocked CAP users during
+          # local development so the UI can create/update data without the
+          # BTP Application Router.
+          Authorization: 'Basic ZGV2OmRldg=='
     - name: ui5-middleware-simpleproxy
       afterMiddleware: compression
       mountPath: /api
       configuration:
         baseUri: 'http://localhost:4004/api'
+        httpHeaders:
+          Authorization: 'Basic ZGV2OmRldg=='
     - name: ui5-middleware-simpleproxy
       afterMiddleware: compression
       mountPath: /clients
       configuration:
         baseUri: 'http://localhost:4004/clients'
+        httpHeaders:
+          Authorization: 'Basic ZGV2OmRldg=='
     - name: ui5-middleware-simpleproxy
       afterMiddleware: compression
       mountPath: /health
       configuration:
         baseUri: 'http://localhost:4004/health'
+        httpHeaders:
+          Authorization: 'Basic ZGV2OmRldg=='
