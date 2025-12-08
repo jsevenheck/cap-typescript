@@ -10,6 +10,6 @@
     "@sap/approuter": "^20.8.2"
   },
   "scripts": {
-    "start": "node node_modules/@sap/approuter/approuter.js"
+    "start": "node local-start.js"
   }
 }
