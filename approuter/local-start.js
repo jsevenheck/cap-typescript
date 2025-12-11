@@ -41,6 +41,7 @@ if (!destinationsEnvExists && !hasVcapServices) {
       }
     } catch (error) {
       console.warn('[approuter] Failed to read default-env.json, using built-in local destinations');
+      console.error('[approuter] Error details:', error && error.stack ? error.stack : error);
     }
   }
 
