@@ -4,18 +4,16 @@
   "private": true,
   "scripts": {
     "clean": "rimraf dist",
-    "build": "npm run clean && npm run ams:generate && tsc --project tsconfig.json",
-    "watch": "npm run ams:generate && concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
+    "build": "npm run clean && tsc --project tsconfig.json",
+    "watch": "concurrently \"tsc --project tsconfig.json --watch --preserveWatchOutput\" \"cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=1 NODE_OPTIONS=--require=ts-node/register cds watch\"",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "lint": "eslint \"**/*.ts\"",
-    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --coverage",
-    "ams:generate": "node ./scripts/generate-ams.mjs"
+    "test": "cross-env TS_NODE_TRANSPILE_ONLY=1 jest --coverage"
   },
   "dependencies": {
     "@cap-js/hana": "^2",
     "@sap-cloud-sdk/connectivity": "^3.23.0",
     "@sap-cloud-sdk/http-client": "^3.23.0",
-    "@sap/ams": "^3",
     "@sap/audit-logging": "^6.9.0",
     "@sap/cds": "^9.4.0",
     "@sap/logging": "^8.2.0",
@@ -32,7 +30,6 @@
     "@cap-js/cds-test": "^0.4.0",
     "@cap-js/sqlite": "^2.0.3",
     "@eslint/eslintrc": "^3.1.0",
-    "@sap/ams-dev": "^2",
     "@sap/cds-dk": "^9.4.0",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",

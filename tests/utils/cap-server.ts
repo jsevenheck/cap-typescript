@@ -1,7 +1,6 @@
 import type { Server } from 'http';
 import path from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { once } from 'node:events';
 
 export interface RunningServer {
@@ -10,87 +9,13 @@ export interface RunningServer {
   close: () => Promise<void>;
 }
 
-const runCommand = (command: string, args: string[], options: Record<string, unknown>, errorMessage: string) =>
-  new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, options);
-
-    child.on('close', (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      const reason = code != null ? `exit code ${code}` : signal ? `signal ${signal}` : 'unknown exit';
-      reject(new Error(`${errorMessage} (${reason})`));
-    });
-
-    child.on('error', (error) => {
-      reject(error);
-    });
-  });
-
-const ensureAmsArtifacts = async (projectRoot: string): Promise<void> => {
-  const generatorScript = path.join(projectRoot, 'srv', 'scripts', 'generate-ams.mjs');
-  if (!existsSync(generatorScript)) {
-    throw new Error('AMS generation script is missing; cannot prepare authorization data');
-  }
-  const dclRoot = path.join(projectRoot, 'srv', 'ams');
-  const dcnRoot = path.join(projectRoot, 'srv', 'gen', 'ams', 'dcn');
-  const generatedDclRoot = path.join(projectRoot, 'srv', 'gen', 'policies', 'dcl');
-  await runCommand(
-    process.execPath,
-    [generatorScript],
-    {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        NODE_ENV: process.env.NODE_ENV ?? 'test',
-        CDS_AMS_CREDENTIALS_DCLROOT: dclRoot,
-        CDS_AMS_CREDENTIALS_DCNROOT: dcnRoot,
-      },
-    },
-    'Failed to generate AMS authorization artifacts',
-  );
-
-  if (!existsSync(generatedDclRoot)) {
-    throw new Error('AMS DCL artifacts missing after generation');
-  }
-
-  const compileBinary = path.join(projectRoot, 'node_modules', '.bin', 'compile-dcl');
-  await runCommand(
-    compileBinary,
-    ['--dcl', generatedDclRoot, '--output', dcnRoot],
-    {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        NODE_ENV: process.env.NODE_ENV ?? 'test',
-      },
-    },
-    'Failed to compile AMS DCL into DCN artifacts',
-  );
-
-  const schemaPath = path.join(dcnRoot, 'schema.dcn');
-  if (!existsSync(schemaPath)) {
-    throw new Error('AMS DCN artifacts missing after generation');
-  }
-};
-
 export const startCapServer = async (): Promise<RunningServer> => {
   process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
   process.env.CDS_ENV = process.env.CDS_ENV ?? 'test';
   process.env.CDS_PROFILES = process.env.CDS_PROFILES ?? 'test';
-  // Allow enabling AMS in tests via environment variable for authorization testing
-  const amsDisabled = process.env.TEST_ENABLE_AMS !== 'true';
-  const cdsConfig = { requires: { ams: !amsDisabled } };
-  process.env.CDS_CONFIG = JSON.stringify(cdsConfig);
+  process.env.CDS_CONFIG = JSON.stringify({ requires: { ams: false } });
   const projectRoot = path.resolve(__dirname, '../..');
   const tsConfig = path.join(projectRoot, 'srv/tsconfig.json');
-  if (!amsDisabled) {
-    await ensureAmsArtifacts(projectRoot);
-  }
   const child = spawn(
     'node',
     ['-r', 'ts-node/register/transpile-only', './node_modules/@sap/cds-dk/bin/cds.js', 'run', '--in-memory?', '--port', '0'],
@@ -99,11 +24,8 @@ export const startCapServer = async (): Promise<RunningServer> => {
       env: {
         ...process.env,
         TS_NODE_PROJECT: tsConfig,
-        CDS_REQUIRES_AMS: String(!amsDisabled),
-        CDS_AMS: String(!amsDisabled),
-        CDS_CONFIG: JSON.stringify(cdsConfig),
-        CDS_AMS_CREDENTIALS_DCLROOT: path.join(projectRoot, 'srv', 'ams'),
-        CDS_AMS_CREDENTIALS_DCNROOT: path.join(projectRoot, 'srv', 'gen', 'ams', 'dcn'),
+        CDS_REQUIRES_AMS: 'false',
+        CDS_AMS: 'false',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
