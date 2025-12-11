@@ -1,0 +1,24 @@
+{
+  "destinations": [
+    {
+      "name": "srv-api",
+      "url": "http://localhost:4004",
+      "type": "HTTP",
+      "proxyType": "Internet",
+      "authentication": "BasicAuthentication",
+      "username": "dev",
+      "password": "dev",
+      "forwardAuthToken": true,
+      "strictSSL": false
+    },
+    {
+      "name": "ui5-hr-admin",
+      "url": "http://localhost:8081",
+      "type": "HTTP",
+      "proxyType": "Internet",
+      "authentication": "NoAuthentication",
+      "forwardAuthToken": false,
+      "strictSSL": false
+    }
+  ]
+}
