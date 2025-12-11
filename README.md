@@ -15,7 +15,9 @@ The `/api/employees/active` endpoint requires an API key for access. Configure i
 - Binding a **Credential Store** instance that provides the `employee-export/api-key` secret, or
 - Setting the `EMPLOYEE_EXPORT_API_KEY` environment variable (used for local development or as a fallback).
 
-If no key is available at startup, the service skips registering the endpoint and logs an error.
+For convenience during local development, the service falls back to a deterministic key (`local-dev-api-key`).
+You can override it without changing your main environment by setting `LOCAL_EMPLOYEE_EXPORT_API_KEY`. In
+production you must bind the Credential Store or set `EMPLOYEE_EXPORT_API_KEY` explicitly.
 
 ## 🎯 Key Features
 
