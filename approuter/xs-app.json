@@ -17,7 +17,7 @@
       "csrfProtection": true
     },
     {
-      "source": "^/api/(. *)$",
+      "source": "^/api/(.*)$",
       "target": "/api/$1",
       "destination": "srv-api",
       "authenticationType": "none",
@@ -31,7 +31,7 @@
       "csrfProtection": false
     },
     {
-      "source":  "^/(. *)$",
+      "source":  "^/(.*)$",
       "target": "/$1",
       "destination":  "ui5-hr-admin",
       "authenticationType": "none"
