@@ -5,7 +5,9 @@
       "url": "http://localhost:4004",
       "type": "HTTP",
       "proxyType": "Internet",
-      "authentication": "NoAuthentication",
+      "authentication": "BasicAuthentication",
+      "username": "dev",
+      "password": "dev",
       "forwardAuthToken": true,
       "strictSSL": false
     },

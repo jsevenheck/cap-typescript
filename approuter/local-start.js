@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const basicAuthUser = process.env.CAP_BASIC_USER || 'dev';
+const basicAuthPassword = process.env.CAP_BASIC_PASSWORD || 'dev';
+
 const destinationsEnvExists = Boolean(process.env.destinations);
 const hasVcapServices = Boolean(process.env.VCAP_SERVICES);
 
@@ -12,7 +15,9 @@ if (!destinationsEnvExists && !hasVcapServices) {
       url: 'http://localhost:4004',
       type: 'HTTP',
       proxyType: 'Internet',
-      authentication: 'NoAuthentication',
+      authentication: 'BasicAuthentication',
+      username: basicAuthUser,
+      password: basicAuthPassword,
       forwardAuthToken: true,
       strictSSL: false,
     },
