@@ -2,6 +2,13 @@
   "xsappname": "cap-typescript",
   "tenant-mode": "shared",
   "description": "Security configuration for the CAP TypeScript HR application using XSUAA.",
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.cfapps.*.hana.ondemand.com/login/callback",
+      "https://*.hana.ondemand.com/login/callback",
+      "http://localhost:5000/login/callback"
+    ]
+  },
   "scopes": [
     {
       "name": "$XSAPPNAME.HRViewer",
