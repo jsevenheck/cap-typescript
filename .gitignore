@@ -40,7 +40,6 @@ srv/**/*.js.map
 # --- Environment & Secrets
 .env
 .env.*
-default-env.json
 
 # --- CF/MTA
 mta_archives/
@@ -49,7 +48,6 @@ mta_op/
 # --- Approuter
 approuter/node_modules/
 approuter/resources/
-approuter/default-env.json
 approuter/package-lock.json
 
 # --- Testing

@@ -1,0 +1,50 @@
+{
+  "VCAP_SERVICES": {
+    "xsuaa": [
+      {
+        "name": "xsuaa",
+        "label": "xsuaa",
+        "tags": [
+          "xsuaa",
+          "uaa"
+        ],
+        "credentials": {
+          "clientid": "local-approuter-client",
+          "clientsecret": "local-approuter-secret",
+          "url": "http://localhost:3443",
+          "token_endpoint": "http://localhost:3443/oauth/token",
+          "xsappname": "cap-typescript!t123"
+        }
+      }
+    ],
+    "html5-apps-repo-rt": [
+      {
+        "name": "html5-apps-repo-rt",
+        "label": "html5-apps-repo-rt",
+        "tags": [
+          "html5-apps-repo-rt"
+        ],
+        "credentials": {
+          "uri": "http://localhost:8081",
+          "url": "http://localhost:8081",
+          "endpoints": {
+            "html5-repo": {
+              "url": "http://localhost:8081"
+            }
+          },
+          "grant_type": "client_credentials",
+          "clientid": "local-client-id",
+          "clientsecret": "local-client-secret",
+          "token_url": "http://localhost:8081/oauth/token"
+        }
+      }
+    ]
+  },
+  "destinations": [
+    {
+      "name": "srv-api",
+      "url": "http://localhost:4004",
+      "forwardAuthToken": false
+    }
+  ]
+}
