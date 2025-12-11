@@ -1,39 +1,32 @@
 {
-  "welcomeFile": "/index.html",
+  "welcomeFile": "/",
   "authenticationMethod": "none",
   "routes": [
     {
-      "source": "^/odata/v4/?(.*)$",
+      "source": "^/odata/v4/(.*) $",
       "target": "/odata/v4/$1",
       "destination": "srv-api",
       "authenticationType": "none",
-      "csrfProtection": true
+      "csrfProtection": false
     },
     {
-      "source": "^/clients/?(.*)$",
-      "target": "/clients/$1",
-      "destination": "srv-api",
-      "authenticationType": "none",
-      "csrfProtection": true
-    },
-    {
-      "source": "^/api/(.*)$",
+      "source": "^/api/(. *)$",
       "target": "/api/$1",
       "destination": "srv-api",
       "authenticationType": "none",
-      "csrfProtection": true
+      "csrfProtection": false
     },
     {
-      "source": "^/health$",
+      "source":  "^/health$",
       "target": "/health",
       "destination": "srv-api",
       "authenticationType": "none",
       "csrfProtection": false
     },
     {
-      "source": "^/(.*)$",
+      "source":  "^/(. *)$",
       "target": "/$1",
-      "destination": "ui5-hr-admin",
+      "destination":  "ui5-hr-admin",
       "authenticationType": "none"
     }
   ]
