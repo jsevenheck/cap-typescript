@@ -15,9 +15,8 @@ if (!destinationsEnvExists && !hasVcapServices) {
       url: 'http://localhost:4004',
       type: 'HTTP',
       proxyType: 'Internet',
-      authentication: 'BasicAuthentication',
-      username: basicAuthUser,
-      password: basicAuthPassword,
+      authentication: 'NoAuthentication', // Change to NoAuthentication
+      // Remove user and password
       forwardAuthToken: true,
       strictSSL: false,
     },
@@ -37,10 +36,27 @@ if (!destinationsEnvExists && !hasVcapServices) {
       const content = fs.readFileSync(defaultEnvPath, 'utf8');
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed.destinations) && parsed.destinations.length > 0) {
-        destinations = parsed.destinations;
+        // Validate each destination object
+        const isValidDestination = (dest) =>
+          dest &&
+          typeof dest.name === 'string' &&
+          typeof dest.url === 'string' &&
+          typeof dest.type === 'string';
+        const validDestinations = parsed.destinations.filter(isValidDestination);
+        if (validDestinations.length < parsed.destinations.length) {
+          console.warn(
+            '[approuter] Some destinations in default-env.json are missing required fields and will be ignored.',
+          );
+        }
+        if (validDestinations.length > 0) {
+          destinations = validDestinations;
+        }
       }
     } catch (error) {
-      console.warn('[approuter] Failed to read default-env.json, using built-in local destinations');
+      console.warn(
+        '[approuter] Failed to read default-env.json, using built-in local destinations',
+      );
+      console.error('[approuter] Error details:', error && error.stack ? error.stack : error);
     }
   }
 
