@@ -187,7 +187,7 @@ module.exports = cds.server;
 
 // When executed directly (e.g., via `node dist/server.js`), start the CAP server
 if (require.main === module) {
-  (async () => {
+  void (async () => {
     try {
       await cds.server;
       logger.info('CAP server started via direct execution');
@@ -195,8 +195,5 @@ if (require.main === module) {
       logger.error({ err: error }, 'Failed to start CAP server');
       process.exitCode = 1;
     }
-  })().catch((error) => {
-    logger.error({ err: error }, 'Unhandled error during server startup');
-    process.exit(1);
-  });
+  })();
 }
