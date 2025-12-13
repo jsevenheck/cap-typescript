@@ -59,6 +59,8 @@ coverage/
 
 # --- SQLite Databases
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 !db/data/**
 db/*.db
