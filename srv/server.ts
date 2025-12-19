@@ -48,19 +48,21 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
   }
 
   app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
-  app.post('/api/employees/active/reload-key', async (_req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      res.status(404).json({ error: 'not_found' });
-      return;
-    }
+  app.post('/api/employees/active/reload-key', (_req, res) => {
+    void (async () => {
+      if (process.env.NODE_ENV === 'production') {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
 
-    try {
-      const reloaded = await forceReloadApiKey();
-      res.status(reloaded ? 200 : 503).json({ reloaded });
-    } catch (error) {
-      logger.warn({ err: error }, 'Failed to force reload employee export API key');
-      res.status(500).json({ error: 'reload_failed' });
-    }
+      try {
+        const reloaded = await forceReloadApiKey();
+        res.status(reloaded ? 200 : 503).json({ reloaded });
+      } catch (error) {
+        logger.warn({ err: error }, 'Failed to force reload employee export API key');
+        res.status(500).json({ error: 'reload_failed' });
+      }
+    })();
   });
   activeEmployeesEndpointRegistered = true;
   logger.info('Registered /api/employees/active endpoint with API key protection');
