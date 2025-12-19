@@ -2,7 +2,12 @@ import cds from '@sap/cds';
 import type { Application, Request, Response, NextFunction } from 'express';
 import 'dotenv/config';
 
-import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
+import apiKeyMiddleware, {
+  forceReloadApiKey,
+  loadApiKey,
+  startApiKeyRefreshScheduler,
+  stopApiKeyRefreshScheduler,
+} from './middleware/apiKey';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
@@ -25,6 +30,7 @@ const ensureShutdownHooks = (): void => {
   shutdownHooksRegistered = true;
   const stopScheduler = (): void => {
     outboxScheduler.stop();
+    stopApiKeyRefreshScheduler();
   };
   cds.on('shutdown', stopScheduler);
   process.on('exit', stopScheduler);
@@ -42,6 +48,20 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
   }
 
   app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
+  app.post('/api/employees/active/reload-key', async (_req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    try {
+      const reloaded = await forceReloadApiKey();
+      res.status(reloaded ? 200 : 503).json({ reloaded });
+    } catch (error) {
+      logger.warn({ err: error }, 'Failed to force reload employee export API key');
+      res.status(500).json({ error: 'reload_failed' });
+    }
+  });
   activeEmployeesEndpointRegistered = true;
   logger.info('Registered /api/employees/active endpoint with API key protection');
 };
@@ -162,6 +182,12 @@ cds.on('served', async () => {
       registerActiveEmployeesEndpoint(expressAppInstance);
     } else {
       logger.warn('Express application instance not available; cannot register /api/employees/active endpoint');
+    }
+
+    startApiKeyRefreshScheduler();
+
+    if (!apiKeyLoaded) {
+      void forceReloadApiKey();
     }
 
     if (process.env.NODE_ENV === 'test') {
