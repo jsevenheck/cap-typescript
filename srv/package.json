@@ -77,7 +77,7 @@
         "db": {
           "kind": "sqlite",
           "credentials": {
-            "filename": "../db/sqlite.db"
+            "url": "../db/sqlite.db"
           }
         },
         "auth": {
@@ -169,7 +169,7 @@
         "db": {
           "kind": "sqlite",
           "credentials": {
-            "filename": "../db/test.db"
+            "url": "../db/test.db"
           }
         },
         "auth": {

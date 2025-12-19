@@ -15,7 +15,9 @@ The `/api/employees/active` endpoint requires an API key for access. Configure i
 - Binding a **Credential Store** instance that provides the `employee-export/api-key` secret, or
 - Setting the `EMPLOYEE_EXPORT_API_KEY` environment variable (used for local development or as a fallback).
 
-If no key is available at startup, the service skips registering the endpoint and logs an error.
+For convenience during local development, the service falls back to a deterministic key (`local-dev-api-key`).
+You can override it without changing your main environment by setting `LOCAL_EMPLOYEE_EXPORT_API_KEY`. In
+production you must bind the Credential Store or set `EMPLOYEE_EXPORT_API_KEY` explicitly.
 
 ## 🎯 Key Features
 
@@ -244,21 +246,108 @@ npm >= 10.0.0
 ```
 
 ### Installation
+
+#### 1. Install Dependencies
 ```bash
-# Install dependencies
+# Install root and workspace dependencies
 npm install
 
-# Deploy database
-npm run deploy
+# Install approuter dependencies (required for approuter mode)
+cd approuter && npm install && cd ..
+```
 
-# Start development servers (backend + frontend)
+#### 2. Deploy Database
+```bash
+# Deploy SQLite database with initial data
+npm run deploy
+```
+
+This creates `db/sqlite.db` and loads initial data from CSV files.
+
+#### 3. Start Development Servers
+
+**Option A: Backend + Frontend** (recommended for most development)
+```bash
 npm run dev
 ```
 
+**Option B: Backend + Frontend + Approuter** (for testing with application router)
+```bash
+npm run dev:approuter
+```
+
+**Option C: Backend Only** (for API testing with Postman/curl)
+```bash
+npm run watch --workspace srv
+```
+
 ### Development URLs
-- Backend OData: http://localhost:4004/odata/v4/clients/
-- Frontend UI: http://localhost:8081
-- Default Credentials: `dev` / `dev`
+- **Backend API (direct)**: http://localhost:4004/odata/v4/clients/
+- **Backend Health Check**: http://localhost:4004/health
+- **Frontend UI**: http://localhost:8081
+- **Approuter** (when using dev:approuter): http://localhost:5000
+- **Default Credentials**: `dev` / `dev`
+
+### Testing with Postman
+
+To test the backend API directly with Postman:
+
+1. **URL**: `http://localhost:4004/odata/v4/clients/Clients`
+2. **Method**: GET
+3. **Auth**: Basic Auth
+   - Username: `dev`
+   - Password: `dev`
+4. **Headers** (optional):
+   - `Content-Type`: `application/json`
+
+**Example Requests:**
+- Get all clients: `GET http://localhost:4004/odata/v4/clients/Clients`
+- Get all employees: `GET http://localhost:4004/odata/v4/clients/Employees`
+- Health check: `GET http://localhost:4004/health`
+
+### Troubleshooting
+
+**Backend not responding on localhost:4004?**
+
+1. Ensure dependencies are installed:
+   ```bash
+   npm install
+   ```
+
+2. Ensure database is deployed:
+   ```bash
+   npm run deploy
+   ```
+
+3. Check if port 4004 is available:
+   ```bash
+   # On macOS/Linux
+   lsof -i :4004
+   
+   # On Windows
+   netstat -ano | findstr :4004
+   ```
+
+4. Start backend server and check for errors:
+   ```bash
+   npm run watch --workspace srv
+   ```
+
+**Approuter not connecting?**
+
+1. Ensure approuter dependencies are installed:
+   ```bash
+   cd approuter && npm install
+   ```
+
+2. Ensure backend is running on port 4004
+
+3. Start approuter:
+   ```bash
+   npm run dev:approuter
+   ```
+
+4. Access via approuter: `http://localhost:5000`
 
 ### Building for Production
 ```bash
