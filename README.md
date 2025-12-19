@@ -19,6 +19,20 @@ For convenience during local development, the service falls back to a determinis
 You can override it without changing your main environment by setting `LOCAL_EMPLOYEE_EXPORT_API_KEY`. In
 production you must bind the Credential Store or set `EMPLOYEE_EXPORT_API_KEY` explicitly.
 
+### Rate limiting backend (in-memory vs. distributed)
+
+The built-in rate limiter defaults to an in-memory store for local development and automated tests. For
+multi-instance deployments (e.g., BTP), configure a shared cache such as Redis or SAP Cache as follows:
+
+- Set `RATE_LIMIT_BACKEND=redis`.
+- Provide the cache endpoint via `RATE_LIMIT_REDIS_URL` (or `REDIS_URL`).
+- Optionally set `RATE_LIMIT_NAMESPACE` to avoid key collisions across applications and `RATE_LIMIT_MAX_KEYS`
+  to cap distinct keys.
+- If the backend is unavailable, the limiter logs a warning and falls back to the in-memory store so startup
+  is not blocked.
+- Advanced deployments can supply a custom store implementation through the middleware configuration when
+  bootstrapping the Express app.
+
 ## 🎯 Key Features
 
 - **Client Management** - Manage multiple company clients
