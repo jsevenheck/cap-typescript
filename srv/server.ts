@@ -36,12 +36,27 @@ const logger = getLogger('server');
 
 logger.info({ odataUrlPath: (cds as any).env?.odata?.urlPath }, 'Effective CDS OData base path');
 
+const wrapAsyncMiddleware = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<void> | void,
+): ((req: Request, res: Response, next: NextFunction) => void) => (
+  req,
+  res,
+  next,
+) => {
+  Promise.resolve(handler(req, res, next)).catch(next);
+};
+
 const registerActiveEmployeesEndpoint = (app: Application): void => {
   if (activeEmployeesEndpointRegistered) {
     return;
   }
 
-  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
+  app.get(
+    '/api/employees/active',
+    wrapAsyncMiddleware(apiRateLimiter),
+    apiKeyMiddleware,
+    wrapAsyncMiddleware(activeEmployeesHandler),
+  );
   activeEmployeesEndpointRegistered = true;
   logger.info('Registered /api/employees/active endpoint with API key protection');
 };
