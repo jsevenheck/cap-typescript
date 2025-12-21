@@ -38,15 +38,21 @@ const REFRESH_BACKOFF_MIN_MS = parseDurationMs(
   process.env.EMPLOYEE_EXPORT_API_KEY_REFRESH_BACKOFF_MIN_MS,
   DEFAULT_BACKOFF_MIN_MS,
   1_000,
-  DEFAULT_BACKOFF_MAX_MS,
+  Number.MAX_SAFE_INTEGER,
 );
 
 const REFRESH_BACKOFF_MAX_MS = parseDurationMs(
   process.env.EMPLOYEE_EXPORT_API_KEY_REFRESH_BACKOFF_MAX_MS,
   DEFAULT_BACKOFF_MAX_MS,
-  REFRESH_BACKOFF_MIN_MS,
+  DEFAULT_BACKOFF_MAX_MS,
   Number.MAX_SAFE_INTEGER,
 );
+
+type LoadResult = {
+  loaded: boolean;
+  rotated: boolean;
+  source: 'primary' | 'fallback' | 'unknown';
+};
 
 // Cache for the configured API key (loaded from Credential Store or env)
 let cachedApiKey: string | undefined;
@@ -55,6 +61,7 @@ let lastLoadedAt = 0;
 let refreshTimer: NodeJS.Timeout | undefined;
 let currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
 let refreshLoopEnabled = false;
+let loadInFlight: Promise<LoadResult> | null = null;
 
 const LOCAL_DEV_FALLBACK_API_KEY = 'local-dev-api-key';
 
@@ -115,7 +122,7 @@ const scheduleRefresh = (delayMs: number): void => {
   refreshTimer.unref?.();
 };
 
-const applyApiKey = (nextKey: string, source: 'primary' | 'fallback', reason?: string): boolean => {
+const applyApiKey = (nextKey: string, source: 'primary' | 'fallback', reason?: string): LoadResult => {
   const trimmedKey = nextKey.trim();
   const previousKey = cachedApiKey;
   cachedApiKey = trimmedKey;
@@ -123,66 +130,75 @@ const applyApiKey = (nextKey: string, source: 'primary' | 'fallback', reason?: s
 
   if (!previousKey) {
     logger.info({ reason: reason ?? 'initial-load', source }, 'Employee export API key loaded successfully');
-    return true;
+    return { loaded: true, rotated: true, source };
   }
 
   if (previousKey !== trimmedKey) {
     logger.info({ reason: reason ?? 'refresh', source }, 'Employee export API key rotated');
-    return true;
+    return { loaded: true, rotated: true, source };
   }
 
   logger.debug({ reason: reason ?? 'refresh', source }, 'Employee export API key refreshed with unchanged value');
-  return false;
+  return { loaded: true, rotated: false, source };
 };
 
 /**
  * Load API key from Credential Store or environment variable.
  * Respects a cache TTL unless force=true is provided.
  */
-export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<boolean> => {
+export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<LoadResult> => {
   const { force = false, reason } = options;
 
   if (!shouldRefresh(force)) {
-    return Boolean(cachedApiKey);
+    return { loaded: Boolean(cachedApiKey), rotated: false, source: 'unknown' };
   }
 
-  try {
-    const fetchedKey = await getEmployeeExportApiKey();
-    if (fetchedKey) {
-      applyApiKey(fetchedKey, 'primary', reason);
-      return true;
-    }
+  if (loadInFlight) {
+    return loadInFlight;
+  }
 
-    // Use a deterministic, overridable fallback for local development so the endpoint is still reachable
-    const localFallbackApiKey = resolveLocalDevApiKey();
-    if (localFallbackApiKey) {
-      applyApiKey(localFallbackApiKey, 'fallback', reason);
+  loadInFlight = (async () => {
+    try {
+      const fetchedKey = await getEmployeeExportApiKey();
+      if (fetchedKey) {
+        return applyApiKey(fetchedKey, 'primary', reason);
+      }
+
+      // Use a deterministic, overridable fallback for local development so the endpoint is still reachable
+      const localFallbackApiKey = resolveLocalDevApiKey();
+      if (localFallbackApiKey) {
+        const result = applyApiKey(localFallbackApiKey, 'fallback', reason);
+        logger.warn(
+          'Employee export API key not configured. Using local development fallback key (set LOCAL_EMPLOYEE_EXPORT_API_KEY to override).',
+        );
+        return result;
+      }
+
       logger.warn(
-        'Employee export API key not configured. Using local development fallback key (set LOCAL_EMPLOYEE_EXPORT_API_KEY to override).',
+        'Employee export API key not configured. Set EMPLOYEE_EXPORT_API_KEY or bind the Credential Store secret employee-export/api-key.',
       );
-      return true;
+      return { loaded: false, rotated: false, source: 'unknown' };
+    } catch (error) {
+      logger.warn({ err: error, reason: reason ?? 'refresh' }, 'Failed to load employee export API key');
+      throw error;
+    } finally {
+      loadInFlight = null;
     }
+  })();
 
-    logger.warn(
-      'Employee export API key not configured. Set EMPLOYEE_EXPORT_API_KEY or bind the Credential Store secret employee-export/api-key.',
-    );
-    return false;
-  } catch (error) {
-    logger.warn({ err: error, reason: reason ?? 'refresh' }, 'Failed to load employee export API key');
-    throw error;
-  }
+  return loadInFlight;
 };
 
-const refreshWithBackoff = async (reason: string, shouldScheduleNext: boolean): Promise<boolean> => {
+const refreshWithBackoff = async (reason: string, shouldScheduleNext: boolean): Promise<LoadResult> => {
   try {
-    const loaded = await loadApiKey({ force: true, reason });
+    const result = await loadApiKey({ force: true, reason });
     currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
 
     if (shouldScheduleNext && refreshLoopEnabled) {
       scheduleRefresh(withJitter(API_KEY_TTL_MS));
     }
 
-    return loaded;
+    return result;
   } catch (error) {
     const nextDelay = Math.min(currentBackoffMs * 2, REFRESH_BACKOFF_MAX_MS);
     currentBackoffMs = nextDelay;
@@ -193,7 +209,7 @@ const refreshWithBackoff = async (reason: string, shouldScheduleNext: boolean): 
       scheduleRefresh(withJitter(nextDelay));
     }
 
-    return false;
+    return { loaded: false, rotated: false, source: 'unknown' };
   }
 };
 
@@ -216,7 +232,7 @@ export const stopApiKeyRefreshScheduler = (): void => {
   }
 };
 
-export const forceReloadApiKey = async (): Promise<boolean> => {
+export const forceReloadApiKey = async (): Promise<LoadResult> => {
   return refreshWithBackoff('forced-reload', refreshLoopEnabled);
 };
 
@@ -231,7 +247,7 @@ function extractApiKey(req: Request): string | undefined {
     return undefined;
   }
 
-  const matches = authorization.match(/^ApiKey\\s+(?<key>.+)$/i);
+  const matches = authorization.match(/^ApiKey\s+(?<key>.+)$/i);
   return matches?.groups?.key?.trim();
 }
 

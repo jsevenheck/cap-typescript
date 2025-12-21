@@ -48,7 +48,7 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
   }
 
   app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
-  app.post('/api/employees/active/reload-key', (_req, res) => {
+  app.post('/api/employees/active/reload-key', apiRateLimiter, apiKeyMiddleware, (_req, res) => {
     void (async () => {
       if (process.env.NODE_ENV === 'production') {
         res.status(404).json({ error: 'not_found' });
@@ -56,8 +56,8 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
       }
 
       try {
-        const reloaded = await forceReloadApiKey();
-        res.status(reloaded ? 200 : 503).json({ reloaded });
+        const reloadResult = await forceReloadApiKey();
+        res.status(reloadResult.loaded ? 200 : 503).json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
       } catch (error) {
         logger.warn({ err: error }, 'Failed to force reload employee export API key');
         res.status(500).json({ error: 'reload_failed' });
@@ -176,7 +176,7 @@ cds.on('served', async () => {
     // Load API key from Credential Store or environment before accepting requests
     const apiKeyLoaded = await loadApiKey();
 
-    if (!apiKeyLoaded) {
+    if (!apiKeyLoaded.loaded) {
       logger.error(
         'EMPLOYEE_EXPORT_API_KEY missing - skipping /api/employees/active endpoint registration. Bind Credential Store or set the environment variable before starting the service.',
       );
@@ -187,10 +187,8 @@ cds.on('served', async () => {
     }
 
     startApiKeyRefreshScheduler();
-
-    if (!apiKeyLoaded) {
-      void forceReloadApiKey();
-    }
+    // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early
+    void forceReloadApiKey();
 
     if (process.env.NODE_ENV === 'test') {
       return;
