@@ -90,7 +90,7 @@ describe('createRateLimiter', () => {
           return entry;
         }
 
-        const entry = { count: existing.count + 1, resetTime };
+        const entry = { count: existing.count + 1, resetTime: existing.resetTime };
         this.entries.set(key, entry);
         return entry;
       };
@@ -101,7 +101,6 @@ describe('createRateLimiter', () => {
       windowMs: 1_000,
       maxRequests: 1,
       namespace: 'distributed-test',
-      backend: 'redis',
       keyGenerator: (req: Request) => (req as Request & { key: string }).key,
       store,
     });
@@ -113,7 +112,7 @@ describe('createRateLimiter', () => {
     await rateLimiter(req, res as Response, next);
     expect(next).toHaveBeenCalledTimes(1);
     const expectedBucket = Math.floor(now.getTime() / 1_000);
-    expect(store.calls[0]?.key).toBe(`distributed-test:bucket:${expectedBucket}:api-key-123`);
+    expect(store.calls[0]?.key).toBe(`distributed-test:bucket:${expectedBucket}:API-KEY-123`);
 
     const resBlocked = createResponse();
     await rateLimiter(req, resBlocked as Response, next);
@@ -121,5 +120,50 @@ describe('createRateLimiter', () => {
     expect(resBlocked.status).toHaveBeenCalledWith(429);
     expect(resBlocked.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'rate_limit_exceeded' }));
     expect(resBlocked.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(Number));
+  });
+
+  it('falls back to in-memory store when primary store fails (fail-open)', async () => {
+    const failingStore: RateLimitStore = {
+      increment: jest.fn().mockRejectedValue(new Error('backend down')),
+    };
+
+    const fallbackRateLimiter = createRateLimiter({
+      windowMs: 1_000,
+      maxRequests: 1,
+      backend: 'redis',
+      keyGenerator,
+      store: failingStore,
+      failOpenOnError: true,
+    });
+
+    const res = createResponse();
+    const next = jest.fn() as NextFunction;
+
+    await fallbackRateLimiter(createRequest('client-1'), res as Response, next);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when backend errors and failOpenOnError is false', async () => {
+    const failingStore: RateLimitStore = {
+      increment: jest.fn().mockRejectedValue(new Error('backend down')),
+    };
+
+    const closedLimiter = createRateLimiter({
+      windowMs: 1_000,
+      maxRequests: 1,
+      backend: 'redis',
+      keyGenerator,
+      store: failingStore,
+      failOpenOnError: false,
+    });
+
+    const res = createResponse();
+    const next = jest.fn() as NextFunction;
+
+    await closedLimiter(createRequest('client-1'), res as Response, next);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'rate_limit_unavailable' }));
+    expect(next).not.toHaveBeenCalled();
   });
 });

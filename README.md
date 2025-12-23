@@ -30,6 +30,8 @@ multi-instance deployments (e.g., BTP), configure a shared cache such as Redis o
   to cap distinct keys.
 - If the backend is unavailable, the limiter logs a warning and falls back to the in-memory store so startup
   is not blocked.
+- If the configured backend cannot be created during initialization, the limiter logs a warning and uses the
+  in-memory store. Runtime connectivity issues with the backend are logged and must be handled operationally.
 - Advanced deployments can supply a custom store implementation through the middleware configuration when
   bootstrapping the Express app.
 
