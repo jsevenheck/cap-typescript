@@ -32,12 +32,32 @@ const ensureShutdownHooks = (): void => {
     return;
   }
   shutdownHooksRegistered = true;
+  const stopRateLimiter = async (): Promise<void> => {
+    const shutdown = (apiRateLimiter as typeof apiRateLimiter & { shutdown?: () => Promise<void> }).shutdown;
+    if (typeof shutdown === 'function') {
+      await shutdown();
+    }
+  };
   const stopScheduler = (): void => {
     outboxScheduler.stop();
     stopApiKeyRefreshScheduler();
   };
-  cds.on('shutdown', stopScheduler);
-  process.on('exit', stopScheduler);
+  cds.on('shutdown', () => {
+    void stopRateLimiter();
+    stopScheduler();
+  });
+  const gracefulStop = async (): Promise<void> => {
+    await stopRateLimiter();
+    stopScheduler();
+  };
+  const handleSignal = (): void => {
+    void (async () => {
+      await gracefulStop();
+      process.exit(0);
+    })();
+  };
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
 };
 
 // Initialize structured logger
@@ -46,11 +66,27 @@ const logger = getLogger('server');
 
 logger.info({ odataUrlPath: (cds as any).env?.odata?.urlPath }, 'Effective CDS OData base path');
 
+const wrapAsyncMiddleware = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<void> | void,
+): ((req: Request, res: Response, next: NextFunction) => void) => (
+  req,
+  res,
+  next,
+) => {
+  Promise.resolve(handler(req, res, next)).catch(next);
+};
+
 const registerActiveEmployeesEndpoint = (app: Application): void => {
   if (activeEmployeesEndpointRegistered) {
     return;
   }
 
+  app.get(
+    '/api/employees/active',
+    wrapAsyncMiddleware(apiRateLimiter),
+    apiKeyMiddleware,
+    wrapAsyncMiddleware(activeEmployeesHandler),
+  );
   const reloadToken = process.env.EMPLOYEE_EXPORT_API_RELOAD_TOKEN?.trim();
 
   app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
