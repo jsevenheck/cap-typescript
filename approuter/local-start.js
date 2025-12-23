@@ -15,9 +15,11 @@ if (!destinationsEnvExists && !hasVcapServices) {
       url: 'http://localhost:4004',
       type: 'HTTP',
       proxyType: 'Internet',
-      authentication: 'NoAuthentication', // Change to NoAuthentication
-      // Remove user and password
-      forwardAuthToken: true,
+      // Mocked auth expects Basic Auth for local development.
+      authentication: 'BasicAuthentication',
+      user: basicAuthUser,
+      password: basicAuthPassword,
+      forwardAuthToken: false,
       strictSSL: false,
     },
     {
