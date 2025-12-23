@@ -223,8 +223,8 @@ export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<LoadR
 const handleRefreshFailure = (reason: string, error: unknown, scheduleNextRefresh: boolean): LoadResult => {
   consecutiveRefreshFailures += 1;
 
-  const nextBackoffMs = currentBackoffMs * 2;
-  const nextDelay = Math.min(nextBackoffMs, REFRESH_BACKOFF_MAX_MS);
+  const nextBackoffMs = Math.min(currentBackoffMs * 2, REFRESH_BACKOFF_MAX_MS);
+  const nextDelay = nextBackoffMs;
   currentBackoffMs = nextBackoffMs;
 
   const shouldPause = consecutiveRefreshFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES;
@@ -311,6 +311,12 @@ export const stopApiKeyRefreshScheduler = (): void => {
  * Force an immediate API key reload, optionally continuing the refresh loop.
  */
 export const forceReloadApiKey = async (): Promise<LoadResult> => {
+  // Avoid overlapping timers when a force reload is triggered
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = undefined;
+  }
+
   return refreshWithBackoff('forced-reload', refreshLoopEnabled && !refreshPausedDueToFailures);
 };
 
@@ -391,6 +397,7 @@ export const resetApiKeyCacheForTest = (): void => {
     clearTimeout(refreshTimer);
     refreshTimer = undefined;
   }
+  refreshLoopEnabled = false;
 };
 
 export default apiKeyMiddleware;

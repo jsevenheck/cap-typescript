@@ -1,4 +1,5 @@
 import cds from '@sap/cds';
+import crypto from 'node:crypto';
 import type { Application, Request, Response, NextFunction } from 'express';
 import 'dotenv/config';
 
@@ -64,7 +65,10 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
       const providedApiKey = readApiKeyFromRequest(req);
       const cachedApiKey = getCachedApiKeySnapshot();
 
-      const authorizedByToken = Boolean(reloadToken && providedReloadToken === reloadToken);
+      const authorizedByToken = Boolean(reloadToken && providedReloadToken && crypto.timingSafeEqual(
+        Buffer.from(providedReloadToken, 'utf8'),
+        Buffer.from(reloadToken, 'utf8'),
+      ));
       const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
 
       if (!authorizedByToken && !authorizedByApiKey) {
@@ -211,8 +215,10 @@ cds.on('served', async () => {
     }
 
     startApiKeyRefreshScheduler();
-    // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early
+    // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early.
+    // Clear any pending scheduled refresh to avoid back-to-back runs.
     await forceReloadApiKey();
+    startApiKeyRefreshScheduler();
 
     if (process.env.NODE_ENV === 'test') {
       return;

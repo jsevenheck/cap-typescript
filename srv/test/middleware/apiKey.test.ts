@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express, { RequestHandler } from 'express';
 import request from 'supertest';
 
@@ -79,7 +80,11 @@ describe('apiKeyMiddleware', () => {
         const providedApiKey = handlers.readApiKeyFromRequest(req);
         const cachedApiKey = handlers.getCachedApiKeySnapshot();
 
-        const authorizedByToken = Boolean(reloadToken && providedReloadToken === reloadToken);
+        const authorizedByToken = Boolean(
+          reloadToken &&
+            providedReloadToken &&
+            crypto.timingSafeEqual(Buffer.from(providedReloadToken, 'utf8'), Buffer.from(reloadToken, 'utf8')),
+        );
         const authorizedByApiKey = Boolean(cachedApiKey && handlers.isApiKeyValid(providedApiKey, cachedApiKey));
 
         if (!authorizedByToken && !authorizedByApiKey) {
@@ -262,8 +267,14 @@ describe('apiKeyMiddleware', () => {
     const apiKeyModule = await importApiKeyModule({
       EMPLOYEE_EXPORT_API_KEY_REFRESH_JITTER_MS: '0',
     });
-    const { forceReloadApiKey, getCachedApiKeySnapshot, isApiKeyValid, readApiKeyFromRequest, resetApiKeyCacheForTest } =
-      apiKeyModule;
+    const {
+      forceReloadApiKey,
+      getCachedApiKeySnapshot,
+      isApiKeyValid,
+      readApiKeyFromRequest,
+      resetApiKeyCacheForTest,
+      stopApiKeyRefreshScheduler,
+    } = apiKeyModule;
 
     resetApiKeyCacheForTest();
 
@@ -272,6 +283,7 @@ describe('apiKeyMiddleware', () => {
 
     await request(app).post('/api/employees/active/reload-key').set('x-api-key', 'any-key').expect(401);
 
+    stopApiKeyRefreshScheduler();
     resetApiKeyCacheForTest();
   });
 });
