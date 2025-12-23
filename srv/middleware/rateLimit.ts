@@ -4,6 +4,18 @@ import { getLogger } from '../shared/utils/logger';
 
 const logger = getLogger('rate-limiter');
 
+/**
+ * Allow expired Redis ZSET entries to linger for two full windows to tolerate minor clock skew
+ * and ensure cleanup only targets definitively stale keys.
+ */
+const STALE_KEY_CLEANUP_WINDOW_MULTIPLIER = 2;
+
+/**
+ * Spread Redis key set enforcement across callers to limit transaction overhead while still
+ * preventing unbounded growth under heavy load.
+ */
+const DEFAULT_ENFORCE_MAX_KEYS_SAMPLE_RATE = 0.01;
+
 export interface RateLimitEntry {
   count: number;
   resetTime: number;
@@ -157,7 +169,7 @@ class RedisRateLimitStore implements RateLimitStore {
     const parsedSampleRate = Number.parseFloat(process.env.RATE_LIMIT_ENFORCE_MAX_KEYS_SAMPLE_RATE ?? '');
     this.enforceMaxKeysSampleRate = Number.isFinite(parsedSampleRate) && parsedSampleRate > 0 && parsedSampleRate <= 1
       ? parsedSampleRate
-      : 0.01;
+      : DEFAULT_ENFORCE_MAX_KEYS_SAMPLE_RATE;
     this.client = options.client ?? createClient({ url: options.url });
     this.keySetName = `${options.namespace}:keys`;
     this.ready = this.initialize().catch((err) => {
@@ -220,7 +232,7 @@ class RedisRateLimitStore implements RateLimitStore {
       .pExpire(key, ttlMs)
       .pTTL(key)
       .zAdd(this.keySetName, { score: now, value: key })
-      .zRemRangeByScore(this.keySetName, '-inf', now - windowMs * 2)
+      .zRemRangeByScore(this.keySetName, '-inf', now - windowMs * STALE_KEY_CLEANUP_WINDOW_MULTIPLIER)
       .exec();
 
     if (!results || results.length < 5) {
