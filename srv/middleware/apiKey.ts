@@ -260,7 +260,11 @@ const refreshWithBackoff = async (reason: string, scheduleNextRefresh: boolean):
     const result = await loadApiKey({ force: true, reason });
 
     if (!result.loaded) {
-      return handleRefreshFailure(reason, new Error('employee export API key unavailable'), scheduleNextRefresh);
+      return handleRefreshFailure(
+        reason,
+        new Error(`employee export API key refresh failed: loadApiKey returned loaded=false (reason="${reason}")`),
+        scheduleNextRefresh,
+      );
     }
 
     consecutiveRefreshFailures = 0;
