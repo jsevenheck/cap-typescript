@@ -1,8 +1,17 @@
 import cds from '@sap/cds';
+import crypto from 'node:crypto';
 import type { Application, Request, Response, NextFunction } from 'express';
 import 'dotenv/config';
 
-import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
+import apiKeyMiddleware, {
+  forceReloadApiKey,
+  isApiKeyValid,
+  loadApiKey,
+  readApiKeyFromRequest,
+  getCachedApiKeySnapshot,
+  startApiKeyRefreshScheduler,
+  stopApiKeyRefreshScheduler,
+} from './middleware/apiKey';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
@@ -23,11 +32,32 @@ const ensureShutdownHooks = (): void => {
     return;
   }
   shutdownHooksRegistered = true;
+  const stopRateLimiter = async (): Promise<void> => {
+    const shutdown = (apiRateLimiter as typeof apiRateLimiter & { shutdown?: () => Promise<void> }).shutdown;
+    if (typeof shutdown === 'function') {
+      await shutdown();
+    }
+  };
   const stopScheduler = (): void => {
     outboxScheduler.stop();
+    stopApiKeyRefreshScheduler();
   };
-  cds.on('shutdown', stopScheduler);
-  process.on('exit', stopScheduler);
+  cds.on('shutdown', () => {
+    void stopRateLimiter();
+    stopScheduler();
+  });
+  const gracefulStop = async (): Promise<void> => {
+    await stopRateLimiter();
+    stopScheduler();
+  };
+  const handleSignal = (): void => {
+    void (async () => {
+      await gracefulStop();
+      process.exit(0);
+    })();
+  };
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
 };
 
 // Initialize structured logger
@@ -36,14 +66,79 @@ const logger = getLogger('server');
 
 logger.info({ odataUrlPath: (cds as any).env?.odata?.urlPath }, 'Effective CDS OData base path');
 
+const wrapAsyncMiddleware = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<void> | void,
+): ((req: Request, res: Response, next: NextFunction) => void) => (
+  req,
+  res,
+  next,
+) => {
+  Promise.resolve(handler(req, res, next)).catch((err: unknown) => next(err));
+};
+
 const registerActiveEmployeesEndpoint = (app: Application): void => {
   if (activeEmployeesEndpointRegistered) {
     return;
   }
 
-  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
+  app.get(
+    '/api/employees/active',
+    wrapAsyncMiddleware(apiRateLimiter),
+    apiKeyMiddleware,
+    wrapAsyncMiddleware(activeEmployeesHandler),
+  );
+  const reloadToken = process.env.EMPLOYEE_EXPORT_API_RELOAD_TOKEN?.trim();
+  const isReloadTokenAuthorized = (providedToken: string | undefined): boolean => {
+    if (!reloadToken || !providedToken) {
+      return false;
+    }
+
+    const providedLength = Buffer.byteLength(providedToken, 'utf8');
+    const reloadLength = Buffer.byteLength(reloadToken, 'utf8');
+    if (providedLength !== reloadLength) {
+      return false;
+    }
+
+    const providedBuffer = Buffer.from(providedToken, 'utf8');
+    const reloadBuffer = Buffer.from(reloadToken, 'utf8');
+    return crypto.timingSafeEqual(providedBuffer, reloadBuffer);
+  };
+
+  app.post('/api/employees/active/reload-key', wrapAsyncMiddleware(apiRateLimiter), wrapAsyncMiddleware(async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    const providedReloadToken = req.header('x-reload-token')?.trim();
+    const providedApiKey = readApiKeyFromRequest(req);
+    const cachedApiKey = getCachedApiKeySnapshot();
+
+    const authorizedByToken = isReloadTokenAuthorized(providedReloadToken);
+    const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
+
+    if (!authorizedByToken && !authorizedByApiKey) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+
+    try {
+      const reloadResult = await forceReloadApiKey();
+      if (!reloadResult.loaded) {
+        logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
+      }
+
+      // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
+      res
+        .status(reloadResult.loaded ? 200 : 503)
+        .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
+    } catch (error) {
+      logger.warn({ err: error }, 'Failed to force reload employee export API key');
+      res.status(500).json({ error: 'reload_failed' });
+    }
+  }));
   activeEmployeesEndpointRegistered = true;
-  logger.info('Registered /api/employees/active endpoint with API key protection');
+  logger.info('Registered /api/employees/active and /api/employees/active/reload-key endpoints with API key protection');
 };
 
 /**
@@ -154,7 +249,7 @@ cds.on('served', async () => {
     // Load API key from Credential Store or environment before accepting requests
     const apiKeyLoaded = await loadApiKey();
 
-    if (!apiKeyLoaded) {
+    if (!apiKeyLoaded.loaded) {
       logger.error(
         'EMPLOYEE_EXPORT_API_KEY missing - skipping /api/employees/active endpoint registration. Bind Credential Store or set the environment variable before starting the service.',
       );
@@ -163,6 +258,10 @@ cds.on('served', async () => {
     } else {
       logger.warn('Express application instance not available; cannot register /api/employees/active endpoint');
     }
+
+    startApiKeyRefreshScheduler();
+    // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early.
+    await forceReloadApiKey();
 
     if (process.env.NODE_ENV === 'test') {
       return;
