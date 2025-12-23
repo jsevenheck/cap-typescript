@@ -305,6 +305,28 @@ npm run watch --workspace srv
 - **Approuter** (when using dev:approuter): http://localhost:5000
 - **Default Credentials**: `dev` / `dev`
 
+### Local authentication (mocked)
+The development profile uses mocked authentication, which expects **Basic Auth** for CAP requests.
+When running the approuter locally, configure credentials via env vars (defaults to `dev/dev`):
+
+```bash
+export CAP_BASIC_USER=dev
+export CAP_BASIC_PASSWORD=dev
+```
+
+**Smoke checks (direct to CAP):**
+```bash
+curl -i http://localhost:4004/health
+curl -i http://localhost:4004/odata/v4/clients/$metadata
+curl -i -u dev:dev http://localhost:4004/odata/v4/clients/$metadata
+```
+
+**Smoke checks (via approuter):**
+```bash
+curl -i http://localhost:5000/health
+curl -i http://localhost:5000/odata/v4/clients/$metadata
+```
+
 ### Testing with Postman
 
 To test the backend API directly with Postman:

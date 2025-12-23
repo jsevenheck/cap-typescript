@@ -11,7 +11,7 @@
     },
     {
       "source": "^/clients/?(.*)$",
-      "target": "/clients/$1",
+      "target": "/odata/v4/clients/$1",
       "destination": "srv-api",
       "authenticationType": "ias",
       "csrfProtection": true

@@ -48,7 +48,7 @@ server:
       afterMiddleware: compression
       mountPath: /clients
       configuration:
-        baseUri: 'http://localhost:4004/clients'
+        baseUri: 'http://localhost:4004/odata/v4/clients'
         httpHeaders:
           Authorization: 'Basic ZGV2OmRldg=='
     - name: ui5-middleware-simpleproxy
