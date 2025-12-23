@@ -89,45 +89,42 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
   );
   const reloadToken = process.env.EMPLOYEE_EXPORT_API_RELOAD_TOKEN?.trim();
 
-  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
-  app.post('/api/employees/active/reload-key', apiRateLimiter, (req, res) => {
-    void (async () => {
-      if (process.env.NODE_ENV === 'production') {
-        res.status(404).json({ error: 'not_found' });
-        return;
+  app.post('/api/employees/active/reload-key', wrapAsyncMiddleware(apiRateLimiter), wrapAsyncMiddleware(async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    const providedReloadToken = req.header('x-reload-token')?.trim();
+    const providedApiKey = readApiKeyFromRequest(req);
+    const cachedApiKey = getCachedApiKeySnapshot();
+
+    const authorizedByToken = Boolean(reloadToken && providedReloadToken && crypto.timingSafeEqual(
+      Buffer.from(providedReloadToken, 'utf8'),
+      Buffer.from(reloadToken, 'utf8'),
+    ));
+    const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
+
+    if (!authorizedByToken && !authorizedByApiKey) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+
+    try {
+      const reloadResult = await forceReloadApiKey();
+      if (!reloadResult.loaded) {
+        logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
       }
 
-      const providedReloadToken = req.header('x-reload-token')?.trim();
-      const providedApiKey = readApiKeyFromRequest(req);
-      const cachedApiKey = getCachedApiKeySnapshot();
-
-      const authorizedByToken = Boolean(reloadToken && providedReloadToken && crypto.timingSafeEqual(
-        Buffer.from(providedReloadToken, 'utf8'),
-        Buffer.from(reloadToken, 'utf8'),
-      ));
-      const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
-
-      if (!authorizedByToken && !authorizedByApiKey) {
-        res.status(401).json({ error: 'unauthorized' });
-        return;
-      }
-
-      try {
-        const reloadResult = await forceReloadApiKey();
-        if (!reloadResult.loaded) {
-          logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
-        }
-
-        // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
-        res
-          .status(reloadResult.loaded ? 200 : 503)
-          .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
-      } catch (error) {
-        logger.warn({ err: error }, 'Failed to force reload employee export API key');
-        res.status(500).json({ error: 'reload_failed' });
-      }
-    })();
-  });
+      // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
+      res
+        .status(reloadResult.loaded ? 200 : 503)
+        .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
+    } catch (error) {
+      logger.warn({ err: error }, 'Failed to force reload employee export API key');
+      res.status(500).json({ error: 'reload_failed' });
+    }
+  }));
   activeEmployeesEndpointRegistered = true;
   logger.info('Registered /api/employees/active and /api/employees/active/reload-key endpoints with API key protection');
 };
