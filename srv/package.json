@@ -17,7 +17,7 @@
     "@sap-cloud-sdk/http-client": "^3.23.0",
     "@sap/ams": "^3",
     "@sap/audit-logging": "^6.9.0",
-    "@sap/cds": "^9.4.0",
+    "@sap/cds": "^9.6.1",
     "@sap/logging": "^8.2.0",
     "@sap/xsenv": "^5.3.0",
     "axios": "^1.13.2",
@@ -30,11 +30,11 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
-    "@cap-js/cds-test": "^0.4.0",
-    "@cap-js/sqlite": "^2.0.3",
+    "@cap-js/cds-test": "^0.4.1",
+    "@cap-js/sqlite": "^2.1.2",
     "@eslint/eslintrc": "^3.1.0",
     "@sap/ams-dev": "^2",
-    "@sap/cds-dk": "^9.4.0",
+    "@sap/cds-dk": "^9.6.0",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.1",

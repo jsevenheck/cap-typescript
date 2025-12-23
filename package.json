@@ -32,7 +32,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@cap-js/hana": "^2",
+    "@cap-js/hana": "^2.5.1",
     "@ui5/cli": "^4.0.30",
     "dotenv": "^17.2.3"
   },
@@ -40,6 +40,10 @@
     "axios": "^1.13.2",
     "follow-redirects": "^1.15.11",
     "form-data": "4.0.4",
+    "@sap/cds": "9.6.1",
+    "@sap/cds-dk": {
+      "@sap/cds": "9.6.1"
+    },
     "js-yaml": "4.1.1",
     "tar": "7.5.2",
     "tmp": "0.2.4"
