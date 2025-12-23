@@ -166,4 +166,29 @@ describe('createRateLimiter', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'rate_limit_unavailable' }));
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('resets the bucket after the window elapses', async () => {
+    jest.useFakeTimers();
+    const now = Date.now();
+    jest.setSystemTime(now);
+
+    const rateLimiter = createRateLimiter({
+      windowMs: 1_000,
+      maxRequests: 1,
+      keyGenerator,
+    });
+
+    const res = createResponse();
+    const next = jest.fn() as NextFunction;
+
+    await rateLimiter(createRequest('client-1'), res as Response, next);
+    const firstCallCount = (res.setHeader as jest.Mock).mock.calls.find((c) => c[0] === 'X-RateLimit-Remaining')?.[1];
+    expect(firstCallCount).toBe(0);
+
+    jest.advanceTimersByTime(1_100);
+    const resAfterWindow = createResponse();
+    await rateLimiter(createRequest('client-1'), resAfterWindow as Response, next);
+    const secondCallCount = (resAfterWindow.setHeader as jest.Mock).mock.calls.find((c) => c[0] === 'X-RateLimit-Remaining')?.[1];
+    expect(secondCallCount).toBe(0);
+  });
 });

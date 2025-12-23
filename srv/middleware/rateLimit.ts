@@ -35,7 +35,6 @@ interface RedisStoreOptions {
 interface InMemoryStoreOptions {
   namespace: string;
   maxKeys: number;
-  cleanupIntervalMs: number;
 }
 
 interface RateLimitConfig {
@@ -90,27 +89,13 @@ const parseMaxKeys = (maxKeys?: number): number => {
 class InMemoryRateLimitStore implements RateLimitStore {
   private readonly store = new Map<string, RateLimitEntry>();
   private readonly effectiveMaxKeys: number;
-  private readonly cleanupInterval: ReturnType<typeof setInterval>;
 
   constructor(private readonly options: InMemoryStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
-
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [key, entry] of this.store.entries()) {
-        if (entry.resetTime <= now) {
-          this.store.delete(key);
-        }
-      }
-    }, options.cleanupIntervalMs);
-
-    if (this.cleanupInterval.unref) {
-      this.cleanupInterval.unref();
-    }
   }
 
   shutdown = async (): Promise<void> => {
-    clearInterval(this.cleanupInterval);
+    // No periodic resources to clean up.
   };
 
   private evictOldestKey(): void {
@@ -186,6 +171,9 @@ class RedisRateLimitStore implements RateLimitStore {
 
   shutdown = async (): Promise<void> => {
     await this.ready;
+    if (this.initError) {
+      return;
+    }
     if (this.client.isOpen) {
       await this.client.quit();
     }
@@ -259,8 +247,9 @@ const resolveNamespace = (namespace?: string): string => namespace ?? process.en
 const toBucketKey = (baseKey: string, namespace: string, windowMs: number, now: number): { key: string; resetTime: number } => {
   const bucket = Math.floor(now / windowMs);
   const resetTime = (bucket + 1) * windowMs;
-  const sanitizedKey = baseKey.replace(/\s+/g, '').replace(/:/g, '%3A');
-  const safeNamespace = namespace.replace(/:/g, '%3A');
+  const encodeComponent = (value: string): string => encodeURIComponent(value.replace(/\s+/g, ''));
+  const sanitizedKey = encodeComponent(baseKey);
+  const safeNamespace = encodeComponent(namespace);
 
   return {
     key: `${safeNamespace}:bucket:${bucket}:${sanitizedKey}`,
@@ -294,7 +283,6 @@ const resolveStore = (
   return new InMemoryRateLimitStore({
     namespace,
     maxKeys: options.maxKeys ?? 10_000,
-    cleanupIntervalMs: options.windowMs,
   });
 };
 
@@ -334,19 +322,20 @@ export const createRateLimiter = (config: RateLimitConfig) => {
   } = config;
 
   const effectiveNamespace = resolveNamespace(namespace);
+  const effectiveBackend = resolveBackend(backend);
   const primaryStore = resolveStore({
-    backend,
+    backend: effectiveBackend,
     redisUrl,
     namespace: effectiveNamespace,
     maxKeys,
     windowMs,
     store,
   });
-  const fallbackStore = failOpenOnError
+  const shouldCreateFallback = failOpenOnError && effectiveBackend === 'redis';
+  const fallbackStore = shouldCreateFallback
     ? new InMemoryRateLimitStore({
       namespace: effectiveNamespace,
       maxKeys: maxKeys ?? 10_000,
-      cleanupIntervalMs: windowMs,
     })
     : null;
 

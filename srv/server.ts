@@ -36,10 +36,18 @@ const ensureShutdownHooks = (): void => {
     void stopRateLimiter();
     stopScheduler();
   });
-  process.on('exit', () => {
-    void stopRateLimiter();
+  const gracefulStop = async (): Promise<void> => {
+    await stopRateLimiter();
     stopScheduler();
-  });
+  };
+  const handleSignal = (): void => {
+    void (async () => {
+      await gracefulStop();
+      process.exit(0);
+    })();
+  };
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
 };
 
 // Initialize structured logger
