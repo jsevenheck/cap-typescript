@@ -1,8 +1,17 @@
 import cds from '@sap/cds';
+import crypto from 'node:crypto';
 import type { Application, Request, Response, NextFunction } from 'express';
 import 'dotenv/config';
 
-import apiKeyMiddleware, { loadApiKey } from './middleware/apiKey';
+import apiKeyMiddleware, {
+  forceReloadApiKey,
+  isApiKeyValid,
+  loadApiKey,
+  readApiKeyFromRequest,
+  getCachedApiKeySnapshot,
+  startApiKeyRefreshScheduler,
+  stopApiKeyRefreshScheduler,
+} from './middleware/apiKey';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
@@ -31,6 +40,7 @@ const ensureShutdownHooks = (): void => {
   };
   const stopScheduler = (): void => {
     outboxScheduler.stop();
+    stopApiKeyRefreshScheduler();
   };
   cds.on('shutdown', () => {
     void stopRateLimiter();
@@ -77,8 +87,49 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
     apiKeyMiddleware,
     wrapAsyncMiddleware(activeEmployeesHandler),
   );
+  const reloadToken = process.env.EMPLOYEE_EXPORT_API_RELOAD_TOKEN?.trim();
+
+  app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
+  app.post('/api/employees/active/reload-key', apiRateLimiter, (req, res) => {
+    void (async () => {
+      if (process.env.NODE_ENV === 'production') {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const providedReloadToken = req.header('x-reload-token')?.trim();
+      const providedApiKey = readApiKeyFromRequest(req);
+      const cachedApiKey = getCachedApiKeySnapshot();
+
+      const authorizedByToken = Boolean(reloadToken && providedReloadToken && crypto.timingSafeEqual(
+        Buffer.from(providedReloadToken, 'utf8'),
+        Buffer.from(reloadToken, 'utf8'),
+      ));
+      const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
+
+      if (!authorizedByToken && !authorizedByApiKey) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+      }
+
+      try {
+        const reloadResult = await forceReloadApiKey();
+        if (!reloadResult.loaded) {
+          logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
+        }
+
+        // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
+        res
+          .status(reloadResult.loaded ? 200 : 503)
+          .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
+      } catch (error) {
+        logger.warn({ err: error }, 'Failed to force reload employee export API key');
+        res.status(500).json({ error: 'reload_failed' });
+      }
+    })();
+  });
   activeEmployeesEndpointRegistered = true;
-  logger.info('Registered /api/employees/active endpoint with API key protection');
+  logger.info('Registered /api/employees/active and /api/employees/active/reload-key endpoints with API key protection');
 };
 
 /**
@@ -189,7 +240,7 @@ cds.on('served', async () => {
     // Load API key from Credential Store or environment before accepting requests
     const apiKeyLoaded = await loadApiKey();
 
-    if (!apiKeyLoaded) {
+    if (!apiKeyLoaded.loaded) {
       logger.error(
         'EMPLOYEE_EXPORT_API_KEY missing - skipping /api/employees/active endpoint registration. Bind Credential Store or set the environment variable before starting the service.',
       );
@@ -198,6 +249,12 @@ cds.on('served', async () => {
     } else {
       logger.warn('Express application instance not available; cannot register /api/employees/active endpoint');
     }
+
+    startApiKeyRefreshScheduler();
+    // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early.
+    // Clear any pending scheduled refresh to avoid back-to-back runs.
+    await forceReloadApiKey();
+    startApiKeyRefreshScheduler();
 
     if (process.env.NODE_ENV === 'test') {
       return;
