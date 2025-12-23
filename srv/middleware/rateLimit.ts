@@ -148,6 +148,7 @@ class RedisRateLimitStore implements RateLimitStore {
   private readonly client: RedisClientType;
   private readonly keySetName: string;
   private readonly effectiveMaxKeys: number;
+  private readonly enforceMaxKeysSampleRate = 0.01;
   private readonly ready: Promise<void>;
   private initError: Error | null = null;
 
@@ -162,11 +163,12 @@ class RedisRateLimitStore implements RateLimitStore {
   }
 
   private initialize = async (): Promise<void> => {
-    if (this.client.isOpen) {
-      return;
+    if (!this.client.isOpen) {
+      await this.client.connect();
     }
 
-    await this.client.connect();
+    // Ensure the client is responsive even if already marked open (e.g., reused connection).
+    await this.client.ping();
   };
 
   shutdown = async (): Promise<void> => {
@@ -217,7 +219,7 @@ class RedisRateLimitStore implements RateLimitStore {
       .zRemRangeByScore(this.keySetName, '-inf', now - windowMs * 2)
       .exec();
 
-    if (!results) {
+    if (!results || results.length < 5) {
       throw new Error('Redis transaction failed for rate limiting');
     }
 
@@ -225,7 +227,9 @@ class RedisRateLimitStore implements RateLimitStore {
     const ttlResult = Number(results[2]);
     const effectiveResetTime = Number.isFinite(ttlResult) && ttlResult > 0 ? now + ttlResult : resetTime;
 
-    if (this.effectiveMaxKeys < Number.POSITIVE_INFINITY) {
+    const shouldEnforceMaxKeys = this.effectiveMaxKeys < Number.POSITIVE_INFINITY
+      && Math.random() < this.enforceMaxKeysSampleRate;
+    if (shouldEnforceMaxKeys) {
       await this.enforceMaxKeys();
     }
 
@@ -277,6 +281,8 @@ const resolveStore = (
       } catch (error) {
         logger.error({ err: error }, 'Failed to initialize Redis rate limit store; falling back to in-memory store');
       }
+
+      // Asynchronous Redis connectivity issues surface during the first command and are handled by the middleware fallback.
     }
   }
 
@@ -332,12 +338,21 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     store,
   });
   const shouldCreateFallback = failOpenOnError && effectiveBackend === 'redis';
-  const fallbackStore = shouldCreateFallback
-    ? new InMemoryRateLimitStore({
-      namespace: effectiveNamespace,
-      maxKeys: maxKeys ?? 10_000,
-    })
-    : null;
+  let fallbackStore: InMemoryRateLimitStore | null = null;
+  const resolveFallbackStore = (): InMemoryRateLimitStore | null => {
+    if (!shouldCreateFallback) {
+      return null;
+    }
+
+    if (!fallbackStore) {
+      fallbackStore = new InMemoryRateLimitStore({
+        namespace: effectiveNamespace,
+        maxKeys: maxKeys ?? 10_000,
+      });
+    }
+
+    return fallbackStore;
+  };
 
   const middleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const baseKey = keyGenerator(req);
@@ -358,12 +373,16 @@ export const createRateLimiter = (config: RateLimitConfig) => {
         return;
       }
 
-      if (fallbackStore) {
+      const fallback = resolveFallbackStore();
+      if (fallback) {
         try {
-          entry = await fallbackStore.increment(key, windowMs, now, resetTime);
+          entry = await fallback.increment(key, windowMs, now, resetTime);
         } catch (fallbackError) {
-          logger.error({ err: fallbackError }, 'Fallback rate limiter failed; allowing request to proceed');
-          next();
+          logger.error({ err: fallbackError }, 'Fallback rate limiter failed; rejecting request');
+          res.status(503).json({
+            error: 'rate_limit_unavailable',
+            message: 'Rate limiting temporarily unavailable',
+          });
           return;
         }
       } else {

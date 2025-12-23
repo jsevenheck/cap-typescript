@@ -30,6 +30,50 @@ const createApp = (middleware: RequestHandler) => {
   return app;
 };
 
+const registerReloadEndpoint = (
+  app: ReturnType<typeof express>,
+  handlers: {
+    readApiKeyFromRequest: (req: Request) => string | undefined;
+    isApiKeyValid: (providedKey: string | undefined, referenceKey?: string) => boolean;
+    forceReloadApiKey: () => Promise<{ loaded: boolean; rotated: boolean; source: string }>;
+    getCachedApiKeySnapshot: () => string | undefined;
+  },
+  reloadToken?: string,
+) => {
+  app.post('/api/employees/active/reload-key', (req: Request, res: Response) => {
+    void (async () => {
+      if (process.env.NODE_ENV === 'production') {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const providedReloadToken = req.header('x-reload-token')?.trim();
+      const providedApiKey = handlers.readApiKeyFromRequest(req);
+      const cachedApiKey = handlers.getCachedApiKeySnapshot();
+
+      const authorizedByToken = Boolean(
+        reloadToken
+          && providedReloadToken
+          && Buffer.byteLength(providedReloadToken, 'utf8') === Buffer.byteLength(reloadToken, 'utf8')
+          && crypto.timingSafeEqual(Buffer.from(providedReloadToken, 'utf8'), Buffer.from(reloadToken, 'utf8')),
+      );
+      const authorizedByApiKey = Boolean(cachedApiKey && handlers.isApiKeyValid(providedApiKey, cachedApiKey));
+
+      if (!authorizedByToken && !authorizedByApiKey) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+      }
+
+      try {
+        const reloadResult = await handlers.forceReloadApiKey();
+        res.status(reloadResult.loaded ? 200 : 503).json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
+      } catch {
+        res.status(500).json({ error: 'reload_failed' });
+      }
+    })();
+  });
+};
+
 describe('apiKeyMiddleware', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -58,49 +102,6 @@ describe('apiKeyMiddleware', () => {
     stopApiKeyRefreshScheduler();
     resetApiKeyCacheForTest();
   });
-
-  const registerReloadEndpoint = (
-    app: ReturnType<typeof express>,
-    handlers: {
-      readApiKeyFromRequest: (req: Request) => string | undefined;
-      isApiKeyValid: (providedKey: string | undefined, referenceKey?: string) => boolean;
-      forceReloadApiKey: () => Promise<{ loaded: boolean; rotated: boolean; source: string }>;
-      getCachedApiKeySnapshot: () => string | undefined;
-    },
-    reloadToken?: string,
-  ) => {
-    app.post('/api/employees/active/reload-key', (req: Request, res: Response) => {
-      void (async () => {
-        if (process.env.NODE_ENV === 'production') {
-          res.status(404).json({ error: 'not_found' });
-          return;
-        }
-
-        const providedReloadToken = req.header('x-reload-token')?.trim();
-        const providedApiKey = handlers.readApiKeyFromRequest(req);
-        const cachedApiKey = handlers.getCachedApiKeySnapshot();
-
-        const authorizedByToken = Boolean(
-          reloadToken &&
-            providedReloadToken &&
-            crypto.timingSafeEqual(Buffer.from(providedReloadToken, 'utf8'), Buffer.from(reloadToken, 'utf8')),
-        );
-        const authorizedByApiKey = Boolean(cachedApiKey && handlers.isApiKeyValid(providedApiKey, cachedApiKey));
-
-        if (!authorizedByToken && !authorizedByApiKey) {
-          res.status(401).json({ error: 'unauthorized' });
-          return;
-        }
-
-        try {
-          const reloadResult = await handlers.forceReloadApiKey();
-          res.status(reloadResult.loaded ? 200 : 503).json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
-        } catch {
-          res.status(500).json({ error: 'reload_failed' });
-        }
-      })();
-    });
-  };
 
   it('respects TTL and avoids reloading before expiration', async () => {
     const apiKeyModule = await importApiKeyModule({

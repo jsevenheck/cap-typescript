@@ -88,6 +88,7 @@ let refreshTimer: NodeJS.Timeout | undefined;
 let currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
 let refreshLoopEnabled = false;
 let refreshPausedDueToFailures = false;
+let refreshSchedulerInitInProgress = false;
 let consecutiveRefreshFailures = 0;
 let loadInFlight: Promise<LoadResult> | null = null;
 
@@ -223,9 +224,8 @@ export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<LoadR
 const handleRefreshFailure = (reason: string, error: unknown, scheduleNextRefresh: boolean): LoadResult => {
   consecutiveRefreshFailures += 1;
 
-  const nextBackoffMs = Math.min(currentBackoffMs * 2, REFRESH_BACKOFF_MAX_MS);
-  const nextDelay = nextBackoffMs;
-  currentBackoffMs = nextBackoffMs;
+  currentBackoffMs = Math.min(currentBackoffMs * 2, REFRESH_BACKOFF_MAX_MS);
+  const nextDelay = currentBackoffMs;
 
   const shouldPause = consecutiveRefreshFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES;
 
@@ -281,15 +281,20 @@ const refreshWithBackoff = async (reason: string, scheduleNextRefresh: boolean):
  * Start the periodic API key refresh loop using TTL and jitter settings.
  */
 export const startApiKeyRefreshScheduler = (): void => {
-  if (refreshLoopEnabled) {
+  if (refreshLoopEnabled || refreshSchedulerInitInProgress) {
     return;
   }
 
-  refreshLoopEnabled = true;
-  refreshPausedDueToFailures = false;
-  consecutiveRefreshFailures = 0;
-  currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
-  scheduleRefresh(withJitter(API_KEY_TTL_MS));
+  refreshSchedulerInitInProgress = true;
+  try {
+    refreshLoopEnabled = true;
+    refreshPausedDueToFailures = false;
+    consecutiveRefreshFailures = 0;
+    currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
+    scheduleRefresh(withJitter(API_KEY_TTL_MS));
+  } finally {
+    refreshSchedulerInitInProgress = false;
+  }
 };
 
 /**
@@ -298,6 +303,7 @@ export const startApiKeyRefreshScheduler = (): void => {
 export const stopApiKeyRefreshScheduler = (): void => {
   refreshLoopEnabled = false;
   currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
+  refreshSchedulerInitInProgress = false;
 
   if (refreshTimer) {
     clearTimeout(refreshTimer);
@@ -392,6 +398,7 @@ export const resetApiKeyCacheForTest = (): void => {
   currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
   refreshPausedDueToFailures = false;
   consecutiveRefreshFailures = 0;
+  refreshSchedulerInitInProgress = false;
   loadInFlight = null;
   if (refreshTimer) {
     clearTimeout(refreshTimer);

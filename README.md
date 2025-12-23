@@ -28,16 +28,11 @@ multi-instance deployments (e.g., BTP), configure a shared cache such as Redis o
 - Provide the cache endpoint via `RATE_LIMIT_REDIS_URL` (or `REDIS_URL`).
 - Optionally set `RATE_LIMIT_NAMESPACE` to avoid key collisions across applications and `RATE_LIMIT_MAX_KEYS`
   to cap distinct keys.
-- If the backend is unavailable, the limiter logs a warning and falls back to the in-memory store so startup
-  is not blocked.
-- If the backend becomes unavailable at runtime, the limiter logs a warning and falls back to the in-memory
-  store for processing the affected requests. Monitor logs and health checks to detect prolonged backend
+- If the backend is unavailable during initialization or at runtime (for example, due to invalid configuration
+  or connection failures), the limiter logs a warning and transparently falls back to the in-memory store so
+  startup is not blocked and requests continue to be processed. Rate limiting remains functional but may be less
+  precise during backend outages. Monitor logs and health checks to detect and mitigate prolonged backend
   outages.
-- If the backend cannot be constructed (for example, due to invalid configuration), the limiter logs a warning
-  and falls back to the in-memory store so startup is not blocked.
-- If the backend becomes unavailable during initialization or at runtime (for example, connection failures),
-  rate-limited requests may fail until the backend is reachable again. Monitor logs and health checks to detect
-  and mitigate prolonged backend outages.
 - Advanced deployments can supply a custom store implementation through the middleware configuration when
   bootstrapping the Express app.
 
