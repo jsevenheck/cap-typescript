@@ -80,11 +80,11 @@ describe('createRateLimiter', () => {
       public calls: { key: string; now: number; resetTime: number }[] = [];
       private readonly entries = new Map<string, RateLimitEntry>();
 
-      increment = async (key: string, _windowMs: number, nowTs: number, resetTime: number): Promise<RateLimitEntry> => {
-        this.calls.push({ key, now: nowTs, resetTime });
+      increment = async (key: string, _windowMs: number, now: number, resetTime: number): Promise<RateLimitEntry> => {
+        this.calls.push({ key, now, resetTime });
 
         const existing = this.entries.get(key);
-        if (!existing || existing.resetTime <= nowTs) {
+        if (!existing || existing.resetTime <= now) {
           const entry = { count: 1, resetTime };
           this.entries.set(key, entry);
           return entry;
