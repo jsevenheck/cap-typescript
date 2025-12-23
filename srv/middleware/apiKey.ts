@@ -10,7 +10,7 @@ const DEFAULT_API_KEY_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const DEFAULT_REFRESH_JITTER_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_BACKOFF_MIN_MS = 5_000;
 const DEFAULT_BACKOFF_MAX_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_CONSECUTIVE_REFRESH_FAILURES = 5;
+const DEFAULT_MAX_CONSECUTIVE_REFRESH_FAILURES = 5;
 
 const parseDurationMs = (value: string | undefined, fallback: number, minimum: number, maximum: number): number => {
   const parsed = Number(value);
@@ -45,8 +45,21 @@ const REFRESH_BACKOFF_MIN_MS = parseDurationMs(
 const REFRESH_BACKOFF_MAX_MS = parseDurationMs(
   process.env.EMPLOYEE_EXPORT_API_KEY_REFRESH_BACKOFF_MAX_MS,
   DEFAULT_BACKOFF_MAX_MS,
-  DEFAULT_BACKOFF_MAX_MS,
+  REFRESH_BACKOFF_MIN_MS,
   Number.MAX_SAFE_INTEGER,
+);
+
+const parseMaxFailures = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const MAX_CONSECUTIVE_REFRESH_FAILURES = parseMaxFailures(
+  process.env.EMPLOYEE_EXPORT_API_KEY_MAX_CONSECUTIVE_FAILURES,
+  DEFAULT_MAX_CONSECUTIVE_REFRESH_FAILURES,
 );
 
 type LoadResult = {
@@ -69,6 +82,7 @@ type LoadResult = {
 // Cache for the configured API key (loaded from Credential Store or env)
 let cachedApiKey: string | undefined;
 let lastLoadedAt = 0;
+let lastLoadedSource: LoadResult['source'] = 'unknown';
 
 let refreshTimer: NodeJS.Timeout | undefined;
 let currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
@@ -142,6 +156,7 @@ const applyApiKey = (nextKey: string, source: 'primary' | 'fallback', reason?: s
   const previousKey = cachedApiKey;
   cachedApiKey = trimmedKey;
   lastLoadedAt = Date.now();
+  lastLoadedSource = source;
 
   if (!previousKey) {
     logger.info({ reason: reason ?? 'initial-load', source }, 'Employee export API key loaded successfully');
@@ -166,7 +181,7 @@ export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<LoadR
   const { force = false, reason } = options;
 
   if (!shouldRefresh(force)) {
-    return { loaded: Boolean(cachedApiKey), rotated: false, source: 'unknown' };
+    return { loaded: Boolean(cachedApiKey), rotated: false, source: lastLoadedSource };
   }
 
   if (loadInFlight) {
@@ -205,9 +220,49 @@ export const loadApiKey = async (options: LoadApiKeyOptions = {}): Promise<LoadR
   return loadInFlight;
 };
 
+const handleRefreshFailure = (reason: string, error: unknown, scheduleNextRefresh: boolean): LoadResult => {
+  consecutiveRefreshFailures += 1;
+
+  const nextBackoffMs = currentBackoffMs * 2;
+  const nextDelay = Math.min(nextBackoffMs, REFRESH_BACKOFF_MAX_MS);
+  currentBackoffMs = nextBackoffMs;
+
+  const shouldPause = consecutiveRefreshFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES;
+
+  logger.warn(
+    {
+      err: error,
+      delayMs: nextDelay,
+      reason,
+      consecutiveFailures: consecutiveRefreshFailures,
+      paused: shouldPause,
+    },
+    shouldPause
+      ? 'Failed to refresh employee export API key repeatedly; pausing scheduler'
+      : 'Failed to refresh employee export API key; applying backoff',
+  );
+
+  if (shouldPause) {
+    refreshPausedDueToFailures = true;
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = undefined;
+    }
+  } else if (scheduleNextRefresh && refreshLoopEnabled) {
+    scheduleRefresh(withJitter(nextDelay));
+  }
+
+  return { loaded: false, rotated: false, source: 'unknown' };
+};
+
 const refreshWithBackoff = async (reason: string, scheduleNextRefresh: boolean): Promise<LoadResult> => {
   try {
     const result = await loadApiKey({ force: true, reason });
+
+    if (!result.loaded) {
+      return handleRefreshFailure(reason, new Error('employee export API key unavailable'), scheduleNextRefresh);
+    }
+
     consecutiveRefreshFailures = 0;
     currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
     refreshPausedDueToFailures = false;
@@ -218,41 +273,13 @@ const refreshWithBackoff = async (reason: string, scheduleNextRefresh: boolean):
 
     return result;
   } catch (error) {
-    consecutiveRefreshFailures += 1;
-
-    const nextBackoffMs = currentBackoffMs * 2;
-    const nextDelay = Math.min(nextBackoffMs, REFRESH_BACKOFF_MAX_MS);
-    currentBackoffMs = nextBackoffMs;
-
-    const shouldPause = consecutiveRefreshFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES;
-
-    logger.warn(
-      {
-        err: error,
-        delayMs: nextDelay,
-        reason,
-        consecutiveFailures: consecutiveRefreshFailures,
-        paused: shouldPause,
-      },
-      shouldPause
-        ? 'Failed to refresh employee export API key repeatedly; pausing scheduler'
-        : 'Failed to refresh employee export API key; applying backoff',
-    );
-
-    if (shouldPause) {
-      refreshPausedDueToFailures = true;
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = undefined;
-      }
-    } else if (scheduleNextRefresh && refreshLoopEnabled) {
-      scheduleRefresh(withJitter(nextDelay));
-    }
-
-    return { loaded: false, rotated: false, source: 'unknown' };
+    return handleRefreshFailure(reason, error, scheduleNextRefresh);
   }
 };
 
+/**
+ * Start the periodic API key refresh loop using TTL and jitter settings.
+ */
 export const startApiKeyRefreshScheduler = (): void => {
   if (refreshLoopEnabled) {
     return;
@@ -265,6 +292,9 @@ export const startApiKeyRefreshScheduler = (): void => {
   scheduleRefresh(withJitter(API_KEY_TTL_MS));
 };
 
+/**
+ * Stop the periodic API key refresh loop and reset backoff state.
+ */
 export const stopApiKeyRefreshScheduler = (): void => {
   refreshLoopEnabled = false;
   currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
@@ -277,10 +307,16 @@ export const stopApiKeyRefreshScheduler = (): void => {
   consecutiveRefreshFailures = 0;
 };
 
+/**
+ * Force an immediate API key reload, optionally continuing the refresh loop.
+ */
 export const forceReloadApiKey = async (): Promise<LoadResult> => {
   return refreshWithBackoff('forced-reload', refreshLoopEnabled && !refreshPausedDueToFailures);
 };
 
+/**
+ * Extract an API key from request headers (x-api-key or Authorization: ApiKey ...).
+ */
 export function readApiKeyFromRequest(req: Request): string | undefined {
   const headerKey = req.header('x-api-key');
   if (headerKey) {
@@ -304,9 +340,12 @@ const toKeyBuffer = (key: string | undefined): Buffer | undefined => {
   return Buffer.from(key, 'utf8');
 };
 
-export const isApiKeyValid = (providedKey: string | undefined): boolean => {
+/**
+ * Validate a provided API key against the cached key. Optionally supply a snapshot to avoid races.
+ */
+export const isApiKeyValid = (providedKey: string | undefined, referenceKey?: string): boolean => {
   // Use cached API key (loaded from Credential Store or env at startup)
-  const configuredKey = cachedApiKey?.trim();
+  const configuredKey = (referenceKey ?? cachedApiKey)?.trim();
   const provided = providedKey?.trim();
 
   const configuredBuffer = toKeyBuffer(configuredKey);
@@ -323,6 +362,9 @@ export const isApiKeyValid = (providedKey: string | undefined): boolean => {
   }
 };
 
+/**
+ * Express middleware enforcing API key authentication.
+ */
 export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const providedKey = readApiKeyFromRequest(req);
 
@@ -334,10 +376,13 @@ export const apiKeyMiddleware = (req: Request, res: Response, next: NextFunction
   next();
 };
 
+export const getCachedApiKeySnapshot = (): string | undefined => cachedApiKey;
+
 /* istanbul ignore next - test-only state reset helper */
 export const resetApiKeyCacheForTest = (): void => {
   cachedApiKey = undefined;
   lastLoadedAt = 0;
+  lastLoadedSource = 'unknown';
   currentBackoffMs = REFRESH_BACKOFF_MIN_MS;
   refreshPausedDueToFailures = false;
   consecutiveRefreshFailures = 0;

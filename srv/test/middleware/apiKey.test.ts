@@ -1,6 +1,8 @@
 import express, { RequestHandler } from 'express';
 import request from 'supertest';
 
+import type { Request, Response } from 'express';
+
 let currentApiKey = 'initial-key';
 const originalEnv = { ...process.env };
 
@@ -56,6 +58,45 @@ describe('apiKeyMiddleware', () => {
     resetApiKeyCacheForTest();
   });
 
+  const registerReloadEndpoint = (
+    app: ReturnType<typeof express>,
+    handlers: {
+      readApiKeyFromRequest: (req: Request) => string | undefined;
+      isApiKeyValid: (providedKey: string | undefined, referenceKey?: string) => boolean;
+      forceReloadApiKey: () => Promise<{ loaded: boolean; rotated: boolean; source: string }>;
+      getCachedApiKeySnapshot: () => string | undefined;
+    },
+    reloadToken?: string,
+  ) => {
+    app.post('/api/employees/active/reload-key', (req: Request, res: Response) => {
+      void (async () => {
+        if (process.env.NODE_ENV === 'production') {
+          res.status(404).json({ error: 'not_found' });
+          return;
+        }
+
+        const providedReloadToken = req.header('x-reload-token')?.trim();
+        const providedApiKey = handlers.readApiKeyFromRequest(req);
+        const cachedApiKey = handlers.getCachedApiKeySnapshot();
+
+        const authorizedByToken = Boolean(reloadToken && providedReloadToken === reloadToken);
+        const authorizedByApiKey = Boolean(cachedApiKey && handlers.isApiKeyValid(providedApiKey, cachedApiKey));
+
+        if (!authorizedByToken && !authorizedByApiKey) {
+          res.status(401).json({ error: 'unauthorized' });
+          return;
+        }
+
+        try {
+          const reloadResult = await handlers.forceReloadApiKey();
+          res.status(reloadResult.loaded ? 200 : 503).json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
+        } catch {
+          res.status(500).json({ error: 'reload_failed' });
+        }
+      })();
+    });
+  };
+
   it('respects TTL and avoids reloading before expiration', async () => {
     const apiKeyModule = await importApiKeyModule({
       EMPLOYEE_EXPORT_API_KEY_TTL_MS: '5000',
@@ -107,19 +148,19 @@ describe('apiKeyMiddleware', () => {
     const { getEmployeeExportApiKey } = getSecretsMock();
 
     resetApiKeyCacheForTest();
-    let resolveKey: (value: string | undefined) => void = () => {};
+    let fulfillPromise: (value: string | undefined) => void = () => {};
 
     getEmployeeExportApiKey.mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveKey = resolve;
+          fulfillPromise = resolve;
         }),
     );
 
     const first = loadApiKey({ force: true, reason: 'concurrent-1' });
     const second = loadApiKey({ force: true, reason: 'concurrent-2' });
 
-    resolveKey?.('shared-key');
+    fulfillPromise?.('shared-key');
 
     const [firstResult, secondResult] = await Promise.all([first, second]);
 
@@ -162,6 +203,75 @@ describe('apiKeyMiddleware', () => {
     expect(getEmployeeExportApiKey).toHaveBeenCalledTimes(5);
 
     stopApiKeyRefreshScheduler();
+    resetApiKeyCacheForTest();
+  });
+
+  it('authorizes reload endpoint via cached API key without being affected by rotation during reload', async () => {
+    const apiKeyModule = await importApiKeyModule({
+      EMPLOYEE_EXPORT_API_KEY_REFRESH_JITTER_MS: '0',
+    });
+    const {
+      apiKeyMiddleware,
+      forceReloadApiKey,
+      getCachedApiKeySnapshot,
+      isApiKeyValid,
+      loadApiKey,
+      readApiKeyFromRequest,
+      resetApiKeyCacheForTest,
+      stopApiKeyRefreshScheduler,
+    } = apiKeyModule;
+
+    resetApiKeyCacheForTest();
+    await loadApiKey({ force: true, reason: 'test-initial-load' });
+
+    const app = express();
+    app.get('/api/employees/active', apiKeyMiddleware, (_req, res) => res.json({ status: 'ok' }));
+    registerReloadEndpoint(app, { readApiKeyFromRequest, isApiKeyValid, forceReloadApiKey, getCachedApiKeySnapshot });
+
+    await request(app).post('/api/employees/active/reload-key').set('x-api-key', 'initial-key').expect(200);
+
+    stopApiKeyRefreshScheduler();
+    resetApiKeyCacheForTest();
+  });
+
+  it('authorizes reload endpoint via reload token even when no cached key exists', async () => {
+    const apiKeyModule = await importApiKeyModule({
+      EMPLOYEE_EXPORT_API_KEY_REFRESH_JITTER_MS: '0',
+    });
+    const {
+      forceReloadApiKey,
+      getCachedApiKeySnapshot,
+      isApiKeyValid,
+      readApiKeyFromRequest,
+      resetApiKeyCacheForTest,
+      stopApiKeyRefreshScheduler,
+    } = apiKeyModule;
+
+    resetApiKeyCacheForTest();
+
+    const app = express();
+    registerReloadEndpoint(app, { readApiKeyFromRequest, isApiKeyValid, forceReloadApiKey, getCachedApiKeySnapshot }, 'secret-token');
+
+    await request(app).post('/api/employees/active/reload-key').set('x-reload-token', 'secret-token').expect(200);
+
+    stopApiKeyRefreshScheduler();
+    resetApiKeyCacheForTest();
+  });
+
+  it('rejects reload endpoint when neither token nor cached API key authorization is available', async () => {
+    const apiKeyModule = await importApiKeyModule({
+      EMPLOYEE_EXPORT_API_KEY_REFRESH_JITTER_MS: '0',
+    });
+    const { forceReloadApiKey, getCachedApiKeySnapshot, isApiKeyValid, readApiKeyFromRequest, resetApiKeyCacheForTest } =
+      apiKeyModule;
+
+    resetApiKeyCacheForTest();
+
+    const app = express();
+    registerReloadEndpoint(app, { readApiKeyFromRequest, isApiKeyValid, forceReloadApiKey, getCachedApiKeySnapshot });
+
+    await request(app).post('/api/employees/active/reload-key').set('x-api-key', 'any-key').expect(401);
+
     resetApiKeyCacheForTest();
   });
 });

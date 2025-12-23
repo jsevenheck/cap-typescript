@@ -7,6 +7,7 @@ import apiKeyMiddleware, {
   isApiKeyValid,
   loadApiKey,
   readApiKeyFromRequest,
+  getCachedApiKeySnapshot,
   startApiKeyRefreshScheduler,
   stopApiKeyRefreshScheduler,
 } from './middleware/apiKey';
@@ -61,24 +62,30 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
 
       const providedReloadToken = req.header('x-reload-token')?.trim();
       const providedApiKey = readApiKeyFromRequest(req);
+      const cachedApiKey = getCachedApiKeySnapshot();
 
       const authorizedByToken = Boolean(reloadToken && providedReloadToken === reloadToken);
-      const authorizedByApiKey = isApiKeyValid(providedApiKey);
+      const authorizedByApiKey = Boolean(cachedApiKey && isApiKeyValid(providedApiKey, cachedApiKey));
 
       if (!authorizedByToken && !authorizedByApiKey) {
         res.status(401).json({ error: 'unauthorized' });
         return;
       }
 
-      const reloadResult = await forceReloadApiKey();
-      if (!reloadResult.loaded) {
-        logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
-      }
+      try {
+        const reloadResult = await forceReloadApiKey();
+        if (!reloadResult.loaded) {
+          logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
+        }
 
-      // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
-      res
-        .status(reloadResult.loaded ? 200 : 503)
-        .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
+        // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
+        res
+          .status(reloadResult.loaded ? 200 : 503)
+          .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
+      } catch (error) {
+        logger.warn({ err: error }, 'Failed to force reload employee export API key');
+        res.status(500).json({ error: 'reload_failed' });
+      }
     })();
   });
   activeEmployeesEndpointRegistered = true;
@@ -205,7 +212,7 @@ cds.on('served', async () => {
 
     startApiKeyRefreshScheduler();
     // Trigger an immediate refresh so the scheduler has a warm baseline and failures are surfaced early
-    void forceReloadApiKey();
+    await forceReloadApiKey();
 
     if (process.env.NODE_ENV === 'test') {
       return;
