@@ -4,7 +4,9 @@ import 'dotenv/config';
 
 import apiKeyMiddleware, {
   forceReloadApiKey,
+  isApiKeyValid,
   loadApiKey,
+  readApiKeyFromRequest,
   startApiKeyRefreshScheduler,
   stopApiKeyRefreshScheduler,
 } from './middleware/apiKey';
@@ -47,25 +49,40 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
     return;
   }
 
+  const reloadToken = process.env.EMPLOYEE_EXPORT_API_RELOAD_TOKEN?.trim();
+
   app.get('/api/employees/active', apiRateLimiter, apiKeyMiddleware, activeEmployeesHandler);
-  app.post('/api/employees/active/reload-key', apiRateLimiter, apiKeyMiddleware, (_req, res) => {
+  app.post('/api/employees/active/reload-key', apiRateLimiter, (req, res) => {
     void (async () => {
       if (process.env.NODE_ENV === 'production') {
         res.status(404).json({ error: 'not_found' });
         return;
       }
 
-      try {
-        const reloadResult = await forceReloadApiKey();
-        res.status(reloadResult.loaded ? 200 : 503).json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated });
-      } catch (error) {
-        logger.warn({ err: error }, 'Failed to force reload employee export API key');
-        res.status(500).json({ error: 'reload_failed' });
+      const providedReloadToken = req.header('x-reload-token')?.trim();
+      const providedApiKey = readApiKeyFromRequest(req);
+
+      const authorizedByToken = Boolean(reloadToken && providedReloadToken === reloadToken);
+      const authorizedByApiKey = isApiKeyValid(providedApiKey);
+
+      if (!authorizedByToken && !authorizedByApiKey) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
       }
+
+      const reloadResult = await forceReloadApiKey();
+      if (!reloadResult.loaded) {
+        logger.warn({ reloadResult }, 'Failed to force reload employee export API key');
+      }
+
+      // NOTE: forceReloadApiKey returns { loaded, rotated, source }; expose `loaded` as `reloaded` to reflect this endpoint's action.
+      res
+        .status(reloadResult.loaded ? 200 : 503)
+        .json({ reloaded: reloadResult.loaded, rotated: reloadResult.rotated, source: reloadResult.source });
     })();
   });
   activeEmployeesEndpointRegistered = true;
-  logger.info('Registered /api/employees/active endpoint with API key protection');
+  logger.info('Registered /api/employees/active and /api/employees/active/reload-key endpoints with API key protection');
 };
 
 /**
