@@ -23,11 +23,23 @@ const ensureShutdownHooks = (): void => {
     return;
   }
   shutdownHooksRegistered = true;
+  const stopRateLimiter = async (): Promise<void> => {
+    const shutdown = (apiRateLimiter as typeof apiRateLimiter & { shutdown?: () => Promise<void> }).shutdown;
+    if (typeof shutdown === 'function') {
+      await shutdown();
+    }
+  };
   const stopScheduler = (): void => {
     outboxScheduler.stop();
   };
-  cds.on('shutdown', stopScheduler);
-  process.on('exit', stopScheduler);
+  cds.on('shutdown', () => {
+    void stopRateLimiter();
+    stopScheduler();
+  });
+  process.on('exit', () => {
+    void stopRateLimiter();
+    stopScheduler();
+  });
 };
 
 // Initialize structured logger

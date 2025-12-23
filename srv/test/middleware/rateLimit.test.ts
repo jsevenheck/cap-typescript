@@ -73,7 +73,7 @@ describe('createRateLimiter', () => {
 
   it('uses namespaced bucket keys with a distributed store and enforces limits', async () => {
     jest.useFakeTimers();
-    const now = new Date('2023-01-01T00:00:00.000Z');
+    const now = new Date();
     jest.setSystemTime(now);
 
     class RecordingStore implements RateLimitStore {

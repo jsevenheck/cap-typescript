@@ -164,14 +164,15 @@ class RedisRateLimitStore implements RateLimitStore {
   private readonly keySetName: string;
   private readonly effectiveMaxKeys: number;
   private readonly ready: Promise<void>;
+  private initError: Error | null = null;
 
   constructor(private readonly options: RedisStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
     this.client = options.client ?? createClient({ url: options.url });
     this.keySetName = `${options.namespace}:keys`;
     this.ready = this.initialize().catch((err) => {
-      logger.error({ err }, 'Failed to initialize Redis rate limit store');
-      throw err;
+      this.initError = err instanceof Error ? err : new Error(String(err));
+      logger.error({ err: this.initError }, 'Failed to initialize Redis rate limit store');
     });
   }
 
@@ -214,6 +215,9 @@ class RedisRateLimitStore implements RateLimitStore {
 
   increment = async (key: string, windowMs: number, now: number, resetTime: number): Promise<RateLimitEntry> => {
     await this.ready;
+    if (this.initError) {
+      throw this.initError;
+    }
     const ttlMs = Math.max(resetTime - now, 1);
 
     const results = await this.client
@@ -265,9 +269,7 @@ const toBucketKey = (baseKey: string, namespace: string, windowMs: number, now: 
 };
 
 const resolveStore = (
-  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store' | 'failOpenOnError'> & {
-    windowMs: number;
-  },
+  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store'> & { windowMs: number },
 ): RateLimitStore => {
   if (options.store) {
     return options.store;
@@ -275,42 +277,25 @@ const resolveStore = (
 
   const backend = resolveBackend(options.backend);
   const namespace = resolveNamespace(options.namespace);
-  const fallbackStore = new InMemoryRateLimitStore({
-    namespace,
-    maxKeys: options.maxKeys ?? 10_000,
-    cleanupIntervalMs: options.windowMs,
-  });
 
   if (backend === 'redis') {
     const url = options.redisUrl ?? process.env.RATE_LIMIT_REDIS_URL ?? process.env.REDIS_URL;
     if (!url) {
       logger.warn('RATE_LIMIT_BACKEND=redis but no Redis URL provided; falling back to in-memory store');
     } else {
-      const redisStore = new RedisRateLimitStore({ namespace, maxKeys: options.maxKeys ?? 10_000, url });
-
-      if (options.failOpenOnError ?? true) {
-        let activeStore: RateLimitStore = redisStore;
-        return {
-          increment: async (key, windowMs, now, resetTime) => {
-            try {
-              return await activeStore.increment(key, windowMs, now, resetTime);
-            } catch (error) {
-              logger.error({ err: error }, 'Primary rate limit store failed; switching to in-memory fallback');
-              activeStore = fallbackStore;
-              return activeStore.increment(key, windowMs, now, resetTime);
-            }
-          },
-          shutdown: async () => {
-            await Promise.allSettled([redisStore.shutdown?.(), fallbackStore.shutdown?.()]);
-          },
-        };
+      try {
+        return new RedisRateLimitStore({ namespace, maxKeys: options.maxKeys ?? 10_000, url });
+      } catch (error) {
+        logger.error({ err: error }, 'Failed to initialize Redis rate limit store; falling back to in-memory store');
       }
-
-      return redisStore;
     }
   }
 
-  return fallbackStore;
+  return new InMemoryRateLimitStore({
+    namespace,
+    maxKeys: options.maxKeys ?? 10_000,
+    cleanupIntervalMs: options.windowMs,
+  });
 };
 
 /**
@@ -349,14 +334,13 @@ export const createRateLimiter = (config: RateLimitConfig) => {
   } = config;
 
   const effectiveNamespace = resolveNamespace(namespace);
-  const backingStore = resolveStore({
+  const primaryStore = resolveStore({
     backend,
     redisUrl,
     namespace: effectiveNamespace,
     maxKeys,
     windowMs,
     store,
-    failOpenOnError,
   });
   const fallbackStore = failOpenOnError
     ? new InMemoryRateLimitStore({
@@ -365,16 +349,15 @@ export const createRateLimiter = (config: RateLimitConfig) => {
       cleanupIntervalMs: windowMs,
     })
     : null;
-  let activeStore: RateLimitStore = backingStore;
 
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const middleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const baseKey = keyGenerator(req);
     const now = Date.now();
     const { key, resetTime } = toBucketKey(baseKey, effectiveNamespace, windowMs, now);
 
     let entry: RateLimitEntry;
     try {
-      entry = await activeStore.increment(key, windowMs, now, resetTime);
+      entry = await primaryStore.increment(key, windowMs, now, resetTime);
     } catch (error) {
       logger.error({ err: error }, 'Rate limiter backend failed');
 
@@ -388,8 +371,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
 
       if (fallbackStore) {
         try {
-          activeStore = fallbackStore;
-          entry = await activeStore.increment(key, windowMs, now, resetTime);
+          entry = await fallbackStore.increment(key, windowMs, now, resetTime);
         } catch (fallbackError) {
           logger.error({ err: fallbackError }, 'Fallback rate limiter failed; allowing request to proceed');
           next();
@@ -425,6 +407,12 @@ export const createRateLimiter = (config: RateLimitConfig) => {
 
     next();
   };
+
+  (middleware as typeof middleware & { shutdown?: () => Promise<void> }).shutdown = async () => {
+    await Promise.allSettled([primaryStore.shutdown?.(), fallbackStore?.shutdown?.()]);
+  };
+
+  return middleware as typeof middleware & { shutdown?: () => Promise<void> };
 };
 
 /**
