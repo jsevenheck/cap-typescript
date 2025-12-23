@@ -93,9 +93,15 @@ const registerActiveEmployeesEndpoint = (app: Application): void => {
       return false;
     }
 
+    const providedLength = Buffer.byteLength(providedToken, 'utf8');
+    const reloadLength = Buffer.byteLength(reloadToken, 'utf8');
+    if (providedLength !== reloadLength) {
+      return false;
+    }
+
     const providedBuffer = Buffer.from(providedToken, 'utf8');
     const reloadBuffer = Buffer.from(reloadToken, 'utf8');
-    return providedBuffer.length === reloadBuffer.length && crypto.timingSafeEqual(providedBuffer, reloadBuffer);
+    return crypto.timingSafeEqual(providedBuffer, reloadBuffer);
   };
 
   app.post('/api/employees/active/reload-key', wrapAsyncMiddleware(apiRateLimiter), wrapAsyncMiddleware(async (req, res) => {

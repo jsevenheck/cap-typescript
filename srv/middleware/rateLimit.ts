@@ -148,12 +148,16 @@ class RedisRateLimitStore implements RateLimitStore {
   private readonly client: RedisClientType;
   private readonly keySetName: string;
   private readonly effectiveMaxKeys: number;
-  private readonly enforceMaxKeysSampleRate = 0.01;
+  private readonly enforceMaxKeysSampleRate: number;
   private readonly ready: Promise<void>;
   private initError: Error | null = null;
 
   constructor(private readonly options: RedisStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
+    const parsedSampleRate = Number.parseFloat(process.env.RATE_LIMIT_ENFORCE_MAX_KEYS_SAMPLE_RATE ?? '');
+    this.enforceMaxKeysSampleRate = Number.isFinite(parsedSampleRate) && parsedSampleRate > 0 && parsedSampleRate <= 1
+      ? parsedSampleRate
+      : 0.01;
     this.client = options.client ?? createClient({ url: options.url });
     this.keySetName = `${options.namespace}:keys`;
     this.ready = this.initialize().catch((err) => {
@@ -345,6 +349,8 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     }
 
     if (!fallbackStore) {
+      // Lazily create the fallback store to avoid memory overhead in healthy Redis scenarios; this adds a small
+      // latency hit to the first failing request that needs the fallback.
       fallbackStore = new InMemoryRateLimitStore({
         namespace: effectiveNamespace,
         maxKeys: maxKeys ?? 10_000,
