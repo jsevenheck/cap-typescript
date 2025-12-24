@@ -1,6 +1,6 @@
 {
   "xsappname": "cap-ts-ias",
-  "tenant-mode": "shared",
+  "tenant-mode": "dedicated",
   "description": "Base IAS/XSUAA configuration for CAP. Extend with AMS-specific scopes/attributes as needed.",
   "scopes": [
     {
