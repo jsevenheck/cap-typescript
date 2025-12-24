@@ -1,0 +1,42 @@
+{
+  "xsappname": "cap-ts-ias",
+  "tenant-mode": "dedicated",
+  "description": "Base IAS/XSUAA configuration for CAP. Extend with AMS-specific scopes/attributes as needed.",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.HRViewer",
+      "description": "View HR data"
+    },
+    {
+      "name": "$XSAPPNAME.HREditor",
+      "description": "Edit HR data"
+    },
+    {
+      "name": "$XSAPPNAME.HRAdmin",
+      "description": "Administer HR data"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "HRViewer",
+      "description": "HR viewer role",
+      "scope-references": [
+        "$XSAPPNAME.HRViewer"
+      ]
+    },
+    {
+      "name": "HREditor",
+      "description": "HR editor role",
+      "scope-references": [
+        "$XSAPPNAME.HREditor"
+      ]
+    },
+    {
+      "name": "HRAdmin",
+      "description": "HR admin role",
+      "scope-references": [
+        "$XSAPPNAME.HRAdmin"
+      ]
+    }
+  ]
+}

@@ -1,40 +1,40 @@
 {
   "welcomeFile": "/index.html",
-  "authenticationMethod": "route",
+  "authenticationMethod": "none",
   "routes": [
     {
       "source": "^/odata/v4/?(.*)$",
       "target": "/odata/v4/$1",
       "destination": "srv-api",
-      "authenticationType": "ias",
+      "authenticationType": "none",
       "csrfProtection": true
     },
     {
       "source": "^/clients/?(.*)$",
       "target": "/odata/v4/clients/$1",
       "destination": "srv-api",
-      "authenticationType": "ias",
+      "authenticationType": "none",
       "csrfProtection": true
     },
     {
       "source": "^/api/(.*)$",
       "target": "/api/$1",
       "destination": "srv-api",
-      "authenticationType": "ias",
-      "csrfProtection": true
+      "authenticationType": "none",
+      "csrfProtection": false
     },
     {
-      "source":  "^/health$",
+      "source": "^/health$",
       "target": "/health",
       "destination": "srv-api",
       "authenticationType": "none",
       "csrfProtection": false
     },
     {
-      "source":  "^/(.*)$",
+      "source": "^/(.*)$",
       "target": "/$1",
-      "destination":  "ui5-hr-admin",
-      "authenticationType": "ias"
+      "destination": "ui5-hr-admin",
+      "authenticationType": "none"
     }
   ]
 }

@@ -1,5 +1,9 @@
 {
-  "folders": { "db": "../db", "srv": "." },
-  "build": { "java": { "out": "src/gen" } },
-  "odata": { "version": "v4" }
+  "folders": {
+    "db": "../db",
+    "srv": "."
+  },
+  "odata": {
+    "version": "v4"
+  }
 }

@@ -13,6 +13,7 @@ build-parameters:
       commands:
         - npm ci
         - npm run build
+        - npx cds build --production
 
 modules:
   # ===================================
@@ -20,19 +21,11 @@ modules:
   # ===================================
   - name: cap-ts-srv
     type: nodejs
-    path: srv
+    path: gen/srv
     parameters:
       buildpack: nodejs_buildpack
       memory: 512M
       disk-quota: 512M
-    build-parameters:
-      builder: custom
-      commands:
-        - npm ci
-        - npm run build
-      ignore:
-        - "test"
-        - "types"
     provides:
       - name: srv-api
         properties:
@@ -51,7 +44,7 @@ modules:
   # ===================================
   - name: cap-ts-db-deployer
     type: hdb
-    path: db
+    path: gen/db
     parameters:
       buildpack: nodejs_buildpack
       memory: 256M

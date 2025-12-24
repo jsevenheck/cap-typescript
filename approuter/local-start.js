@@ -6,6 +6,15 @@ const basicAuthPassword = process.env.CAP_BASIC_PASSWORD || 'dev';
 
 const destinationsEnvExists = Boolean(process.env.destinations);
 const hasVcapServices = Boolean(process.env.VCAP_SERVICES);
+const isCloudFoundry = Boolean(process.env.VCAP_APPLICATION);
+
+const xsAppLocalPath = path.join(__dirname, 'xs-app.local.json');
+const startOptions = {};
+
+if (!isCloudFoundry && fs.existsSync(xsAppLocalPath)) {
+  startOptions.xsappConfig = xsAppLocalPath;
+  console.info('[approuter] Using local xs-app.local.json for development.');
+}
 
 if (!destinationsEnvExists && !hasVcapServices) {
   const defaultEnvPath = path.join(__dirname, 'default-env.json');
@@ -71,4 +80,4 @@ if (!destinationsEnvExists && !hasVcapServices) {
 const Approuter = require('@sap/approuter');
 
 const approuter = new Approuter();
-approuter.start();
+approuter.start(startOptions);
