@@ -346,7 +346,9 @@ To test the backend API directly with Postman:
 
 ### Troubleshooting
 
-**Backend not responding on localhost:4004?**
+> **📖 For comprehensive troubleshooting, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**
+
+**Quick checks if backend not responding on localhost:4004:**
 
 1. Ensure dependencies are installed:
    ```bash
@@ -387,6 +389,8 @@ To test the backend API directly with Postman:
    ```
 
 4. Access via approuter: `http://localhost:5000`
+
+**For more detailed diagnostics** including network/routing issues, Docker/WSL networking, and step-by-step debugging commands, see the [comprehensive troubleshooting guide](./TROUBLESHOOTING.md).
 
 ### Building for Production
 ```bash
