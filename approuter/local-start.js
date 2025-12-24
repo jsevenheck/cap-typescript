@@ -6,6 +6,15 @@ const basicAuthPassword = process.env.CAP_BASIC_PASSWORD || 'dev';
 
 const destinationsEnvExists = Boolean(process.env.destinations);
 const hasVcapServices = Boolean(process.env.VCAP_SERVICES);
+const isCloudFoundry = Boolean(process.env.VCAP_APPLICATION);
+
+const xsAppPath = path.join(__dirname, 'xs-app.json');
+const xsAppLocalPath = path.join(__dirname, 'xs-app.local.json');
+
+if (!isCloudFoundry && fs.existsSync(xsAppLocalPath)) {
+  fs.copyFileSync(xsAppLocalPath, xsAppPath);
+  console.info('[approuter] Using local xs-app.local.json for development.');
+}
 
 if (!destinationsEnvExists && !hasVcapServices) {
   const defaultEnvPath = path.join(__dirname, 'default-env.json');
