@@ -4,6 +4,89 @@
     "srv": "."
   },
   "odata": {
-    "version": "v4"
+    "version": "v4",
+    "urlPath": "/odata/v4"
+  },
+  "features": {
+    "typescript": true
+  },
+  "[development]": {
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "url": "../db/sqlite.db"
+        }
+      },
+      "auth": {
+        "kind": "mocked",
+        "users": {
+          "dev": {
+            "password": "dev",
+            "roles": ["HRViewer", "HREditor", "HRAdmin"],
+            "attributes": {
+              "companyCodes": ["COMP-001", "COMP-002"],
+              "CompanyCode": ["COMP-001", "COMP-002"]
+            }
+          },
+          "hrviewer": {
+            "password": "hrviewer",
+            "roles": ["HRViewer"],
+            "attributes": {
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
+            }
+          },
+          "hreditor": {
+            "password": "hreditor",
+            "roles": ["HREditor"],
+            "attributes": {
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "[test]": {
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "url": "../db/test.db"
+        }
+      },
+      "auth": {
+        "kind": "mocked",
+        "users": {
+          "dev": {
+            "password": "dev",
+            "roles": ["HRViewer", "HREditor", "HRAdmin"],
+            "attributes": {
+              "companyCodes": ["COMP-001", "COMP-002"],
+              "CompanyCode": ["COMP-001", "COMP-002"]
+            }
+          },
+          "hrviewer": {
+            "password": "hrviewer",
+            "roles": ["HRViewer"],
+            "attributes": {
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
+            }
+          },
+          "hreditor": {
+            "password": "hreditor",
+            "roles": ["HREditor"],
+            "attributes": {
+              "companyCodes": ["COMP-001"],
+              "CompanyCode": ["COMP-001"]
+            }
+          }
+        }
+      },
+      "ams": false
+    }
   }
 }
