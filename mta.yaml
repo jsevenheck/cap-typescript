@@ -26,6 +26,8 @@ modules:
       buildpack: nodejs_buildpack
       memory: 512M
       disk-quota: 512M
+    deployed-after:
+      - cap-ts-ams-deployer
     provides:
       - name: srv-api
         properties:
