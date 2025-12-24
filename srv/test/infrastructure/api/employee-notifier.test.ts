@@ -39,6 +39,7 @@ describe('EmployeeThirdPartyNotifier', () => {
     mockGetDestination.mockReset();
     mockIsHttpDestination.mockReset();
     mockPostEmployeeNotification.mockReset();
+    process.env.EMPLOYEE_CREATED_DESTINATION = destinationName;
   });
 
   afterEach(() => {
