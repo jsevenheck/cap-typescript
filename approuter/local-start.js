@@ -8,11 +8,11 @@ const destinationsEnvExists = Boolean(process.env.destinations);
 const hasVcapServices = Boolean(process.env.VCAP_SERVICES);
 const isCloudFoundry = Boolean(process.env.VCAP_APPLICATION);
 
-const xsAppPath = path.join(__dirname, 'xs-app.json');
 const xsAppLocalPath = path.join(__dirname, 'xs-app.local.json');
+const startOptions = {};
 
 if (!isCloudFoundry && fs.existsSync(xsAppLocalPath)) {
-  fs.copyFileSync(xsAppLocalPath, xsAppPath);
+  startOptions.xsappConfig = xsAppLocalPath;
   console.info('[approuter] Using local xs-app.local.json for development.');
 }
 
@@ -80,4 +80,4 @@ if (!destinationsEnvExists && !hasVcapServices) {
 const Approuter = require('@sap/approuter');
 
 const approuter = new Approuter();
-approuter.start();
+approuter.start(startOptions);

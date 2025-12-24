@@ -27,7 +27,7 @@
       "source":  "^/health$",
       "target": "/health",
       "destination": "srv-api",
-      "authenticationType": "ias",
+      "authenticationType": "none",
       "csrfProtection": false
     },
     {
