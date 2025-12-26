@@ -43,6 +43,7 @@ export default class Main extends Controller {
   private cacheCleanupIntervalId?: number;
   private initialCacheCleanupTimeoutId?: number;
   private lastHash?: string;
+  private searchDebounceTimeoutId?: number;
 
   public onInit(): void {
     const view = this.getView();
@@ -415,6 +416,10 @@ export default class Main extends Controller {
       clearTimeout(this.initialCacheCleanupTimeoutId);
       this.initialCacheCleanupTimeoutId = undefined;
     }
+    if (this.searchDebounceTimeoutId !== undefined) {
+      clearTimeout(this.searchDebounceTimeoutId);
+      this.searchDebounceTimeoutId = undefined;
+    }
 
     // Destroy handler instances
     if (this.clients && typeof (this.clients as any).destroy === 'function') {
@@ -582,16 +587,27 @@ export default class Main extends Controller {
 
   /**
    * Handle employee search live change - triggered as user types
-   * Uses debouncing to avoid excessive filtering
+   * Uses debouncing to avoid excessive OData requests
    */
   public onEmployeeSearchLiveChange(event: Event): void {
     const query = event.getParameter("newValue") as string;
-    this.filterEmployees(query);
+    
+    // Clear any pending debounce timeout
+    if (this.searchDebounceTimeoutId !== undefined) {
+      clearTimeout(this.searchDebounceTimeoutId);
+    }
+    
+    // Debounce search to avoid excessive requests (300ms delay)
+    this.searchDebounceTimeoutId = setTimeout(() => {
+      this.filterEmployees(query);
+      this.searchDebounceTimeoutId = undefined;
+    }, 300) as unknown as number;
   }
 
   /**
    * Apply filter to employees list based on search query.
    * Filters by firstName, lastName, email, and employeeId.
+   * Note: OData V4 Contains filter is case-insensitive by default.
    */
   private filterEmployees(query: string): void {
     const employeesList = this.byId("employeesList") as List;
