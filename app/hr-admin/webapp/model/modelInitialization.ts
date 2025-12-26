@@ -17,6 +17,7 @@ import {
   EMPLOYMENT_TYPE_OPTIONS,
   STATUS_OPTIONS,
 } from '../constants/selectOptions';
+import { getEmptyStatistics } from '../services/statistics.service';
 
 const DEFAULT_STATUS: EmployeeStatusKey = 'active';
 const DEFAULT_EMPLOYMENT_TYPE: EmploymentTypeKey = 'internal';
@@ -88,6 +89,7 @@ export function createInitialViewState(): ViewState {
   return {
     selectedTabKey: 'clients',
     anonymizeBefore: '',
+    statisticsExpanded: false,
   };
 }
 
@@ -126,4 +128,5 @@ export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(STATUS_OPTIONS), 'statusOptions');
   view.setModel(new JSONModel(EMPLOYMENT_TYPE_OPTIONS), 'employmentTypeOptions');
   view.setModel(new JSONModel(COUNTRY_OPTIONS), 'countryOptions');
+  view.setModel(new JSONModel(getEmptyStatistics()), 'statistics');
 }
