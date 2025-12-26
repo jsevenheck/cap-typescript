@@ -23,7 +23,7 @@ export async function fetchEmployeeStatistics(clientId?: string): Promise<Employ
   // Properly encode the clientId to prevent URL injection
   const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
   const url = encodedClientId
-    ? `/odata/v4/clients/employeeStatistics(clientId=${encodedClientId})`
+    ? `/odata/v4/clients/employeeStatistics(clientId='${encodedClientId}')`
     : '/odata/v4/clients/employeeStatistics()';
 
   const response = await fetch(url, {
