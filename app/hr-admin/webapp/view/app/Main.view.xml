@@ -54,7 +54,7 @@
                                 <StandardListItem
                                         title="{name}"
                                         description="{companyId}"
-                                        info="{= ${employees@odata.count} !== undefined ? ${employees@odata.count} + ' ' + ${i18n>employees} : '' }"
+                                        info="{= ${employees@odata.count} !== undefined ? ${employees@odata.count} + ' ' + (${employees@odata.count} === 1 ? ${i18n>employee} : ${i18n>employees}) : '' }"
                                         infoState="Information"
                                         type="Active"/>
                             </items>
