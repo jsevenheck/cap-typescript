@@ -98,6 +98,7 @@ export interface ViewState {
   selectedAssignmentId?: string;
   selectedTabKey: string;
   anonymizeBefore?: string;
+  statisticsExpanded?: boolean;
 }
 
 export interface AuthorizationState {

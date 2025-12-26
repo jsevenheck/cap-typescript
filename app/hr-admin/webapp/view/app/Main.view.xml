@@ -96,6 +96,66 @@
                                 text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
                         <Text
                                 text="{i18n>manageEmployeesDesc}"/>
+                        <Panel
+                                id="statisticsPanel"
+                                headerText="{i18n>statisticsDashboard}"
+                                expandable="true"
+                                expanded="{view>/statisticsExpanded}"
+                                class="sapUiSmallMarginTop sapUiSmallMarginBottom"
+                                visible="{= !!${view>/selectedClientId}}">
+                            <content>
+                                <HBox justifyContent="SpaceAround" wrap="Wrap" class="sapUiSmallMargin">
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/totalEmployees}"
+                                                unit="{i18n>totalEmployees}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/activeEmployees}"
+                                                unit="{i18n>activeEmployees}"
+                                                state="Success"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/inactiveEmployees}"
+                                                unit="{i18n>inactiveEmployees}"
+                                                state="Warning"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/internalEmployees}"
+                                                unit="{i18n>internalEmployees}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/externalEmployees}"
+                                                unit="{i18n>externalEmployees}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/managersCount}"
+                                                unit="{i18n>managersCount}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/recentHires}"
+                                                unit="{i18n>recentHires}"
+                                                state="Success"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{statistics>/upcomingExits}"
+                                                unit="{i18n>upcomingExits}"
+                                                state="Warning"/>
+                                    </VBox>
+                                </HBox>
+                            </content>
+                        </Panel>
                         <List
                                 id="employeesList"
                                 mode="SingleSelectMaster"

@@ -1,4 +1,5 @@
 import type { Request, Service } from '@sap/cds';
+import cds from '@sap/cds';
 
 import { registerClientHandlers } from './domain/client';
 import { registerEmployeeHandlers } from './domain/employee';
@@ -13,6 +14,7 @@ import {
   authorizeEmployeeCostCenterAssignments,
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
+import { getEmployeeStatistics } from './domain/employee/services/statistics.service';
 
 type ServiceWithOn = Service & {
   on: (
@@ -62,6 +64,29 @@ const registerHandlers = (srv: Service): void => {
         companyCodes: getAttributeValues(userContext, 'companyCodes'),
       },
     };
+  });
+
+  // Register employeeStatistics function handler
+  (srv as ServiceWithOn).on('employeeStatistics', async (req: Request) => {
+    const user = (req as unknown as { user: CAPUser }).user;
+    const userContext = buildUserContext(user);
+
+    const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
+    const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));
+    if (!hasRequiredRole) {
+      return req.reject(403, 'User is not authorized to access employee statistics');
+    }
+
+    const clientId = (req.data as { clientId?: string })?.clientId ?? null;
+
+    try {
+      const tx = cds.transaction(req);
+      const statistics = await getEmployeeStatistics(tx, clientId);
+      return statistics;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve statistics';
+      return req.reject(500, message);
+    }
   });
 
   registerClientHandlers(srv);

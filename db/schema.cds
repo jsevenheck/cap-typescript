@@ -57,11 +57,17 @@ entity Locations : managed, cuid {
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
+  @mandatory
   firstName     : String(60)  not null;
+  @mandatory
   lastName      : String(60)  not null;
+  @mandatory
+  @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
   location      : Association to Locations not null;
+  @assert.range: true
   positionLevel : String(40);
+  @mandatory
   entryDate     : Date not null;
   exitDate      : Date;
   status        : EmployeeStatus default 'active';

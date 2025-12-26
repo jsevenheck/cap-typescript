@@ -109,4 +109,22 @@ service ClientService @(path:'/clients', impl:'./handlers.ts') {
       companyCodes: array of String;
     };
   };
+
+  /**
+   * Get employee statistics for dashboard.
+   * Returns aggregated counts for employees by status and employment type.
+   * @param clientId - Optional client ID to filter statistics for a specific client
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor', 'HRViewer']
+  function employeeStatistics(clientId: UUID) returns {
+    totalEmployees: Integer;
+    activeEmployees: Integer;
+    inactiveEmployees: Integer;
+    internalEmployees: Integer;
+    externalEmployees: Integer;
+    managersCount: Integer;
+    recentHires: Integer;
+    upcomingExits: Integer;
+  };
 }

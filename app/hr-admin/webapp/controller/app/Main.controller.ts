@@ -28,6 +28,7 @@ import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import HashChanger from "sap/ui/core/routing/HashChanger";
+import { fetchEmployeeStatistics, getEmptyStatistics } from "../../services/statistics.service";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -205,6 +206,39 @@ export default class Main extends Controller {
     const app = this.byId("app") as any;
     if (app && employeesPage) {
       app.to(employeesPage.getId());
+    }
+
+    // Load statistics for the selected client
+    this.loadStatistics(clientId);
+  }
+
+  /**
+   * Load employee statistics for the given client ID.
+   * Updates the statistics model for dashboard display.
+   */
+  private async loadStatistics(clientId?: string): Promise<void> {
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const statisticsModel = view.getModel("statistics") as JSONModel;
+    if (!statisticsModel) {
+      Log.error("Statistics model not found", undefined, "hr.admin.Main");
+      return;
+    }
+
+    try {
+      const stats = await fetchEmployeeStatistics(clientId);
+      statisticsModel.setData(stats);
+    } catch (error) {
+      Log.error(
+        "Failed to load statistics",
+        error instanceof Error ? error.message : String(error),
+        "hr.admin.Main"
+      );
+      // Reset to empty statistics on error
+      statisticsModel.setData(getEmptyStatistics());
     }
   }
 
@@ -575,6 +609,12 @@ export default class Main extends Controller {
       }
     }
     this.employees.refresh();
+
+    // Refresh statistics as well
+    const clientId = this.selection.getSelectedClientId();
+    if (clientId) {
+      this.loadStatistics(clientId);
+    }
   }
 
   /**
