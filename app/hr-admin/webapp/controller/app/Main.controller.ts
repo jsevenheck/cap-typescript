@@ -626,7 +626,7 @@ export default class Main extends Controller {
       return;
     }
 
-    const searchValue = query.trim().toLowerCase();
+    const searchValue = query.trim();
 
     // Create filters for each searchable field using OData contains/tolower
     // For OData V4, we use FilterOperator.Contains for case-insensitive search
