@@ -536,41 +536,6 @@ mbt build
 cf deploy mta_archives/cap-ts_1.0.0.mtar
 ```
 
-## 🐛 Known Issues & Limitations
-
-### Current Limitations
-- Test coverage at ~12% (target: 70%+)
-
-### Completed Improvements ✅
-- [x] **Implement proper UI5 routing with browser history support**
-  - Full routing configuration with 4 routes (clients, employees, costCenters, locations)
-  - Deep linking support with route parameters
-  - Browser back/forward button functionality
-  - SAP Fiori Design Guidelines compliant
-- [x] **Migrate hardcoded strings to i18n for better internationalization**
-  - All 109 strings in Main.view.xml migrated to i18n bindings
-  - All controllers fully internationalized (Client, Employee, CostCenter, Location)
-  - 140+ i18n keys added across the application
-  - Consistent ResourceBundle usage pattern throughout
-  - Ready for multi-language support (German, French, etc.)
-- [x] **Add navigation guards for unsaved changes warning**
-  - UnsavedChangesGuard service tracks form dirty state
-  - beforeMatched route event interception
-  - Confirmation dialog with Yes/No options
-  - Integrated with all entity handlers (Client, Employee, CostCenter, Location)
-  - Prevents accidental data loss during navigation across entire application
-- [x] **Implement frontend caching for frequently accessed data**
-  - CacheService with TTL (time-to-live) support and automatic expiration
-  - Support for both sessionStorage (session-only) and localStorage (persistent)
-  - CacheManager for coordinated cache invalidation (OData + browser storage)
-  - OData V4 model caching enabled with earlyRequests and groupProperties
-  - Periodic cache cleanup (every 5 minutes) to free up storage space
-  - Manual cache invalidation on refresh button clicks
-  - Cache statistics for monitoring (entry count, size in KB)
-
-### Planned Improvements
-- [ ] Increase test coverage to 70%+ (currently at ~12%)
-
 ## 🤝 Contributing
 
 1. Create feature branch from `main`
