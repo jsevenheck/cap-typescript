@@ -17,7 +17,7 @@
                                 id="clientsList"
                                 mode="SingleSelectMaster"
                                 includeItemInSelection="true"
-                                items="{path: '/Clients'}"
+                                items="{path: '/Clients', parameters: {$expand: 'employees($count=true;$top=0)'}}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
                                 selectionChange=".onSelectionChange"
                                 itemPress=".onClientPress">
@@ -54,6 +54,8 @@
                                 <StandardListItem
                                         title="{name}"
                                         description="{companyId}"
+                                        info="{= ${employees@odata.count} !== undefined ? ${employees@odata.count} + ' ' + ${i18n>employees} : '' }"
+                                        infoState="Information"
                                         type="Active"/>
                             </items>
                         </List>
@@ -105,6 +107,12 @@
                                 <Toolbar>
                                     <Title text="{i18n>employees}" level="H3"/>
                                     <ToolbarSpacer/>
+                                    <SearchField
+                                            id="employeeSearchField"
+                                            width="16rem"
+                                            placeholder="{i18n>searchEmployees}"
+                                            search=".onEmployeeSearch"
+                                            liveChange=".onEmployeeSearchLiveChange"/>
                                     <Button
                                             text="{i18n>costCenters}"
                                             icon="sap-icon://collections-management"

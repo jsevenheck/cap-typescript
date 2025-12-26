@@ -1,13 +1,18 @@
 import Controller from "sap/ui/core/mvc/Controller";
 import Dialog from "sap/m/Dialog";
+import List from "sap/m/List";
 import MessageBox from "sap/m/MessageBox";
 import MessageToast from "sap/m/MessageToast";
+import SearchField from "sap/m/SearchField";
 import Event from "sap/ui/base/Event";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Router from "sap/ui/core/routing/Router";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import Filter from "sap/ui/model/Filter";
+import FilterOperator from "sap/ui/model/FilterOperator";
 import Log from "sap/base/Log";
 
 import initializeModels from "../../model/modelInitialization";
@@ -551,7 +556,78 @@ export default class Main extends Controller {
   public onRefreshEmployees(): void {
     // Clear employee entity cache and refresh list
     this.cacheManager.clearEntity('Employees');
+    // Clear search field
+    const searchField = this.byId("employeeSearchField") as SearchField;
+    if (searchField) {
+      searchField.setValue("");
+    }
+    // Clear any filters on the employees list
+    const employeesList = this.byId("employeesList") as List;
+    if (employeesList) {
+      const binding = employeesList.getBinding("items") as ODataListBinding;
+      if (binding) {
+        binding.filter([]);
+      }
+    }
     this.employees.refresh();
+  }
+
+  /**
+   * Handle employee search - triggered on search submit (Enter key)
+   */
+  public onEmployeeSearch(event: Event): void {
+    const query = event.getParameter("query") as string;
+    this.filterEmployees(query);
+  }
+
+  /**
+   * Handle employee search live change - triggered as user types
+   * Uses debouncing to avoid excessive filtering
+   */
+  public onEmployeeSearchLiveChange(event: Event): void {
+    const query = event.getParameter("newValue") as string;
+    this.filterEmployees(query);
+  }
+
+  /**
+   * Apply filter to employees list based on search query.
+   * Filters by firstName, lastName, email, and employeeId.
+   */
+  private filterEmployees(query: string): void {
+    const employeesList = this.byId("employeesList") as List;
+    if (!employeesList) {
+      return;
+    }
+
+    const binding = employeesList.getBinding("items") as ODataListBinding;
+    if (!binding) {
+      return;
+    }
+
+    if (!query || query.trim().length === 0) {
+      // Clear filters when search is empty
+      binding.filter([]);
+      return;
+    }
+
+    const searchValue = query.trim().toLowerCase();
+
+    // Create filters for each searchable field using OData contains/tolower
+    // For OData V4, we use FilterOperator.Contains for case-insensitive search
+    const filters = [
+      new Filter("firstName", FilterOperator.Contains, searchValue),
+      new Filter("lastName", FilterOperator.Contains, searchValue),
+      new Filter("email", FilterOperator.Contains, searchValue),
+      new Filter("employeeId", FilterOperator.Contains, searchValue),
+    ];
+
+    // Combine with OR logic - match any of the fields
+    const combinedFilter = new Filter({
+      filters: filters,
+      and: false,
+    });
+
+    binding.filter([combinedFilter]);
   }
 
   public onAddEmployee(): void {
