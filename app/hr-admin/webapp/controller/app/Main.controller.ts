@@ -628,8 +628,8 @@ export default class Main extends Controller {
 
     const searchValue = query.trim();
 
-    // Create filters for each searchable field using OData contains/tolower
-    // For OData V4, we use FilterOperator.Contains for case-insensitive search
+    // Create filters for each searchable field
+    // In OData V4, FilterOperator.Contains is inherently case-insensitive
     const filters = [
       new Filter("firstName", FilterOperator.Contains, searchValue),
       new Filter("lastName", FilterOperator.Contains, searchValue),
