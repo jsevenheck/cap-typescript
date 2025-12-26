@@ -12,9 +12,11 @@ import {
   authorizeEmployees,
   authorizeLocations,
   authorizeEmployeeCostCenterAssignments,
+  CompanyAuthorization,
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
 import { getEmployeeStatistics } from './domain/employee/services/statistics.service';
+import type { CapServiceError } from './shared/utils/errors';
 
 type ServiceWithOn = Service & {
   on: (
@@ -80,12 +82,16 @@ const registerHandlers = (srv: Service): void => {
     const clientId = (req.data as { clientId?: string })?.clientId ?? null;
 
     try {
+      const authorization = new CompanyAuthorization(req);
+      const clientScope = await authorization.resolveAuthorizedClientScope(clientId);
       const tx = cds.transaction(req);
-      const statistics = await getEmployeeStatistics(tx, clientId);
+      const statistics = await getEmployeeStatistics(tx, clientScope);
       return statistics;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retrieve statistics';
-      return req.reject(500, message);
+      const serviceError = error as CapServiceError;
+      const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
+      return req.reject(status, message);
     }
   });
 

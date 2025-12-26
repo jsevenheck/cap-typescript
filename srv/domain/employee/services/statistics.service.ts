@@ -58,12 +58,29 @@ const extractCount = (result: unknown): number => {
  */
 export async function getEmployeeStatistics(
   tx: Transaction,
-  clientId?: string | null,
+  clientScope?: string | string[] | null,
 ): Promise<EmployeeStatistics> {
   const entityName = 'clientmgmt.Employees';
 
   // Base condition for filtering by client
-  const clientCondition = clientId ? { client_ID: clientId } : {};
+  if (Array.isArray(clientScope) && clientScope.length === 0) {
+    return {
+      totalEmployees: 0,
+      activeEmployees: 0,
+      inactiveEmployees: 0,
+      internalEmployees: 0,
+      externalEmployees: 0,
+      managersCount: 0,
+      recentHires: 0,
+      upcomingExits: 0,
+    };
+  }
+
+  const clientCondition = Array.isArray(clientScope)
+    ? { client_ID: { in: clientScope } }
+    : clientScope
+      ? { client_ID: clientScope }
+      : {};
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysAgo = daysAgo(30);
   const thirtyDaysFromNow = daysFromNow(30);

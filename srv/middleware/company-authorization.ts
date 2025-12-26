@@ -11,6 +11,10 @@ type ClientRow = {
   companyId: string;
 };
 
+type ClientIdRow = {
+  ID: string;
+};
+
 type EmployeeRow = {
   ID: string;
   client_ID: string;
@@ -77,6 +81,30 @@ export class CompanyAuthorization {
     }
 
     return false;
+  }
+
+  async resolveAuthorizedClientScope(clientId?: string | null): Promise<string[] | string | null> {
+    if (clientId) {
+      await this.ensureClientsLoaded(new Set([clientId]));
+      this.ensureClientAccess(clientId, `client ${clientId}`);
+      return clientId;
+    }
+
+    if (this.shouldSkip()) {
+      return null;
+    }
+
+    if (!this.allowedCompanies.size) {
+      throw createServiceError(403, 'Forbidden: user has no assigned company codes.');
+    }
+
+    const rows = (await this.runner.run(
+      SELECT.from(CLIENTS_ENTITY)
+        .columns('ID')
+        .where({ companyId: { in: Array.from(this.allowedCompanies) } }),
+    )) as ClientIdRow[];
+
+    return rows.map((row) => row.ID);
   }
 
   async validateClientAccess(clients: any[]): Promise<void> {
