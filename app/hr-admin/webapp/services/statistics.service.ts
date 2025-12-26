@@ -20,8 +20,10 @@ export interface EmployeeStatistics {
  * @returns Promise resolving to employee statistics
  */
 export async function fetchEmployeeStatistics(clientId?: string): Promise<EmployeeStatistics> {
-  const url = clientId
-    ? `/odata/v4/clients/employeeStatistics(clientId=${clientId})`
+  // Properly encode the clientId to prevent URL injection
+  const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
+  const url = encodedClientId
+    ? `/odata/v4/clients/employeeStatistics(clientId=${encodedClientId})`
     : '/odata/v4/clients/employeeStatistics(clientId=null)';
 
   const response = await fetch(url, {

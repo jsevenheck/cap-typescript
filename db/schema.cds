@@ -65,7 +65,6 @@ entity Employees : managed, cuid {
   @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
   location      : Association to Locations not null;
-  @assert.range: true
   positionLevel : String(40);
   @mandatory
   entryDate     : Date not null;
