@@ -70,15 +70,6 @@ const registerHandlers = (srv: Service): void => {
 
   // Register employeeStatistics function handler
   (srv as ServiceWithOn).on('employeeStatistics', async (req: Request) => {
-    const user = (req as unknown as { user: CAPUser }).user;
-    const userContext = buildUserContext(user);
-
-    const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
-    const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));
-    if (!hasRequiredRole) {
-      return req.reject(403, 'User is not authorized to access employee statistics');
-    }
-
     const clientId = (req.data as { clientId?: string })?.clientId ?? null;
 
     try {
