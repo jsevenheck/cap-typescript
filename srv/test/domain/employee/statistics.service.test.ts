@@ -141,5 +141,24 @@ describe('EmployeeStatisticsService', () => {
       // Execution should be fast (parallel) - less than 100ms for mock calls
       expect(endTime - startTime).toBeLessThan(100);
     });
+
+    it('should return all zeros for empty client scope array', async () => {
+      const results = Array(8).fill([{ count: 10 }]);
+      const { tx, runFn } = createMockTransaction(results);
+
+      const stats = await getEmployeeStatistics(tx, []);
+
+      // No queries should be executed for empty scope
+      expect(runFn).not.toHaveBeenCalled();
+      // All stats should be zero
+      expect(stats.totalEmployees).toBe(0);
+      expect(stats.activeEmployees).toBe(0);
+      expect(stats.inactiveEmployees).toBe(0);
+      expect(stats.internalEmployees).toBe(0);
+      expect(stats.externalEmployees).toBe(0);
+      expect(stats.managersCount).toBe(0);
+      expect(stats.recentHires).toBe(0);
+      expect(stats.upcomingExits).toBe(0);
+    });
   });
 });

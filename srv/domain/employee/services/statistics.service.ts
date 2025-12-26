@@ -80,20 +80,21 @@ export async function getEmployeeStatistics(
     ? { client_ID: { in: clientScope } }
     : clientScope
       ? { client_ID: clientScope }
-      : {};
+      : null;
+  const hasClientCondition = clientCondition !== null;
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysAgo = daysAgo(30);
   const thirtyDaysFromNow = daysFromNow(30);
 
-  // Build conditions for date-based queries
-  const recentHiresCondition: Record<string, unknown> = {
-    ...clientCondition,
-    entryDate: { '>=': thirtyDaysAgo },
-  };
-
-  const upcomingExitsCondition: Record<string, unknown> = {
-    ...clientCondition,
-    exitDate: { '>=': today, '<=': thirtyDaysFromNow },
+  // Helper function to build query with optional client condition
+  const buildQuery = (additionalConditions?: Record<string, unknown>) => {
+    const query = ql.SELECT.from(entityName).columns('count(*) as count');
+    const conditions = {
+      ...(hasClientCondition ? clientCondition : {}),
+      ...(additionalConditions || {}),
+    };
+    // Only add where clause if there are actual conditions
+    return Object.keys(conditions).length > 0 ? query.where(conditions) : query;
   };
 
   // Run all queries in parallel for better performance (SAP best practice)
@@ -108,53 +109,21 @@ export async function getEmployeeStatistics(
     upcomingExitsResult,
   ] = await Promise.all([
     // Total employees
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where(clientCondition),
-    ),
+    tx.run(buildQuery()),
     // Active employees
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where({ ...clientCondition, status: 'active' }),
-    ),
+    tx.run(buildQuery({ status: 'active' })),
     // Inactive employees
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where({ ...clientCondition, status: 'inactive' }),
-    ),
+    tx.run(buildQuery({ status: 'inactive' })),
     // Internal employees
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where({ ...clientCondition, employmentType: 'internal' }),
-    ),
+    tx.run(buildQuery({ employmentType: 'internal' })),
     // External employees
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where({ ...clientCondition, employmentType: 'external' }),
-    ),
+    tx.run(buildQuery({ employmentType: 'external' })),
     // Managers (employees with isManager = true)
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where({ ...clientCondition, isManager: true }),
-    ),
+    tx.run(buildQuery({ isManager: true })),
     // Recent hires (last 30 days)
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where(recentHiresCondition),
-    ),
+    tx.run(buildQuery({ entryDate: { '>=': thirtyDaysAgo } })),
     // Upcoming exits (next 30 days)
-    tx.run(
-      ql.SELECT.from(entityName)
-        .columns('count(*) as count')
-        .where(upcomingExitsCondition),
-    ),
+    tx.run(buildQuery({ exitDate: { '>=': today, '<=': thirtyDaysFromNow } })),
   ]);
 
   return {
