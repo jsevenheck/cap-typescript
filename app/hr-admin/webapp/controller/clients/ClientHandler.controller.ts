@@ -10,6 +10,7 @@ import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Context from "sap/ui/model/odata/v4/Context";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -155,7 +156,7 @@ export default class ClientHandler {
         if (view) {
           view.setBusy(false);
         }
-        console.warn("Failed to fetch delete preview, proceeding with basic confirmation:", error);
+        Log.warning("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error), "hr.admin.ClientHandler");
 
         // Fall back to basic confirmation if preview fails
         MessageBox.confirm(i18n.getText("deleteClientConfirm") + ` ${clientName}?`, {
@@ -171,7 +172,7 @@ export default class ClientHandler {
                   this.selection.clearClient();
                 })
                 .catch((deleteError: Error) => {
-                  console.error("Error deleting client:", deleteError);
+                  Log.error("Error deleting client", deleteError.message, "hr.admin.ClientHandler");
                   MessageBox.error(deleteError.message ?? i18n.getText("errorDeleting", ["client"]));
                 });
             }
