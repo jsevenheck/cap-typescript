@@ -1,7 +1,7 @@
 /**
  * Unit tests for delete-preview.service
  */
-import { getClientDeletePreview, ClientDeletePreview } from '../../../domain/client/services/delete-preview.service';
+import { getClientDeletePreview } from '../../../domain/client/services/delete-preview.service';
 
 describe('getClientDeletePreview', () => {
   // Mock transaction object
