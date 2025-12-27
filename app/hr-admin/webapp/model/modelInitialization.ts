@@ -90,6 +90,7 @@ export function createInitialViewState(): ViewState {
     selectedTabKey: 'clients',
     anonymizeBefore: '',
     statisticsExpanded: false,
+    statisticsLoading: false,
   };
 }
 

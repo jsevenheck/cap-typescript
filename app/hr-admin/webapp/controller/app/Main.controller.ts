@@ -223,10 +223,15 @@ export default class Main extends Controller {
     }
 
     const statisticsModel = view.getModel("statistics") as JSONModel;
+    const viewModel = this.models.getViewStateModel();
+
     if (!statisticsModel) {
       Log.error("Statistics model not found", undefined, "hr.admin.Main");
       return;
     }
+
+    // Set loading state
+    viewModel.setProperty("/statisticsLoading", true);
 
     try {
       const stats = await fetchEmployeeStatistics(clientId);
@@ -239,6 +244,9 @@ export default class Main extends Controller {
       );
       // Reset to empty statistics on error
       statisticsModel.setData(getEmptyStatistics());
+    } finally {
+      // Clear loading state
+      viewModel.setProperty("/statisticsLoading", false);
     }
   }
 
