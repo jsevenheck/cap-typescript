@@ -127,4 +127,20 @@ service ClientService @(path:'/clients', impl:'./handlers.ts') {
     recentHires: Integer;
     upcomingExits: Integer;
   };
+
+  /**
+   * Preview the impact of deleting a client.
+   * Returns counts of child entities that will be deleted.
+   * Used by frontend to show informative delete confirmation dialogs.
+   * @param clientId - The client ID to preview deletion for
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor']
+  function clientDeletePreview(clientId: UUID) returns {
+    clientName: String;
+    employeeCount: Integer;
+    costCenterCount: Integer;
+    locationCount: Integer;
+    assignmentCount: Integer;
+  };
 }

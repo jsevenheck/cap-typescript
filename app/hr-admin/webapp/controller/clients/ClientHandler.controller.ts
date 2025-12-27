@@ -10,6 +10,7 @@ import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Context from "sap/ui/model/odata/v4/Context";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -19,6 +20,7 @@ import NavigationService from "../../core/navigation/NavigationService";
 import { getEventParameter } from "../../core/utils/EventParam";
 import { createAbortableRequest } from "../../core/utils/AbortableRequest";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
+import { fetchClientDeletePreview, buildDeleteSummary } from "../../services/deletePreview.service";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -102,26 +104,81 @@ export default class ClientHandler {
       MessageBox.error(i18n.getText("noClientSelected"));
       return;
     }
-    const client = context.getObject() as { name?: string };
-    MessageBox.confirm(i18n.getText("deleteClientConfirm") + ` ${client.name ?? ""}?`, {
-      title: i18n.getText("confirm"),
-      emphasizedAction: MessageBox.Action.OK,
-      actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-      onClose: (action: string) => {
-        if (action === MessageBox.Action.OK) {
-          context
-            .delete("$auto")
-            .then(() => {
-              MessageToast.show(i18n.getText("clientDeleted"));
-              this.selection.clearClient();
-            })
-            .catch((error: Error) => {
-              console.error("Error deleting client:", error);
-              MessageBox.error(error.message ?? i18n.getText("errorDeleting", ["client"]));
-            });
+    const client = context.getObject() as { ID?: string; name?: string };
+    const clientId = client.ID;
+    const clientName = client.name ?? "";
+
+    if (!clientId) {
+      MessageBox.error(i18n.getText("noClientSelected"));
+      return;
+    }
+
+    // Fetch delete preview to show impact
+    const view = this.controller.getView();
+    if (view) {
+      view.setBusy(true);
+    }
+
+    fetchClientDeletePreview(clientId)
+      .then((preview) => {
+        if (view) {
+          view.setBusy(false);
         }
-      },
-    });
+
+        const summary = buildDeleteSummary(preview);
+        let confirmMessage = i18n.getText("deleteClientConfirm") + ` ${clientName}?`;
+
+        if (summary) {
+          confirmMessage += `\n\n${i18n.getText("deleteClientWarning")}\n${summary}`;
+        }
+
+        MessageBox.confirm(confirmMessage, {
+          title: i18n.getText("confirm"),
+          emphasizedAction: MessageBox.Action.OK,
+          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+          onClose: (action: string) => {
+            if (action === MessageBox.Action.OK) {
+              context
+                .delete("$auto")
+                .then(() => {
+                  MessageToast.show(i18n.getText("clientDeleted"));
+                  this.selection.clearClient();
+                })
+                .catch((error: Error) => {
+                  console.error("Error deleting client:", error);
+                  MessageBox.error(error.message ?? i18n.getText("errorDeleting", ["client"]));
+                });
+            }
+          },
+        });
+      })
+      .catch((error) => {
+        if (view) {
+          view.setBusy(false);
+        }
+        Log.warning("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error), "hr.admin.ClientHandler");
+
+        // Fall back to basic confirmation if preview fails
+        MessageBox.confirm(i18n.getText("deleteClientConfirm") + ` ${clientName}?`, {
+          title: i18n.getText("confirm"),
+          emphasizedAction: MessageBox.Action.OK,
+          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+          onClose: (action: string) => {
+            if (action === MessageBox.Action.OK) {
+              context
+                .delete("$auto")
+                .then(() => {
+                  MessageToast.show(i18n.getText("clientDeleted"));
+                  this.selection.clearClient();
+                })
+                .catch((deleteError: Error) => {
+                  Log.error("Error deleting client", deleteError.message, "hr.admin.ClientHandler");
+                  MessageBox.error(deleteError.message ?? i18n.getText("errorDeleting", ["client"]));
+                });
+            }
+          },
+        });
+      });
   }
 
   public save(): void {

@@ -16,6 +16,7 @@ import {
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
 import { getEmployeeStatistics } from './domain/employee/services/statistics.service';
+import { getClientDeletePreview } from './domain/client/services/delete-preview.service';
 import type { CapServiceError } from './shared/utils/errors';
 
 type ServiceWithOn = Service & {
@@ -80,6 +81,35 @@ const registerHandlers = (srv: Service): void => {
       return statistics;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retrieve statistics';
+      const serviceError = error as CapServiceError;
+      const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
+      return req.reject(status, message);
+    }
+  });
+
+  // Register clientDeletePreview function handler
+  (srv as ServiceWithOn).on('clientDeletePreview', async (req: Request) => {
+    const clientId = (req.data as { clientId?: string })?.clientId;
+
+    if (!clientId) {
+      return req.reject(400, 'Client ID is required');
+    }
+
+    try {
+      // Verify authorization for the client
+      const authorization = new CompanyAuthorization(req);
+      await authorization.resolveAuthorizedClientScope(clientId);
+
+      const tx = cds.transaction(req);
+      const preview = await getClientDeletePreview(tx, clientId);
+
+      if (!preview) {
+        return req.reject(404, 'Client not found');
+      }
+
+      return preview;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve delete preview';
       const serviceError = error as CapServiceError;
       const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
       return req.reject(status, message);
