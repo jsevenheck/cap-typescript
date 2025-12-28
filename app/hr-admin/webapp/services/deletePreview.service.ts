@@ -30,7 +30,34 @@ export async function fetchClientDeletePreview(clientId: string): Promise<Client
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch delete preview: ${response.status} ${response.statusText}`);
+    let errorDetails = '';
+
+    try {
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const errorBody = await response.json();
+        const bodyMessage =
+          (errorBody && (errorBody.error?.message || errorBody.message)) || undefined;
+
+        if (bodyMessage) {
+          errorDetails = ` - ${bodyMessage}`;
+        } else {
+          errorDetails = ` - ${JSON.stringify(errorBody)}`;
+        }
+      } else {
+        const text = await response.text();
+        if (text) {
+          errorDetails = ` - ${text}`;
+        }
+      }
+    } catch {
+      // Ignore errors while reading/processing the error response body.
+    }
+
+    throw new Error(
+      `Failed to fetch delete preview: ${response.status} ${response.statusText}${errorDetails}`,
+    );
   }
 
   const data = await response.json();
