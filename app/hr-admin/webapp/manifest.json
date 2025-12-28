@@ -126,7 +126,7 @@
           "level": 2
         },
         "notFound": {
-          "id": "notFoundPage",
+          "id": "mainPage",
           "name": "Main",
           "level": 1
         }
