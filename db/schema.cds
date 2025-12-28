@@ -25,7 +25,7 @@ entity Clients : managed, cuid {
   @mandatory @assert.unique: { name: 'Clients_companyId_unique' }
   companyId            : String(40) not null;
   @mandatory
-  name                 : String(120);
+  name                 : String(120) not null;
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
   locations            : Composition of many Locations on locations.client = $self;
