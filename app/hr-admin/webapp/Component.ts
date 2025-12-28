@@ -4,6 +4,13 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import Log from "sap/base/Log";
 
 /**
+ * Extended UIComponent interface with handler property for lifecycle management.
+ */
+interface HRAdminComponent extends UIComponent {
+  _fnUnhandledRejectionHandler: ((event: PromiseRejectionEvent) => void) | null;
+}
+
+/**
  * Component for the HR Admin application.
  * 
  * Implements proper lifecycle management for global event handlers
@@ -20,7 +27,7 @@ export default UIComponent.extend("hr.admin.Component", {
    */
   _fnUnhandledRejectionHandler: null as ((event: PromiseRejectionEvent) => void) | null,
 
-  init(this: UIComponent & { _fnUnhandledRejectionHandler: ((event: PromiseRejectionEvent) => void) | null }): void {
+  init(this: HRAdminComponent): void {
     // Call parent init
     UIComponent.prototype.init.call(this);
 
@@ -112,7 +119,7 @@ export default UIComponent.extend("hr.admin.Component", {
    * Cleanup lifecycle hook.
    * Removes global event listeners to prevent memory leaks.
    */
-  exit(this: UIComponent & { _fnUnhandledRejectionHandler: ((event: PromiseRejectionEvent) => void) | null }): void {
+  exit(this: HRAdminComponent): void {
     // Remove global event listener to prevent memory leaks
     if (this._fnUnhandledRejectionHandler) {
       window.removeEventListener('unhandledrejection', this._fnUnhandledRejectionHandler);
