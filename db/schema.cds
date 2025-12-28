@@ -22,8 +22,9 @@ type EmploymentType : String enum {
   { name: 'Clients_companyId_idx', elements: ['companyId'] }
 ]
 entity Clients : managed, cuid {
-  @assert.unique: { name: 'Clients_companyId_unique' }
+  @mandatory @assert.unique: { name: 'Clients_companyId_unique' }
   companyId            : String(40) not null;
+  @mandatory
   name                 : String(120);
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
@@ -36,11 +37,16 @@ entity Clients : managed, cuid {
   { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
 ]
 entity Locations : managed, cuid {
+  @mandatory
   city          : String(100) not null;
+  @mandatory
   country       : Association to CommonCountries not null;
+  @mandatory
   zipCode       : String(20) not null;
+  @mandatory
   street        : String(200) not null;
   addressSupplement : String(200);
+  @mandatory
   validFrom     : Date not null;
   validTo       : Date;
   client        : Association to Clients not null;
@@ -57,12 +63,16 @@ entity Locations : managed, cuid {
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
   employeeId    : String(60)  not null;
+  @mandatory
   firstName     : String(60)  not null;
+  @mandatory
   lastName      : String(60)  not null;
-  @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+  @mandatory @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
+  @mandatory
   location      : Association to Locations not null;
   positionLevel : String(40);
+  @mandatory
   entryDate     : Date not null;
   exitDate      : Date;
   status        : EmployeeStatus default 'active';
@@ -88,12 +98,17 @@ entity EmployeeIdCounters {
   { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
 ]
 entity CostCenters : managed, cuid {
+  @mandatory
   code         : String(40)  not null;
+  @mandatory
   name         : String(120) not null;
   description  : String(255);
+  @mandatory
   validFrom    : Date not null;
   validTo      : Date;
+  @mandatory
   client       : Association to Clients not null;
+  @mandatory
   responsible  : Association to Employees not null;
   employees    : Association to many Employees on employees.costCenter = $self;
   assignments  : Composition of many EmployeeCostCenterAssignments on assignments.costCenter = $self;
@@ -106,11 +121,15 @@ entity CostCenters : managed, cuid {
   { name: 'EmpCCAssign_responsible_idx', elements: ['costCenter_ID', 'isResponsible'] }
 ]
 entity EmployeeCostCenterAssignments : managed, cuid {
+  @mandatory
   employee      : Association to Employees not null;
+  @mandatory
   costCenter    : Association to CostCenters not null;
+  @mandatory
   validFrom     : Date not null;
   validTo       : Date;
   isResponsible : Boolean default false;
+  @mandatory
   client        : Association to Clients not null;
 }
 
