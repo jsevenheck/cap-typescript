@@ -5,16 +5,16 @@
     <title>HR Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- UI5 Bootstrap: Thema & Sprach-/Resourceroots anpassen wie nötig -->
+    <!-- UI5 Bootstrap -->
 <script id="sap-ui-bootstrap"
         nonce="ui5-bootstrap"
         src="resources/sap-ui-core.js"
         data-sap-ui-theme="sap_horizon"
         data-sap-ui-async="true"
-        data-sap-ui-compatVersion="edge"
+        data-sap-ui-compat-version="edge"
         data-sap-ui-language="en"
-        data-sap-ui-onInit="module:sap/ui/core/ComponentSupport"
-        data-sap-ui-resourceroots='{"hr.admin":"./"}'
+        data-sap-ui-on-init="module:sap/ui/core/ComponentSupport"
+        data-sap-ui-resource-roots='{"hr.admin":"./"}'
         data-sap-ui-libs="sap.ui.core,sap.m">
 </script>
 
@@ -22,7 +22,7 @@
 </head>
 
 <body class="sapUiBody" id="content">
-<!-- Lädt hr.admin.Component (aus Component.ts, via manifest.json) -->
+<!-- Loads hr.admin.Component (from Component.ts, via manifest.json) -->
 <div
   data-sap-ui-component
   data-name="hr.admin"

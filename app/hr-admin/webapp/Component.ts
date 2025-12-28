@@ -3,14 +3,36 @@ import MessageBox from "sap/m/MessageBox";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import Log from "sap/base/Log";
 
+/**
+ * Extended UIComponent interface with handler property for lifecycle management.
+ */
+interface HRAdminComponent extends UIComponent {
+  _fnUnhandledRejectionHandler: ((event: PromiseRejectionEvent) => void) | null;
+}
+
+/**
+ * Component for the HR Admin application.
+ * 
+ * Implements proper lifecycle management for global event handlers
+ * to prevent memory leaks when the component is destroyed and recreated.
+ */
 export default UIComponent.extend("hr.admin.Component", {
   metadata: {
     manifest: "json",
   },
 
-  init(this: UIComponent): void {
+  /**
+   * Bound handler for unhandled promise rejections.
+   * Stored as instance property to allow proper cleanup in exit().
+   */
+  _fnUnhandledRejectionHandler: null as ((event: PromiseRejectionEvent) => void) | null,
+
+  init(this: HRAdminComponent): void {
     // Call parent init
     UIComponent.prototype.init.call(this);
+
+    // Initialize the router
+    this.getRouter().initialize();
 
     // Set up global error handler for OData model
     const odataModel = this.getModel();
@@ -72,8 +94,9 @@ export default UIComponent.extend("hr.admin.Component", {
       }
     }
 
-    // Set up global handler for unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+    // Create bound handler for unhandled promise rejections
+    // Store reference for cleanup in exit()
+    this._fnUnhandledRejectionHandler = (event: PromiseRejectionEvent) => {
       console.error('Unhandled promise rejection:', event.reason);
 
       // Prevent default browser error handling
@@ -87,6 +110,20 @@ export default UIComponent.extend("hr.admin.Component", {
           actions: [MessageBox.Action.CLOSE],
         });
       }
-    });
+    };
+
+    window.addEventListener('unhandledrejection', this._fnUnhandledRejectionHandler);
+  },
+
+  /**
+   * Cleanup lifecycle hook.
+   * Removes global event listeners to prevent memory leaks.
+   */
+  exit(this: HRAdminComponent): void {
+    // Remove global event listener to prevent memory leaks
+    if (this._fnUnhandledRejectionHandler) {
+      window.removeEventListener('unhandledrejection', this._fnUnhandledRejectionHandler);
+      this._fnUnhandledRejectionHandler = null;
+    }
   },
 });
