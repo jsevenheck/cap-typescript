@@ -69,11 +69,10 @@ export default class Main extends Controller {
     this.locations = new LocationHandler(this, this.models, this.selection, this.guard);
     this.assignments = new AssignmentHandler(this, this.models, this.selection, this.guard);
 
-    // Initialize router and attach navigation guards
+    // Attach navigation guards to the router (already initialized in Component)
     const router = this.getOwnerComponent()?.getRouter();
     if (router) {
       this.attachNavigationGuards(router);
-      router.initialize();
     }
 
     // Load user authorization information
@@ -867,7 +866,7 @@ export default class Main extends Controller {
     const action = model.bindContext("/anonymizeFormerEmployees(...)");
     action.setParameter("before", before);
     action
-      .execute()
+      .invoke()
       .then(() => {
         const context = action.getBoundContext();
         const result = context?.getObject() as number | { value?: number } | undefined;
