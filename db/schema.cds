@@ -49,6 +49,7 @@ entity Locations : managed, cuid {
   @mandatory
   validFrom     : Date not null;
   validTo       : Date;
+  @mandatory
   client        : Association to Clients not null;
   employees     : Association to many Employees on employees.location = $self;
 }
