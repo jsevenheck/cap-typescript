@@ -100,7 +100,7 @@ export async function getCostCenterStatistics(
   ] = await Promise.all([
     // Total cost centers
     tx.run(buildQuery()),
-    // Active cost centers (validFrom <= today AND (validTo is null OR validTo >= today))
+    // Active cost centers (validFrom <= today AND validTo >= today)
     tx.run(buildQuery({ validFrom: { '<=': today }, validTo: { '>=': today } })),
     // Expired cost centers (validTo < today)
     tx.run(buildQuery({ validTo: { '<': today } })),
