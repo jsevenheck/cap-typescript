@@ -62,6 +62,7 @@ entity Locations : managed, cuid {
 ]
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
+  @mandatory
   employeeId    : String(60)  not null;
   @mandatory
   firstName     : String(60)  not null;
