@@ -431,41 +431,62 @@ export default class Main extends Controller {
   }
 
   /**
-   * Load location statistics for the given client ID.
-   * Updates the locationStatistics model for dashboard display.
+   * Generic helper to load statistics models with common loading and error handling logic.
    */
-  private async loadLocationStatistics(clientId?: string): Promise<void> {
+  private async loadStatistics<T>(
+    modelName: string,
+    loadingPropertyPath: string,
+    fetchFn: (clientId?: string) => Promise<T>,
+    emptyFactory: () => T,
+    clientId?: string,
+    errorContext: string = modelName
+  ): Promise<void> {
     const view = this.getView();
     if (!view) {
       return;
     }
 
-    const statisticsModel = view.getModel("locationStatistics") as JSONModel;
+    const statisticsModel = view.getModel(modelName) as JSONModel;
     const viewModel = this.models.getViewStateModel();
 
     if (!statisticsModel) {
-      Log.error("Location statistics model not found", undefined, "hr.admin.Main");
+      Log.error(`${errorContext} model not found`, undefined, "hr.admin.Main");
       return;
     }
 
     // Set loading state
-    viewModel.setProperty("/locationStatisticsLoading", true);
+    viewModel.setProperty(loadingPropertyPath, true);
 
     try {
-      const stats = await fetchLocationStatistics(clientId);
+      const stats = await fetchFn(clientId);
       statisticsModel.setData(stats);
     } catch (error) {
       Log.error(
-        "Failed to load location statistics",
+        `Failed to load ${errorContext}`,
         error instanceof Error ? error.message : String(error),
         "hr.admin.Main"
       );
       // Reset to empty statistics on error
-      statisticsModel.setData(getEmptyLocationStatistics());
+      statisticsModel.setData(emptyFactory());
     } finally {
       // Clear loading state
-      viewModel.setProperty("/locationStatisticsLoading", false);
+      viewModel.setProperty(loadingPropertyPath, false);
     }
+  }
+
+  /**
+   * Load location statistics for the given client ID.
+   * Updates the locationStatistics model for dashboard display.
+   */
+  private async loadLocationStatistics(clientId?: string): Promise<void> {
+    return this.loadStatistics(
+      "locationStatistics",
+      "/locationStatisticsLoading",
+      fetchLocationStatistics,
+      getEmptyLocationStatistics,
+      clientId,
+      "location statistics"
+    );
   }
 
   /**
