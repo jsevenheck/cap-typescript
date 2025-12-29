@@ -329,37 +329,13 @@ export default class Main extends Controller {
    * Updates the costCenterStatistics model for dashboard display.
    */
   private async loadCostCenterStatistics(clientId?: string): Promise<void> {
-    const view = this.getView();
-    if (!view) {
-      return;
-    }
-
-    const statisticsModel = view.getModel("costCenterStatistics") as JSONModel;
-    const viewModel = this.models.getViewStateModel();
-
-    if (!statisticsModel) {
-      Log.error("Cost center statistics model not found", undefined, "hr.admin.Main");
-      return;
-    }
-
-    // Set loading state
-    viewModel.setProperty("/costCenterStatisticsLoading", true);
-
-    try {
-      const stats = await fetchCostCenterStatistics(clientId);
-      statisticsModel.setData(stats);
-    } catch (error) {
-      Log.error(
-        "Failed to load cost center statistics",
-        error instanceof Error ? error.message : String(error),
-        "hr.admin.Main"
-      );
-      // Reset to empty statistics on error
-      statisticsModel.setData(getEmptyCostCenterStatistics());
-    } finally {
-      // Clear loading state
-      viewModel.setProperty("/costCenterStatisticsLoading", false);
-    }
+    await this.loadStatistics(
+      "costCenterStatistics",
+      "/costCenterStatisticsLoading",
+      fetchCostCenterStatistics,
+      getEmptyCostCenterStatistics,
+      clientId
+    );
   }
 
   /**
