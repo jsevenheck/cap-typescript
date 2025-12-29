@@ -143,4 +143,33 @@ service ClientService @(path:'/clients', impl:'./handlers.ts') {
     locationCount: Integer;
     assignmentCount: Integer;
   };
+
+  /**
+   * Get cost center statistics for dashboard.
+   * Returns aggregated counts for cost centers by validity status.
+   * @param clientId - Optional client ID to filter statistics for a specific client
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor', 'HRViewer']
+  function costCenterStatistics(clientId: UUID) returns {
+    totalCostCenters: Integer;
+    activeCostCenters: Integer;
+    expiredCostCenters: Integer;
+    upcomingExpiry: Integer;
+    withAssignedEmployees: Integer;
+  };
+
+  /**
+   * Get location statistics for dashboard.
+   * Returns aggregated counts for locations by validity status.
+   * @param clientId - Optional client ID to filter statistics for a specific client
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor', 'HRViewer']
+  function locationStatistics(clientId: UUID) returns {
+    totalLocations: Integer;
+    activeLocations: Integer;
+    expiredLocations: Integer;
+    upcomingExpiry: Integer;
+  };
 }

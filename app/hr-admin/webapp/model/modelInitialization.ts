@@ -17,7 +17,7 @@ import {
   EMPLOYMENT_TYPE_OPTIONS,
   STATUS_OPTIONS,
 } from '../constants/selectOptions';
-import { getEmptyStatistics } from '../services/statistics.service';
+import { getEmptyStatistics, getEmptyCostCenterStatistics, getEmptyLocationStatistics } from '../services/statistics.service';
 
 const DEFAULT_STATUS: EmployeeStatusKey = 'active';
 const DEFAULT_EMPLOYMENT_TYPE: EmploymentTypeKey = 'internal';
@@ -130,4 +130,6 @@ export default function initializeModels(view: View): void {
   view.setModel(new JSONModel(EMPLOYMENT_TYPE_OPTIONS), 'employmentTypeOptions');
   view.setModel(new JSONModel(COUNTRY_OPTIONS), 'countryOptions');
   view.setModel(new JSONModel(getEmptyStatistics()), 'statistics');
+  view.setModel(new JSONModel(getEmptyCostCenterStatistics()), 'costCenterStatistics');
+  view.setModel(new JSONModel(getEmptyLocationStatistics()), 'locationStatistics');
 }
