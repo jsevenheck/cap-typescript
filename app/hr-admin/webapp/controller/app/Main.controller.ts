@@ -433,7 +433,7 @@ export default class Main extends Controller {
   /**
    * Generic helper to load statistics models with common loading and error handling logic.
    */
-  private async loadStatistics<T>(
+  private async loadGenericStatistics<T>(
     modelName: string,
     loadingPropertyPath: string,
     fetchFn: (clientId?: string) => Promise<T>,
