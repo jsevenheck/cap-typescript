@@ -126,8 +126,8 @@
           "level": 2
         },
         "notFound": {
-          "id": "mainPage",
-          "name": "Main",
+          "id": "notFoundPage",
+          "name": "NotFound",
           "level": 1
         }
       }
