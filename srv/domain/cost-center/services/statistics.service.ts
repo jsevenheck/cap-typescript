@@ -5,6 +5,9 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
+import { daysFromNow, today as getToday } from '../../../shared/utils/date';
+import { extractCount } from '../../../shared/utils/query';
+
 const ql = cds.ql as typeof cds.ql;
 
 export interface CostCenterStatistics {
@@ -14,27 +17,6 @@ export interface CostCenterStatistics {
   upcomingExpiry: number;
   withAssignedEmployees: number;
 }
-
-/**
- * Extract count from CDS query result
- */
-const extractCount = (result: unknown): number => {
-  if (Array.isArray(result) && result.length > 0) {
-    const row = result[0] as { count?: number | string };
-    return typeof row.count === 'number' ? row.count : parseInt(String(row.count || '0'), 10);
-  }
-  const row = result as { count?: number | string } | undefined;
-  return typeof row?.count === 'number' ? row.count : parseInt(String(row?.count || '0'), 10);
-};
-
-/**
- * Calculate the date N days from today
- */
-const daysFromNow = (days: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
-};
 
 /**
  * Get cost center statistics for a specific client or all clients.
@@ -68,7 +50,7 @@ export async function getCostCenterStatistics(
       ? { client_ID: clientScope }
       : null;
   const hasClientCondition = clientCondition !== null;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getToday();
   const thirtyDaysFromNow = daysFromNow(30);
 
   // Helper function to build query with optional client condition
@@ -79,6 +61,19 @@ export async function getCostCenterStatistics(
       ...(additionalConditions || {}),
     };
     return Object.keys(conditions).length > 0 ? query.where(conditions) : query;
+  };
+
+  // Build query for active cost centers (validFrom <= today AND (validTo IS NULL OR validTo >= today))
+  const buildActiveQuery = () => {
+    const baseConditions = hasClientCondition ? clientCondition : {};
+    // Use raw SQL condition for OR logic with NULL handling
+    return ql.SELECT.from(entityName)
+      .columns('count(*) as count')
+      .where({
+        ...baseConditions,
+        validFrom: { '<=': today },
+        or: [{ validTo: { '>=': today } }, { validTo: { '=': null } }],
+      });
   };
 
   // Build query for cost centers with assigned employees (distinct count)
@@ -100,10 +95,10 @@ export async function getCostCenterStatistics(
   ] = await Promise.all([
     // Total cost centers
     tx.run(buildQuery()),
-    // Active cost centers (validFrom <= today AND validTo >= today)
-    tx.run(buildQuery({ validFrom: { '<=': today }, validTo: { '>=': today } })),
-    // Expired cost centers (validTo < today)
-    tx.run(buildQuery({ validTo: { '<': today } })),
+    // Active cost centers (validFrom <= today AND (validTo IS NULL OR validTo >= today))
+    tx.run(buildActiveQuery()),
+    // Expired cost centers (validTo < today AND validTo IS NOT NULL)
+    tx.run(buildQuery({ validTo: { '<': today, '!=': null } })),
     // Upcoming expiry (validTo within next 30 days)
     tx.run(buildQuery({ validTo: { '>=': today, '<=': thirtyDaysFromNow } })),
     // Cost centers with assigned employees

@@ -134,5 +134,25 @@ describe('LocationStatisticsService', () => {
       expect(stats.expiredLocations).toBe(0);
       expect(stats.upcomingExpiry).toBe(0);
     });
+
+    it('should count locations with NULL validTo as active (indefinitely valid)', async () => {
+      // Scenario: 30 total, 28 active (including those with NULL validTo), 2 expired
+      const results = [
+        [{ count: 30 }], // total
+        [{ count: 28 }], // active (includes NULL validTo entries)
+        [{ count: 2 }],  // expired (validTo < today AND NOT NULL)
+        [{ count: 1 }],  // upcoming expiry
+      ];
+      const { tx, runFn } = createMockTransaction(results);
+
+      const stats = await getLocationStatistics(tx);
+
+      // Verify all 4 queries are executed
+      expect(runFn).toHaveBeenCalledTimes(4);
+      // Active count should include those with NULL validTo
+      expect(stats.activeLocations).toBe(28);
+      expect(stats.totalLocations).toBe(30);
+      expect(stats.expiredLocations).toBe(2);
+    });
   });
 });

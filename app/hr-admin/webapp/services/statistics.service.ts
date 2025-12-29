@@ -1,6 +1,6 @@
 /**
- * Statistics service for fetching employee statistics from the backend.
- * Used by dashboard components to display aggregated employee data.
+ * Statistics service for fetching statistics from the backend.
+ * Used by dashboard components to display aggregated data.
  */
 
 export interface EmployeeStatistics {
@@ -30,16 +30,17 @@ export interface LocationStatistics {
 }
 
 /**
- * Fetches employee statistics from the backend.
+ * Generic statistics fetcher that handles common fetch logic.
+ * @param functionName - The OData function name to call
  * @param clientId - Optional client ID to filter statistics for a specific client
- * @returns Promise resolving to employee statistics
+ * @param entityName - Name of the entity for error messages
+ * @returns Promise resolving to the raw JSON response data
  */
-export async function fetchEmployeeStatistics(clientId?: string): Promise<EmployeeStatistics> {
-  // Properly encode the clientId to prevent URL injection
+async function fetchStatistics(functionName: string, clientId?: string, entityName: string = 'statistics'): Promise<Record<string, unknown>> {
   const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
   const url = encodedClientId
-    ? `/odata/v4/clients/employeeStatistics(clientId='${encodedClientId}')`
-    : '/odata/v4/clients/employeeStatistics()';
+    ? `/odata/v4/clients/${functionName}(clientId='${encodedClientId}')`
+    : `/odata/v4/clients/${functionName}()`;
 
   const response = await fetch(url, {
     method: 'GET',
@@ -51,19 +52,28 @@ export async function fetchEmployeeStatistics(clientId?: string): Promise<Employ
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch statistics: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch ${entityName}: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
+  return response.json();
+}
+
+/**
+ * Fetches employee statistics from the backend.
+ * @param clientId - Optional client ID to filter statistics for a specific client
+ * @returns Promise resolving to employee statistics
+ */
+export async function fetchEmployeeStatistics(clientId?: string): Promise<EmployeeStatistics> {
+  const data = await fetchStatistics('employeeStatistics', clientId, 'employee statistics');
   return {
-    totalEmployees: data.totalEmployees ?? 0,
-    activeEmployees: data.activeEmployees ?? 0,
-    inactiveEmployees: data.inactiveEmployees ?? 0,
-    internalEmployees: data.internalEmployees ?? 0,
-    externalEmployees: data.externalEmployees ?? 0,
-    managersCount: data.managersCount ?? 0,
-    recentHires: data.recentHires ?? 0,
-    upcomingExits: data.upcomingExits ?? 0,
+    totalEmployees: (data.totalEmployees as number) ?? 0,
+    activeEmployees: (data.activeEmployees as number) ?? 0,
+    inactiveEmployees: (data.inactiveEmployees as number) ?? 0,
+    internalEmployees: (data.internalEmployees as number) ?? 0,
+    externalEmployees: (data.externalEmployees as number) ?? 0,
+    managersCount: (data.managersCount as number) ?? 0,
+    recentHires: (data.recentHires as number) ?? 0,
+    upcomingExits: (data.upcomingExits as number) ?? 0,
   };
 }
 
@@ -73,31 +83,13 @@ export async function fetchEmployeeStatistics(clientId?: string): Promise<Employ
  * @returns Promise resolving to cost center statistics
  */
 export async function fetchCostCenterStatistics(clientId?: string): Promise<CostCenterStatistics> {
-  const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
-  const url = encodedClientId
-    ? `/odata/v4/clients/costCenterStatistics(clientId='${encodedClientId}')`
-    : '/odata/v4/clients/costCenterStatistics()';
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch cost center statistics: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  const data = await fetchStatistics('costCenterStatistics', clientId, 'cost center statistics');
   return {
-    totalCostCenters: data.totalCostCenters ?? 0,
-    activeCostCenters: data.activeCostCenters ?? 0,
-    expiredCostCenters: data.expiredCostCenters ?? 0,
-    upcomingExpiry: data.upcomingExpiry ?? 0,
-    withAssignedEmployees: data.withAssignedEmployees ?? 0,
+    totalCostCenters: (data.totalCostCenters as number) ?? 0,
+    activeCostCenters: (data.activeCostCenters as number) ?? 0,
+    expiredCostCenters: (data.expiredCostCenters as number) ?? 0,
+    upcomingExpiry: (data.upcomingExpiry as number) ?? 0,
+    withAssignedEmployees: (data.withAssignedEmployees as number) ?? 0,
   };
 }
 
@@ -107,30 +99,12 @@ export async function fetchCostCenterStatistics(clientId?: string): Promise<Cost
  * @returns Promise resolving to location statistics
  */
 export async function fetchLocationStatistics(clientId?: string): Promise<LocationStatistics> {
-  const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
-  const url = encodedClientId
-    ? `/odata/v4/clients/locationStatistics(clientId='${encodedClientId}')`
-    : '/odata/v4/clients/locationStatistics()';
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch location statistics: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  const data = await fetchStatistics('locationStatistics', clientId, 'location statistics');
   return {
-    totalLocations: data.totalLocations ?? 0,
-    activeLocations: data.activeLocations ?? 0,
-    expiredLocations: data.expiredLocations ?? 0,
-    upcomingExpiry: data.upcomingExpiry ?? 0,
+    totalLocations: (data.totalLocations as number) ?? 0,
+    activeLocations: (data.activeLocations as number) ?? 0,
+    expiredLocations: (data.expiredLocations as number) ?? 0,
+    upcomingExpiry: (data.upcomingExpiry as number) ?? 0,
   };
 }
 

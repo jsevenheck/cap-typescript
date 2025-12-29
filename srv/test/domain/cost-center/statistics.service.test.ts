@@ -141,5 +141,27 @@ describe('CostCenterStatisticsService', () => {
       expect(stats.upcomingExpiry).toBe(0);
       expect(stats.withAssignedEmployees).toBe(0);
     });
+
+    it('should count cost centers with NULL validTo as active (indefinitely valid)', async () => {
+      // Scenario: 50 total, 45 active (including those with NULL validTo), 2 expired, 3 expiring soon
+      const results = [
+        [{ count: 50 }], // total
+        [{ count: 45 }], // active (includes NULL validTo entries)
+        [{ count: 2 }],  // expired (validTo < today AND NOT NULL)
+        [{ count: 3 }],  // upcoming expiry
+        [{ count: 30 }], // with assigned employees
+      ];
+      const { tx, runFn } = createMockTransaction(results);
+
+      const stats = await getCostCenterStatistics(tx);
+
+      // Verify all 5 queries are executed
+      expect(runFn).toHaveBeenCalledTimes(5);
+      // Active count should include those with NULL validTo
+      expect(stats.activeCostCenters).toBe(45);
+      // Total should equal active + expired + (those without validFrom yet started)
+      expect(stats.totalCostCenters).toBe(50);
+      expect(stats.expiredCostCenters).toBe(2);
+    });
   });
 });
