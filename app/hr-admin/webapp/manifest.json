@@ -124,6 +124,11 @@
           "id": "locationsPage",
           "name": "Main",
           "level": 2
+        },
+        "notFound": {
+          "id": "notFoundPage",
+          "name": "NotFound",
+          "level": 1
         }
       }
     }
