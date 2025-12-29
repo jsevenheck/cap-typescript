@@ -87,7 +87,7 @@ export async function getLocationStatistics(
   ] = await Promise.all([
     // Total locations
     tx.run(buildQuery()),
-    // Active locations (validFrom <= today AND (validTo is null OR validTo >= today))
+    // Active locations (validFrom <= today AND validTo >= today)
     tx.run(buildQuery({ validFrom: { '<=': today }, validTo: { '>=': today } })),
     // Expired locations (validTo < today)
     tx.run(buildQuery({ validTo: { '<': today } })),
