@@ -85,19 +85,24 @@ export interface EmployeeExportData {
  * Exports employees to CSV and triggers download.
  * @param employees - Array of employee data to export
  * @param clientName - Name of the client for the filename
+ * @param i18nBundle - Optional i18n bundle providing localized column headers
  */
-export function exportEmployeesToCSV(employees: EmployeeExportData[], clientName?: string): void {
+export function exportEmployeesToCSV(
+  employees: EmployeeExportData[],
+  clientName?: string,
+  i18nBundle?: { getText(key: string): string }
+): void {
   const columns: { field: keyof EmployeeExportData; header: string }[] = [
-    { field: "employeeId", header: "Employee ID" },
-    { field: "firstName", header: "First Name" },
-    { field: "lastName", header: "Last Name" },
-    { field: "email", header: "Email" },
-    { field: "phoneNumber", header: "Phone Number" },
-    { field: "positionLevel", header: "Position Level" },
-    { field: "entryDate", header: "Entry Date" },
-    { field: "exitDate", header: "Exit Date" },
-    { field: "status", header: "Status" },
-    { field: "employmentType", header: "Employment Type" },
+    { field: "employeeId", header: i18nBundle?.getText("employeeId") || "Employee ID" },
+    { field: "firstName", header: i18nBundle?.getText("firstName") || "First Name" },
+    { field: "lastName", header: i18nBundle?.getText("lastName") || "Last Name" },
+    { field: "email", header: i18nBundle?.getText("email") || "Email" },
+    { field: "phoneNumber", header: i18nBundle?.getText("phoneNumber") || "Phone Number" },
+    { field: "positionLevel", header: i18nBundle?.getText("positionLevel") || "Position Level" },
+    { field: "entryDate", header: i18nBundle?.getText("entryDate") || "Entry Date" },
+    { field: "exitDate", header: i18nBundle?.getText("exitDate") || "Exit Date" },
+    { field: "status", header: i18nBundle?.getText("status") || "Status" },
+    { field: "employmentType", header: i18nBundle?.getText("employmentType") || "Employment Type" },
   ];
   
   const csvContent = generateCSV(employees, columns);
