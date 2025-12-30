@@ -71,6 +71,7 @@ entity Employees : managed, cuid {
   lastName      : String(60)  not null;
   @mandatory @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
+  @sap.common.PersonalData.IsPotentiallyPersonal
   @assert.format: '^$|^\+?[0-9\s\-\(\)\.]{1,30}$'
   phoneNumber   : String(30);
   @mandatory
