@@ -103,6 +103,7 @@ export default class EmployeeHandler {
         firstName: "",
         lastName: "",
         email: "",
+        phoneNumber: "",
         costCenter_ID: undefined,
         manager_ID: undefined,
         managerName: "",
@@ -144,6 +145,7 @@ export default class EmployeeHandler {
         firstName?: string;
         lastName?: string;
         email?: string;
+        phoneNumber?: string;
         costCenter_ID?: string;
         costCenter?: { ID?: string };
         manager_ID?: string;
@@ -175,6 +177,7 @@ export default class EmployeeHandler {
           firstName: currentData.firstName ?? "",
           lastName: currentData.lastName ?? "",
           email: currentData.email ?? "",
+          phoneNumber: currentData.phoneNumber ?? "",
           costCenter_ID: currentData.costCenter_ID ?? currentData.costCenter?.ID,
           manager_ID: currentData.manager_ID ?? currentData.manager?.ID,
           managerName,
@@ -250,11 +253,13 @@ export default class EmployeeHandler {
 
     const entryDateValue = data.employee.entryDate?.trim() ?? "";
     const exitDateValue = data.employee.exitDate?.trim() ?? "";
+    const phoneNumberValue = data.employee.phoneNumber?.trim() ?? "";
 
     const payload: Record<string, unknown> = {
       firstName: data.employee.firstName?.trim() ?? "",
       lastName: data.employee.lastName?.trim() ?? "",
       email: data.employee.email?.trim() ?? "",
+      phoneNumber: phoneNumberValue || null,
       location_ID: locationId ?? null,
       positionLevel: data.employee.positionLevel?.trim() ?? "",
       costCenter_ID: costCenterId ?? null,
@@ -401,6 +406,7 @@ export default class EmployeeHandler {
       context.setProperty("firstName", payload.firstName);
       context.setProperty("lastName", payload.lastName);
       context.setProperty("email", payload.email);
+      context.setProperty("phoneNumber", payload.phoneNumber);
       context.setProperty("location_ID", payload.location_ID);
       context.setProperty("positionLevel", payload.positionLevel);
       context.setProperty("costCenter_ID", payload.costCenter_ID ?? null);

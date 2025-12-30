@@ -36,6 +36,7 @@ import {
   getEmptyCostCenterStatistics,
   getEmptyLocationStatistics,
 } from "../../services/statistics.service";
+import { exportEmployeesToCSV, EmployeeExportData } from "../../services/export.service";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -789,6 +790,80 @@ export default class Main extends Controller {
 
   public onDeleteEmployee(): void {
     this.employees.delete();
+  }
+
+  /**
+   * Export employees list to CSV file.
+   * Gets all employees for the current client and triggers download.
+   */
+  public async onExportEmployees(): Promise<void> {
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const i18n = this.getI18nBundle();
+
+    // Verify client is selected
+    if (!this.selection.ensureClientSelected()) {
+      return;
+    }
+
+    const employeesList = this.byId("employeesList") as List;
+    if (!employeesList) {
+      return;
+    }
+
+    const binding = employeesList.getBinding("items") as ODataListBinding;
+    if (!binding) {
+      return;
+    }
+
+    view.setBusy(true);
+
+    try {
+      // Get all contexts from the binding (including all loaded data)
+      const contexts = binding.getAllCurrentContexts();
+      
+      if (contexts.length === 0) {
+        MessageToast.show(i18n.getText("exportEmployeesEmpty"));
+        return;
+      }
+
+      // Extract employee data from contexts
+      const employees: EmployeeExportData[] = contexts.map(context => {
+        const data = context.getObject() as Record<string, unknown>;
+        return {
+          employeeId: String(data.employeeId ?? ""),
+          firstName: String(data.firstName ?? ""),
+          lastName: String(data.lastName ?? ""),
+          email: String(data.email ?? ""),
+          phoneNumber: data.phoneNumber != null ? String(data.phoneNumber) : undefined,
+          positionLevel: data.positionLevel != null ? String(data.positionLevel) : undefined,
+          entryDate: String(data.entryDate ?? ""),
+          exitDate: data.exitDate != null ? String(data.exitDate) : undefined,
+          status: String(data.status ?? ""),
+          employmentType: String(data.employmentType ?? ""),
+        };
+      });
+
+      // Get client name for filename
+      const clientContext = this.selection.getSelectedClientContext();
+      const clientName = clientContext?.getProperty("name") as string | undefined;
+
+      // Export to CSV
+      exportEmployeesToCSV(employees, clientName);
+      MessageToast.show(i18n.getText("exportEmployeesSuccess"));
+    } catch (error) {
+      Log.error(
+        "Failed to export employees",
+        error instanceof Error ? error.message : String(error),
+        "hr.admin.Main"
+      );
+      MessageBox.error(i18n.getText("errorOccurred"));
+    } finally {
+      view.setBusy(false);
+    }
   }
 
   public onSaveEmployee(): void {

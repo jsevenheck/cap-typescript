@@ -203,6 +203,11 @@
                                             enabled="{= !!${view>/selectedEmployeeId}}"
                                             press=".onDeleteEmployee"/>
                                     <Button
+                                            text="{i18n>exportCsv}"
+                                            icon="sap-icon://download"
+                                            type="Transparent"
+                                            press=".onExportEmployees"/>
+                                    <Button
                                             text="{i18n>anonymizeFormerEmployees}"
                                             icon="sap-icon://eraser"
                                             type="Transparent"
@@ -541,6 +546,8 @@
                 <Input id="employeeLastName" value="{employeeDialog>/employee/lastName}" placeholder="{i18n>placeholderLastName}"/>
                 <Label text="{i18n>email}" required="true" labelFor="employeeEmail"/>
                 <Input id="employeeEmail" type="Email" value="{employeeDialog>/employee/email}" placeholder="{i18n>placeholderEmail}"/>
+                <Label text="{i18n>phoneNumber}" labelFor="employeePhoneNumber"/>
+                <Input id="employeePhoneNumber" type="Tel" value="{employeeDialog>/employee/phoneNumber}" placeholder="{i18n>placeholderPhoneNumber}" maxLength="30"/>
                 <Label text="{i18n>costCenter}" labelFor="employeeCostCenter"/>
                 <Select
                         id="employeeCostCenter"
