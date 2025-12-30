@@ -5,6 +5,9 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
+import { daysAgo, daysFromNow, today as getToday } from '../../../shared/utils/date';
+import { extractCount } from '../../../shared/utils/query';
+
 const ql = cds.ql as typeof cds.ql;
 
 export interface EmployeeStatistics {
@@ -17,36 +20,6 @@ export interface EmployeeStatistics {
   recentHires: number;
   upcomingExits: number;
 }
-
-/**
- * Calculate the date N days ago from today
- */
-const daysAgo = (days: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().split('T')[0];
-};
-
-/**
- * Calculate the date N days from today
- */
-const daysFromNow = (days: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
-};
-
-/**
- * Extract count from CDS query result
- */
-const extractCount = (result: unknown): number => {
-  if (Array.isArray(result) && result.length > 0) {
-    const row = result[0] as { count?: number | string };
-    return typeof row.count === 'number' ? row.count : parseInt(String(row.count || '0'), 10);
-  }
-  const row = result as { count?: number | string } | undefined;
-  return typeof row?.count === 'number' ? row.count : parseInt(String(row?.count || '0'), 10);
-};
 
 /**
  * Get employee statistics for a specific client or all clients.
@@ -82,7 +55,7 @@ export async function getEmployeeStatistics(
       ? { client_ID: clientScope }
       : null;
   const hasClientCondition = clientCondition !== null;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getToday();
   const thirtyDaysAgo = daysAgo(30);
   const thirtyDaysFromNow = daysFromNow(30);
 

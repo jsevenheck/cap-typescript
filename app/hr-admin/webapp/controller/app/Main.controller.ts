@@ -28,7 +28,14 @@ import CacheManager from "../../services/cacheManager.service";
 import { AuthorizationService } from "../../core/authorization/AuthorizationService";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import HashChanger from "sap/ui/core/routing/HashChanger";
-import { fetchEmployeeStatistics, getEmptyStatistics } from "../../services/statistics.service";
+import {
+  fetchEmployeeStatistics,
+  fetchCostCenterStatistics,
+  fetchLocationStatistics,
+  getEmptyStatistics,
+  getEmptyCostCenterStatistics,
+  getEmptyLocationStatistics,
+} from "../../services/statistics.service";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -312,6 +319,23 @@ export default class Main extends Controller {
     if (app && costCentersPage) {
       app.to(costCentersPage.getId());
     }
+
+    // Load cost center statistics for the selected client
+    this.loadCostCenterStatistics(clientId);
+  }
+
+  /**
+   * Load cost center statistics for the given client ID.
+   * Updates the costCenterStatistics model for dashboard display.
+   */
+  private async loadCostCenterStatistics(clientId?: string): Promise<void> {
+    await this.loadGenericStatistics(
+      "costCenterStatistics",
+      "/costCenterStatisticsLoading",
+      fetchCostCenterStatistics,
+      getEmptyCostCenterStatistics,
+      clientId
+    );
   }
 
   /**
@@ -377,6 +401,68 @@ export default class Main extends Controller {
     if (app && locationsPage) {
       app.to(locationsPage.getId());
     }
+
+    // Load location statistics for the selected client
+    this.loadLocationStatistics(clientId);
+  }
+
+  /**
+   * Generic helper to load statistics models with common loading and error handling logic.
+   */
+  private async loadGenericStatistics<T>(
+    modelName: string,
+    loadingPropertyPath: string,
+    fetchFn: (clientId?: string) => Promise<T>,
+    emptyFactory: () => T,
+    clientId?: string,
+    errorContext: string = modelName
+  ): Promise<void> {
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const statisticsModel = view.getModel(modelName) as JSONModel;
+    const viewModel = this.models.getViewStateModel();
+
+    if (!statisticsModel) {
+      Log.error(`${errorContext} model not found`, undefined, "hr.admin.Main");
+      return;
+    }
+
+    // Set loading state
+    viewModel.setProperty(loadingPropertyPath, true);
+
+    try {
+      const stats = await fetchFn(clientId);
+      statisticsModel.setData(stats);
+    } catch (error) {
+      Log.error(
+        `Failed to load ${errorContext}`,
+        error instanceof Error ? error.message : String(error),
+        "hr.admin.Main"
+      );
+      // Reset to empty statistics on error
+      statisticsModel.setData(emptyFactory());
+    } finally {
+      // Clear loading state
+      viewModel.setProperty(loadingPropertyPath, false);
+    }
+  }
+
+  /**
+   * Load location statistics for the given client ID.
+   * Updates the locationStatistics model for dashboard display.
+   */
+  private async loadLocationStatistics(clientId?: string): Promise<void> {
+    return this.loadGenericStatistics(
+      "locationStatistics",
+      "/locationStatisticsLoading",
+      fetchLocationStatistics,
+      getEmptyLocationStatistics,
+      clientId,
+      "location statistics"
+    );
   }
 
   /**
@@ -493,7 +579,7 @@ export default class Main extends Controller {
     // Destroy JSON models created during initialization
     const view = this.getView();
     if (view) {
-      const modelNames = ['dialog', 'employeeDialog', 'costCenterDialog', 'locationDialog', 'view', 'auth', 'statusOptions', 'employmentTypeOptions', 'countryOptions'];
+      const modelNames = ['dialog', 'employeeDialog', 'costCenterDialog', 'locationDialog', 'view', 'auth', 'statusOptions', 'employmentTypeOptions', 'countryOptions', 'statistics', 'costCenterStatistics', 'locationStatistics'];
       for (const modelName of modelNames) {
         const model = view.getModel(modelName);
         if (model && typeof model.destroy === 'function') {
@@ -735,6 +821,12 @@ export default class Main extends Controller {
     // Clear cost center entity cache and refresh list
     this.cacheManager.clearEntity('CostCenters');
     this.costCenters.refresh();
+
+    // Refresh cost center statistics as well
+    const clientId = this.selection.getSelectedClientId();
+    if (clientId) {
+      this.loadCostCenterStatistics(clientId);
+    }
   }
 
   public onAddCostCenter(): void {
@@ -779,6 +871,12 @@ export default class Main extends Controller {
     // Clear location entity cache and refresh list
     this.cacheManager.clearEntity('Locations');
     this.locations.refresh();
+
+    // Refresh location statistics as well
+    const clientId = this.selection.getSelectedClientId();
+    if (clientId) {
+      this.loadLocationStatistics(clientId);
+    }
   }
 
   public onAddLocation(): void {

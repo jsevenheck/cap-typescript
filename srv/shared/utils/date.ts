@@ -1,5 +1,30 @@
 /** Utility helpers for parsing and normalising date values. */
 
+/**
+ * Calculate the date N days ago from today in ISO format (YYYY-MM-DD).
+ */
+export const daysAgo = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Calculate the date N days from today in ISO format (YYYY-MM-DD).
+ */
+export const daysFromNow = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Get today's date in ISO format (YYYY-MM-DD).
+ */
+export const today = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
 /** Converts a variety of input types into a valid Date or undefined. */
 export const toDateValue = (value: unknown): Date | undefined => {
   if (value instanceof Date) {

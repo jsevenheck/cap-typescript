@@ -100,6 +100,10 @@ export interface ViewState {
   anonymizeBefore?: string;
   statisticsExpanded?: boolean;
   statisticsLoading?: boolean;
+  costCenterStatisticsExpanded?: boolean;
+  costCenterStatisticsLoading?: boolean;
+  locationStatisticsExpanded?: boolean;
+  locationStatisticsLoading?: boolean;
 }
 
 export interface AuthorizationState {

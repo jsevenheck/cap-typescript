@@ -303,6 +303,49 @@
                                 visible="{= !!${companyId}}"
                                 text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
                         <Text text="{i18n>manageCostCentersDesc}"/>
+                        <Panel
+                                id="costCenterStatisticsPanel"
+                                headerText="{i18n>costCenterStatisticsDashboard}"
+                                expandable="true"
+                                expanded="{view>/costCenterStatisticsExpanded}"
+                                class="sapUiSmallMarginTop sapUiSmallMarginBottom"
+                                visible="{= !!${view>/selectedClientId}}"
+                                busy="{view>/costCenterStatisticsLoading}">
+                            <content>
+                                <HBox justifyContent="SpaceAround" wrap="Wrap" class="sapUiSmallMargin">
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{costCenterStatistics>/totalCostCenters}"
+                                                unit="{i18n>totalCostCenters}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{costCenterStatistics>/activeCostCenters}"
+                                                unit="{i18n>activeCostCenters}"
+                                                state="Success"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{costCenterStatistics>/expiredCostCenters}"
+                                                unit="{i18n>expiredCostCenters}"
+                                                state="Error"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{costCenterStatistics>/upcomingExpiry}"
+                                                unit="{i18n>upcomingCostCenterExpiry}"
+                                                state="Warning"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{costCenterStatistics>/withAssignedEmployees}"
+                                                unit="{i18n>withAssignedEmployees}"
+                                                state="Information"/>
+                                    </VBox>
+                                </HBox>
+                            </content>
+                        </Panel>
                         <List
                                 id="costCentersList"
                                 mode="SingleSelectMaster"
@@ -373,6 +416,43 @@
                                 visible="{= !!${companyId}}"
                                 text="{= ${companyId} ? ${i18n>companyId} + ': ' + ${companyId} : ''}"/>
                         <Text text="{i18n>manageLocationsDesc}"/>
+                        <Panel
+                                id="locationStatisticsPanel"
+                                headerText="{i18n>locationStatisticsDashboard}"
+                                expandable="true"
+                                expanded="{view>/locationStatisticsExpanded}"
+                                class="sapUiSmallMarginTop sapUiSmallMarginBottom"
+                                visible="{= !!${view>/selectedClientId}}"
+                                busy="{view>/locationStatisticsLoading}">
+                            <content>
+                                <HBox justifyContent="SpaceAround" wrap="Wrap" class="sapUiSmallMargin">
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{locationStatistics>/totalLocations}"
+                                                unit="{i18n>totalLocations}"
+                                                state="Information"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{locationStatistics>/activeLocations}"
+                                                unit="{i18n>activeLocations}"
+                                                state="Success"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{locationStatistics>/expiredLocations}"
+                                                unit="{i18n>expiredLocations}"
+                                                state="Error"/>
+                                    </VBox>
+                                    <VBox alignItems="Center" class="sapUiSmallMargin">
+                                        <ObjectNumber
+                                                number="{locationStatistics>/upcomingExpiry}"
+                                                unit="{i18n>upcomingLocationExpiry}"
+                                                state="Warning"/>
+                                    </VBox>
+                                </HBox>
+                            </content>
+                        </Panel>
                         <List
                                 id="locationsList"
                                 mode="SingleSelectMaster"
