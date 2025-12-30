@@ -27,6 +27,7 @@ export interface EmployeeDialogData {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber?: string;
   costCenter_ID?: string;
   manager_ID?: string;
   managerName: string;

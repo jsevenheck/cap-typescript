@@ -36,6 +36,7 @@ import {
   getEmptyCostCenterStatistics,
   getEmptyLocationStatistics,
 } from "../../services/statistics.service";
+import { exportEmployeesToCSV, EmployeeExportData } from "../../services/export.service";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -789,6 +790,86 @@ export default class Main extends Controller {
 
   public onDeleteEmployee(): void {
     this.employees.delete();
+  }
+
+  /**
+   * Export employees list to CSV file.
+   * Fetches ALL employees for the current client from the backend and triggers download.
+   */
+  public async onExportEmployees(): Promise<void> {
+    const view = this.getView();
+    if (!view) {
+      return;
+    }
+
+    const i18n = this.getI18nBundle();
+
+    // Verify client is selected
+    if (!this.selection.ensureClientSelected()) {
+      return;
+    }
+
+    const clientId = this.selection.getSelectedClientId();
+    if (!clientId) {
+      return;
+    }
+
+    view.setBusy(true);
+
+    try {
+      // Get the OData model and create a binding to fetch ALL employees
+      const model = view.getModel() as ODataModel;
+      const binding = model.bindList("/Employees", undefined, undefined, [
+        new Filter("client_ID", FilterOperator.EQ, clientId)
+      ]);
+
+      // Request all contexts from the backend (no pagination limit)
+      const contexts = await binding.requestContexts(0, Infinity);
+
+      if (contexts.length === 0) {
+        view.setBusy(false);
+        MessageToast.show(i18n.getText("exportEmployeesEmpty"));
+        return;
+      }
+
+      // Helper to convert optional values to string
+      const toOptionalString = (value: unknown): string | undefined =>
+        value != null ? String(value) : undefined;
+
+      // Extract employee data from contexts
+      const employees: EmployeeExportData[] = contexts.map(context => {
+        const data = context.getObject() as Record<string, unknown>;
+        return {
+          employeeId: String(data.employeeId ?? ""),
+          firstName: String(data.firstName ?? ""),
+          lastName: String(data.lastName ?? ""),
+          email: String(data.email ?? ""),
+          phoneNumber: toOptionalString(data.phoneNumber),
+          positionLevel: toOptionalString(data.positionLevel),
+          entryDate: String(data.entryDate ?? ""),
+          exitDate: toOptionalString(data.exitDate),
+          status: String(data.status ?? ""),
+          employmentType: String(data.employmentType ?? ""),
+        };
+      });
+
+      // Get client name for filename
+      const clientContext = this.selection.getSelectedClientContext();
+      const clientName = clientContext?.getProperty("name") as string | undefined;
+
+      // Export to CSV with i18n support for column headers
+      exportEmployeesToCSV(employees, clientName, i18n);
+      MessageToast.show(i18n.getText("exportEmployeesSuccess"));
+    } catch (error) {
+      Log.error(
+        "Failed to export employees",
+        error instanceof Error ? error.message : String(error),
+        "hr.admin.Main"
+      );
+      MessageBox.error(i18n.getText("errorOccurred"));
+    } finally {
+      view.setBusy(false);
+    }
   }
 
   public onSaveEmployee(): void {
