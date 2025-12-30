@@ -6,16 +6,22 @@ function escapeCSVValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
-  
+
   const stringValue = String(value);
-  
-  // If the value contains special characters, wrap in quotes
-  if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n") || stringValue.includes("\r")) {
-    // Escape quotes by doubling them
-    return `"${stringValue.replace(/"/g, '""')}"`;
+
+  // Prevent CSV formula injection by neutralizing leading =, +, - or @
+  let safeValue = stringValue;
+  if (/^[=+\-@]/.test(safeValue)) {
+    safeValue = "'" + safeValue;
   }
-  
-  return stringValue;
+
+  // If the value contains special characters, wrap in quotes
+  if (safeValue.includes(",") || safeValue.includes('"') || safeValue.includes("\n") || safeValue.includes("\r")) {
+    // Escape quotes by doubling them
+    return `"${safeValue.replace(/"/g, '""')}"`;
+  }
+
+  return safeValue;
 }
 
 /**
