@@ -249,9 +249,12 @@ export class KeyboardShortcutManager {
     shift?: boolean,
     alt?: boolean
   ): string {
+    // Use userAgentData.platform if available (modern browsers),
+    // fallback to userAgent string check for broader compatibility
     const isMac =
       typeof navigator !== "undefined" &&
-      navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      ((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform?.toLowerCase().includes("mac") ||
+       navigator.userAgent?.toLowerCase().includes("mac"));
     const parts: string[] = [];
 
     if (ctrlOrCmd) {
