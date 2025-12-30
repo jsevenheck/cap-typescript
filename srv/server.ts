@@ -196,6 +196,59 @@ cds.on('bootstrap', (app: Application) => {
   app.use(correlationIdMiddleware);
 
   /**
+   * Liveness probe endpoint - checks if the application is running
+   * Used by Kubernetes/Cloud Foundry for basic liveness checks.
+   * Returns 200 OK if the server is running.
+   */
+  app.get('/health/live', (_req, res) => {
+    res.status(200).json({
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Readiness probe endpoint - checks if the application is ready to accept traffic
+   * Used by Kubernetes/Cloud Foundry for readiness checks before routing traffic.
+   * Returns 200 OK if ready, 503 Service Unavailable if not ready.
+   */
+  app.get('/health/ready', (_req, res) => {
+    void (async () => {
+      try {
+        // Verify database connectivity
+        const db = (cds as any).db ?? (await cds.connect.to('db'));
+
+        if (!db) {
+          throw new Error('Database connection not available');
+        }
+
+        // Quick connectivity check
+        const { SELECT } = cds.ql;
+        await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
+
+        res.status(200).json({
+          status: 'ready',
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'connected',
+            services: 'initialized',
+          },
+        });
+      } catch (error) {
+        logger.warn({ err: error }, 'Readiness check failed');
+        res.status(503).json({
+          status: 'not_ready',
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'disconnected',
+          },
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    })();
+  });
+
+  /**
    * Health check endpoint - verifies application and database connectivity
    * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
    */

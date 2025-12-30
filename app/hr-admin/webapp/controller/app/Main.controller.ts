@@ -37,6 +37,7 @@ import {
   getEmptyLocationStatistics,
 } from "../../services/statistics.service";
 import { exportEmployeesToCSV, EmployeeExportData } from "../../services/export.service";
+import { KeyboardShortcutManager } from "../../core/utils/KeyboardShortcuts";
 
 export default class Main extends Controller {
   private models!: DialogModelAccessor;
@@ -49,6 +50,7 @@ export default class Main extends Controller {
   private costCenters!: CostCenterHandler;
   private locations!: LocationHandler;
   private assignments!: AssignmentHandler;
+  private keyboardShortcuts!: KeyboardShortcutManager;
   private cacheCleanupIntervalId?: number;
   private initialCacheCleanupTimeoutId?: number;
   private lastHash?: string;
@@ -88,6 +90,9 @@ export default class Main extends Controller {
 
     // Setup periodic cache cleanup (every 5 minutes)
     this.setupCacheCleanup();
+
+    // Initialize keyboard shortcuts for productivity (SAP Fiori design guidelines)
+    this.setupKeyboardShortcuts();
   }
 
   /**
@@ -531,10 +536,211 @@ export default class Main extends Controller {
   }
 
   /**
+   * Setup keyboard shortcuts for productivity following SAP Fiori design guidelines.
+   * Implements common shortcuts:
+   * - Ctrl/Cmd+N: Create new item (context-aware)
+   * - Ctrl/Cmd+E: Edit selected item
+   * - Delete: Delete selected item
+   * - F5: Refresh current view
+   * - Escape: Cancel/close dialogs
+   *
+   * @see https://experience.sap.com/fiori-design-web/keyboard-interaction/
+   */
+  private setupKeyboardShortcuts(): void {
+    this.keyboardShortcuts = new KeyboardShortcutManager();
+
+    // Register shortcuts for main actions
+    this.keyboardShortcuts.registerAll([
+      {
+        key: "KeyN",
+        ctrlOrCmd: true,
+        handler: () => this.handleShortcutAdd(),
+        description: "Create new item",
+      },
+      {
+        key: "KeyE",
+        ctrlOrCmd: true,
+        handler: () => this.handleShortcutEdit(),
+        description: "Edit selected item",
+      },
+      {
+        key: "Delete",
+        handler: () => this.handleShortcutDelete(),
+        description: "Delete selected item",
+      },
+      {
+        key: "F5",
+        handler: () => this.handleShortcutRefresh(),
+        description: "Refresh current view",
+      },
+      {
+        key: "Escape",
+        handler: () => this.handleShortcutCancel(),
+        description: "Cancel/Close dialog",
+        allowInDialog: true,
+      },
+    ]);
+
+    // Start listening for keyboard events
+    this.keyboardShortcuts.attach();
+  }
+
+  /**
+   * Handle Ctrl/Cmd+N shortcut - create new item based on current context.
+   */
+  private handleShortcutAdd(): void {
+    const viewModel = this.models.getViewStateModel();
+    const currentTab = viewModel.getProperty("/selectedTabKey") as string;
+
+    switch (currentTab) {
+      case "clients":
+        this.onAddClient();
+        break;
+      case "employees":
+        if (this.selection.getSelectedClientId()) {
+          this.onAddEmployee();
+        }
+        break;
+      case "costCenters":
+        if (this.selection.getSelectedClientId()) {
+          this.onAddCostCenter();
+        }
+        break;
+      case "locations":
+        if (this.selection.getSelectedClientId()) {
+          this.onAddLocation();
+        }
+        break;
+      default:
+        this.onAddClient();
+    }
+  }
+
+  /**
+   * Handle Ctrl/Cmd+E shortcut - edit selected item based on current context.
+   */
+  private handleShortcutEdit(): void {
+    const viewModel = this.models.getViewStateModel();
+    const currentTab = viewModel.getProperty("/selectedTabKey") as string;
+
+    switch (currentTab) {
+      case "clients":
+        if (this.selection.getSelectedClientId()) {
+          this.onEditClient();
+        }
+        break;
+      case "employees":
+        if (this.selection.getSelectedEmployeeContext()) {
+          void this.onEditEmployee();
+        }
+        break;
+      case "costCenters":
+        if (this.selection.getSelectedCostCenterContext()) {
+          void this.onEditCostCenter();
+        }
+        break;
+      case "locations":
+        if (this.selection.getSelectedLocationContext()) {
+          void this.onEditLocation();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Handle Delete shortcut - delete selected item based on current context.
+   */
+  private handleShortcutDelete(): void {
+    const viewModel = this.models.getViewStateModel();
+    const currentTab = viewModel.getProperty("/selectedTabKey") as string;
+
+    switch (currentTab) {
+      case "clients":
+        if (this.selection.getSelectedClientId()) {
+          this.onDeleteClient();
+        }
+        break;
+      case "employees":
+        if (this.selection.getSelectedEmployeeContext()) {
+          this.onDeleteEmployee();
+        }
+        break;
+      case "costCenters":
+        if (this.selection.getSelectedCostCenterContext()) {
+          this.onDeleteCostCenter();
+        }
+        break;
+      case "locations":
+        if (this.selection.getSelectedLocationContext()) {
+          this.onDeleteLocation();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Handle F5 shortcut - refresh current view.
+   */
+  private handleShortcutRefresh(): void {
+    const viewModel = this.models.getViewStateModel();
+    const currentTab = viewModel.getProperty("/selectedTabKey") as string;
+
+    switch (currentTab) {
+      case "clients":
+        this.onRefresh();
+        break;
+      case "employees":
+        this.onRefreshEmployees();
+        break;
+      case "costCenters":
+        this.onRefreshCostCenters();
+        break;
+      case "locations":
+        this.onRefreshLocations();
+        break;
+      default:
+        this.onRefresh();
+    }
+  }
+
+  /**
+   * Handle Escape shortcut - close any open dialog.
+   */
+  private handleShortcutCancel(): void {
+    // Check each dialog and close if open
+    const dialogs = [
+      "clientDialog",
+      "employeeDialog",
+      "costCenterDialog",
+      "locationDialog",
+      "assignmentDialog",
+      "anonymizeDialog",
+    ];
+
+    for (const dialogId of dialogs) {
+      const dialog = this.byId(dialogId) as Dialog | undefined;
+      if (dialog && dialog.isOpen()) {
+        dialog.close();
+        return;
+      }
+    }
+  }
+
+  /**
    * Cleanup lifecycle method - called when controller is destroyed
    * Prevents memory leaks by destroying all service instances and models
    */
   public onExit(): void {
+    // Detach keyboard shortcuts to prevent memory leaks
+    if (this.keyboardShortcuts) {
+      this.keyboardShortcuts.detach();
+      this.keyboardShortcuts.clear();
+    }
+
     // Clear timers to prevent memory leaks
     if (this.cacheCleanupIntervalId !== undefined) {
       clearInterval(this.cacheCleanupIntervalId);
