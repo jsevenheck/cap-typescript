@@ -67,6 +67,33 @@ function isValidEmail(email: string): boolean {
   return true;
 }
 
+/**
+ * Validates phone number format.
+ * Allows empty string or phone numbers with optional leading +,
+ * followed by at least one digit and optional formatting characters.
+ * Must have at least one digit to be valid (not just + or formatting chars).
+ */
+function isValidPhoneNumber(phoneNumber: string): boolean {
+  if (!phoneNumber || phoneNumber.trim() === "") {
+    return true; // Empty is valid (optional field)
+  }
+
+  // Pattern: optional +, then at least one digit, then optional formatting chars
+  // Max length 30 characters
+  const phoneRegex = /^\+?[0-9][0-9\s\-\(\)\.]{0,29}$/;
+  
+  if (!phoneRegex.test(phoneNumber)) {
+    return false;
+  }
+
+  // Ensure at least one digit exists
+  if (!/[0-9]/.test(phoneNumber)) {
+    return false;
+  }
+
+  return true;
+}
+
 export default class EmployeeHandler {
   private static readonly DIALOG_ID = "employeeDialog";
   private currentManagerLookupToken: number = 0;
@@ -295,6 +322,12 @@ export default class EmployeeHandler {
     // Validate email format
     if (typeof payload.email === 'string' && !isValidEmail(payload.email)) {
       MessageBox.error(i18n.getText("invalidEmail"));
+      return;
+    }
+
+    // Validate phone number format
+    if (typeof payload.phoneNumber === 'string' && !isValidPhoneNumber(payload.phoneNumber)) {
+      MessageBox.error(i18n.getText("invalidPhoneNumber"));
       return;
     }
 

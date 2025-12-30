@@ -794,7 +794,7 @@ export default class Main extends Controller {
 
   /**
    * Export employees list to CSV file.
-   * Gets all employees for the current client and triggers download.
+   * Fetches ALL employees for the current client from the backend and triggers download.
    */
   public async onExportEmployees(): Promise<void> {
     const view = this.getView();
@@ -809,30 +809,29 @@ export default class Main extends Controller {
       return;
     }
 
-    const employeesList = this.byId("employeesList") as List;
-    if (!employeesList) {
-      return;
-    }
-
-    const binding = employeesList.getBinding("items") as ODataListBinding;
-    if (!binding) {
+    const clientId = this.selection.getSelectedClientId();
+    if (!clientId) {
       return;
     }
 
     view.setBusy(true);
 
     try {
-      // Ensure at least one employee context is loaded from the backend
-      const initialContexts = await binding.requestContexts(0, 1);
+      // Get the OData model and create a binding to fetch ALL employees
+      const model = view.getModel() as ODataModel;
+      const binding = model.bindList("/Employees", undefined, undefined, [
+        new Filter("client_ID", FilterOperator.EQ, clientId)
+      ]);
 
-      if (initialContexts.length === 0) {
+      // Request all contexts from the backend (no pagination limit)
+      const contexts = await binding.requestContexts(0, Infinity);
+
+      if (contexts.length === 0) {
         view.setBusy(false);
         MessageToast.show(i18n.getText("exportEmployeesEmpty"));
         return;
       }
 
-      // Get all currently loaded contexts from the binding
-      const contexts = binding.getAllCurrentContexts();
       // Helper to convert optional values to string
       const toOptionalString = (value: unknown): string | undefined =>
         value != null ? String(value) : undefined;

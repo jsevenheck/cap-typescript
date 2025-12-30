@@ -26,6 +26,8 @@ function escapeCSVValue(value: unknown): string {
 
 /**
  * Generates a CSV string from an array of objects.
+ * Note: If the data array is empty, returns a CSV with headers only.
+ * Callers should check for empty data before calling if that behavior is undesired.
  * @param data - Array of objects to convert to CSV
  * @param columns - Array of column configurations with field name and header
  * @returns CSV string with BOM for Excel compatibility
