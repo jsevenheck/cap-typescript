@@ -822,14 +822,16 @@ export default class Main extends Controller {
     view.setBusy(true);
 
     try {
-      // Get all contexts from the binding (including all loaded data)
-      const contexts = binding.getAllCurrentContexts();
-      
-      if (contexts.length === 0) {
+      // Ensure at least one employee context is loaded from the backend
+      const initialContexts = await binding.requestContexts(0, 1);
+
+      if (initialContexts.length === 0) {
         MessageToast.show(i18n.getText("exportEmployeesEmpty"));
         return;
       }
 
+      // Get all currently loaded contexts from the binding
+      const contexts = binding.getAllCurrentContexts();
       // Helper to convert optional values to string
       const toOptionalString = (value: unknown): string | undefined =>
         value != null ? String(value) : undefined;
