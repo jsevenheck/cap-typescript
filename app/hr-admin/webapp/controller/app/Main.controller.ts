@@ -826,6 +826,7 @@ export default class Main extends Controller {
       const initialContexts = await binding.requestContexts(0, 1);
 
       if (initialContexts.length === 0) {
+        view.setBusy(false);
         MessageToast.show(i18n.getText("exportEmployeesEmpty"));
         return;
       }
@@ -857,8 +858,8 @@ export default class Main extends Controller {
       const clientContext = this.selection.getSelectedClientContext();
       const clientName = clientContext?.getProperty("name") as string | undefined;
 
-      // Export to CSV
-      exportEmployeesToCSV(employees, clientName);
+      // Export to CSV with i18n support for column headers
+      exportEmployeesToCSV(employees, clientName, i18n);
       MessageToast.show(i18n.getText("exportEmployeesSuccess"));
     } catch (error) {
       Log.error(

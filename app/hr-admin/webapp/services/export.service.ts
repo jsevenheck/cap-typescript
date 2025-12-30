@@ -115,7 +115,11 @@ export function exportEmployeesToCSV(
   
   const MAX_CLIENT_NAME_LENGTH = 50;
   const sanitizedClientName = clientName 
-    ? clientName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, MAX_CLIENT_NAME_LENGTH) 
+    ? clientName
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .replace(/_+/g, "_")  // Collapse consecutive underscores
+        .replace(/^_|_$/g, "") // Remove leading/trailing underscores
+        .substring(0, MAX_CLIENT_NAME_LENGTH) || "employees"
     : "employees";
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizedClientName}_employees_${timestamp}.csv`;
