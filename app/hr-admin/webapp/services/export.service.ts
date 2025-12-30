@@ -102,8 +102,9 @@ export function exportEmployeesToCSV(employees: EmployeeExportData[], clientName
   
   const csvContent = generateCSV(employees, columns);
   
+  const MAX_CLIENT_NAME_LENGTH = 50;
   const sanitizedClientName = clientName 
-    ? clientName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) 
+    ? clientName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, MAX_CLIENT_NAME_LENGTH) 
     : "employees";
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizedClientName}_employees_${timestamp}.csv`;

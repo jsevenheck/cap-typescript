@@ -830,6 +830,10 @@ export default class Main extends Controller {
         return;
       }
 
+      // Helper to convert optional values to string
+      const toOptionalString = (value: unknown): string | undefined =>
+        value != null ? String(value) : undefined;
+
       // Extract employee data from contexts
       const employees: EmployeeExportData[] = contexts.map(context => {
         const data = context.getObject() as Record<string, unknown>;
@@ -838,10 +842,10 @@ export default class Main extends Controller {
           firstName: String(data.firstName ?? ""),
           lastName: String(data.lastName ?? ""),
           email: String(data.email ?? ""),
-          phoneNumber: data.phoneNumber != null ? String(data.phoneNumber) : undefined,
-          positionLevel: data.positionLevel != null ? String(data.positionLevel) : undefined,
+          phoneNumber: toOptionalString(data.phoneNumber),
+          positionLevel: toOptionalString(data.positionLevel),
           entryDate: String(data.entryDate ?? ""),
-          exitDate: data.exitDate != null ? String(data.exitDate) : undefined,
+          exitDate: toOptionalString(data.exitDate),
           status: String(data.status ?? ""),
           employmentType: String(data.employmentType ?? ""),
         };
