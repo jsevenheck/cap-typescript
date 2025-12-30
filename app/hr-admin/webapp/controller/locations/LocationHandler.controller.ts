@@ -190,7 +190,7 @@ export default class LocationHandler {
     // Compare as strings (YYYY-MM-DD format from DatePicker) to avoid timezone issues
     const validFromStr = payload.validFrom as string;
     const validToStr = payload.validTo as string | null;
-    if (validToStr && validFromStr >= validToStr) {
+    if (validToStr && validFromStr > validToStr) {
       MessageBox.error(i18n.getText("locationDatesInvalid"));
       return;
     }
