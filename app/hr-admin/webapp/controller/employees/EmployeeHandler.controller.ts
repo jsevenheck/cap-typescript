@@ -71,7 +71,6 @@ function isValidEmail(email: string): boolean {
  * Validates phone number format.
  * Allows empty string or phone numbers with optional leading +,
  * followed by at least one digit and optional formatting characters.
- * Must have at least one digit to be valid (not just + or formatting chars).
  */
 function isValidPhoneNumber(phoneNumber: string): boolean {
   if (!phoneNumber || phoneNumber.trim() === "") {
@@ -79,19 +78,10 @@ function isValidPhoneNumber(phoneNumber: string): boolean {
   }
 
   // Pattern: optional +, then at least one digit, then optional formatting chars
-  // Max length 30 characters
+  // Max length 30 characters (the regex ensures at least one digit exists)
   const phoneRegex = /^\+?[0-9][0-9\s\-\(\)\.]{0,29}$/;
   
-  if (!phoneRegex.test(phoneNumber)) {
-    return false;
-  }
-
-  // Ensure at least one digit exists
-  if (!/[0-9]/.test(phoneNumber)) {
-    return false;
-  }
-
-  return true;
+  return phoneRegex.test(phoneNumber);
 }
 
 export default class EmployeeHandler {
