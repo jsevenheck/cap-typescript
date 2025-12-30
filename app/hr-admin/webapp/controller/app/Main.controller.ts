@@ -329,7 +329,7 @@ export default class Main extends Controller {
    * Updates the costCenterStatistics model for dashboard display.
    */
   private async loadCostCenterStatistics(clientId?: string): Promise<void> {
-    await this.loadStatistics(
+    await this.loadGenericStatistics(
       "costCenterStatistics",
       "/costCenterStatisticsLoading",
       fetchCostCenterStatistics,
@@ -455,7 +455,7 @@ export default class Main extends Controller {
    * Updates the locationStatistics model for dashboard display.
    */
   private async loadLocationStatistics(clientId?: string): Promise<void> {
-    return this.loadStatistics(
+    return this.loadGenericStatistics(
       "locationStatistics",
       "/locationStatisticsLoading",
       fetchLocationStatistics,
