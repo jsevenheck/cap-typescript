@@ -183,6 +183,14 @@ export default class CostCenterHandler {
       return;
     }
 
+    // Validate date range: validFrom must be before validTo
+    const validFromStr = payload.validFrom as string;
+    const validToStr = payload.validTo as string | null;
+    if (validToStr && validFromStr >= validToStr) {
+      MessageBox.error(i18n.getText("costCenterDatesInvalid"));
+      return;
+    }
+
     if (!clientId) {
       MessageBox.error(i18n.getText("selectClientFirst"));
       return;
