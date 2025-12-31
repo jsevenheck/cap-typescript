@@ -401,7 +401,13 @@
                                 <StandardListItem
                                         title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
                                         description="{= (${responsible/firstName} || '') + ' ' + (${responsible/lastName} || '') }"
-                                        info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
+                                        info="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.util.Formatters.formatValidityPeriod'
+                                        }"
                                         infoState="{= ${validTo} && new Date(${validTo}) < new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
