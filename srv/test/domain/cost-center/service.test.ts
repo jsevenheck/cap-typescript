@@ -339,7 +339,7 @@ describe('CostCenterService', () => {
           user,
           concurrency: { hasHttpHeaders: false },
         })
-      ).rejects.toThrow('Cannot delete cost center: 3 assignment record(s) exist.');
+      ).rejects.toThrow('Cannot delete cost center: 3 assignment record(s) exist. This would result in loss of historical data.');
     });
 
     it('should successfully validate deletion when no dependencies exist', async () => {
