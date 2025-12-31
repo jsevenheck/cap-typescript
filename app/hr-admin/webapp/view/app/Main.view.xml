@@ -409,10 +409,7 @@
                                             formatter: 'hr.admin.util.Formatters.formatValidityPeriod'
                                         }"
                                         infoState="{
-                                            parts: [
-                                                { path: 'validFrom' },
-                                                { path: 'validTo' }
-                                            ],
+                                            path: 'validTo',
                                             formatter: 'hr.admin.util.Formatters.formatValidityStatusState'
                                         }"/>
                             </items>
