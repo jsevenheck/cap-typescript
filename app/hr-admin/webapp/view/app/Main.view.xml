@@ -366,6 +366,12 @@
                                 <Toolbar>
                                     <Title text="{i18n>costCenters}" level="H3"/>
                                     <ToolbarSpacer/>
+                                    <SearchField
+                                            id="costCenterSearchField"
+                                            width="16rem"
+                                            placeholder="{i18n>searchCostCenters}"
+                                            search=".onCostCenterSearch"
+                                            liveChange=".onCostCenterSearchLiveChange"/>
                                     <Button
                                             type="Emphasized"
                                             text="{i18n>add}"
@@ -474,6 +480,12 @@
                                 <Toolbar>
                                     <Title text="{i18n>locations}" level="H3"/>
                                     <ToolbarSpacer/>
+                                    <SearchField
+                                            id="locationSearchField"
+                                            width="16rem"
+                                            placeholder="{i18n>searchLocations}"
+                                            search=".onLocationSearch"
+                                            liveChange=".onLocationSearchLiveChange"/>
                                     <Button
                                             type="Emphasized"
                                             text="{i18n>add}"
