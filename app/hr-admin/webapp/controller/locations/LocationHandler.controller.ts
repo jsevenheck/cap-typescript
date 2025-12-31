@@ -186,6 +186,15 @@ export default class LocationHandler {
       return;
     }
 
+    // Validate date range: validFrom must be before validTo
+    // Compare as strings (YYYY-MM-DD format from DatePicker) to avoid timezone issues
+    const validFromStr = payload.validFrom as string;
+    const validToStr = payload.validTo as string | null;
+    if (validToStr && validFromStr > validToStr) {
+      MessageBox.error(i18n.getText("locationDatesInvalid"));
+      return;
+    }
+
     if (!clientId) {
       MessageBox.error(i18n.getText("selectClientFirst"));
       return;
