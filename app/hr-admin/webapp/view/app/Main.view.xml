@@ -599,6 +599,10 @@
                         required="true">
                     <core:Item key="{employmentTypeOptions>key}" text="{employmentTypeOptions>text}"/>
                 </Select>
+                <CheckBox
+                        id="employeeIsManager"
+                        text="{i18n>isManager}"
+                        selected="{employeeDialog>/employee/isManager}"/>
             </VBox>
         </content>
         <beginButton>
