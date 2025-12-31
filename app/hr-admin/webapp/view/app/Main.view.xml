@@ -20,6 +20,7 @@
                                 includeItemInSelection="true"
                                 items="{path: '/Clients', parameters: {$expand: 'employees($count=true;$top=0)'}}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
+                                noDataText="{i18n>noClientsFound}"
                                 selectionChange=".onSelectionChange"
                                 itemPress=".onClientPress">
                             <headerToolbar>
@@ -164,6 +165,7 @@
                                 includeItemInSelection="true"
                                 items="{path: 'employees'}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
+                                noDataText="{i18n>noEmployeesFound}"
                                 selectionChange=".onEmployeesSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
@@ -237,6 +239,7 @@
                                     includeItemInSelection="true"
                                     items="{path: 'costCenterAssignments', parameters: { $expand: { costCenter: { $select: ['code','name'] } } } }"
                                     growing="true" growingThreshold="10" growingScrollToLoad="true"
+                                    noDataText="{i18n>noAssignmentsFound}"
                                     selectionChange=".onAssignmentsSelectionChange">
                                 <headerToolbar>
                                     <Toolbar>
@@ -357,6 +360,7 @@
                                 includeItemInSelection="true"
                                 items="{path: 'costCenters'}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
+                                noDataText="{i18n>noCostCentersFound}"
                                 selectionChange=".onCostCentersSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
@@ -464,6 +468,7 @@
                                 includeItemInSelection="true"
                                 items="{path: 'locations'}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
+                                noDataText="{i18n>noLocationsFound}"
                                 selectionChange=".onLocationsSelectionChange">
                             <headerToolbar>
                                 <Toolbar>
