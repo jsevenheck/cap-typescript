@@ -71,10 +71,10 @@ export const validateDateRange = (
     return;
   }
 
-  // Validate that validFrom < validTo
-  if (fromDate >= toDate) {
+  // Validate that validFrom <= validTo (same-day validity is allowed)
+  if (fromDate > toDate) {
     throw new Error(
-      `Invalid date range for ${entityName}: validFrom must be before validTo (validFrom: ${fromDate.toISOString()}, validTo: ${toDate.toISOString()})`,
+      `Invalid date range for ${entityName}: validFrom must be on or before validTo (validFrom: ${fromDate.toISOString()}, validTo: ${toDate.toISOString()})`,
     );
   }
 };

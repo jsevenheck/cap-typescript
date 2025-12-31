@@ -191,8 +191,10 @@ export const anonymizeEmployeeRecord = async (
         firstName: placeholder,
         lastName: placeholder,
         email,
+        phoneNumber: null,
         positionLevel: null,
         status: 'inactive',
+        anonymizedAt: new Date().toISOString(),
       })
       .where({ ID: employeeId }),
   );

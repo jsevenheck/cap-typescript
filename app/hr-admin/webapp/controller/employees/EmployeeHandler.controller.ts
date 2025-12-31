@@ -78,7 +78,7 @@ function isValidPhoneNumber(phoneNumber: string): boolean {
   }
 
   // Pattern: optional +, then at least one digit, then optional formatting chars
-  // Max length 30 characters (the regex ensures at least one digit exists)
+  // Max length 30 characters (matches backend schema: String(30) with {0,28} regex)
   const phoneRegex = /^\+?[0-9][0-9\s\-\(\)\.]{0,28}$/;
   
   return phoneRegex.test(phoneNumber);
