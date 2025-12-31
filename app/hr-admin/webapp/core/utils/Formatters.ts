@@ -151,13 +151,13 @@ export function formatDate(date?: string | Date | null): string {
 }
 
 /**
- * Check if a validity period has expired (validTo is in the past)
+ * Check if a validity period has expired (validTo is in the past or equal to now)
  */
 export function isExpired(validTo?: string | Date | null): boolean {
   if (!validTo) return false;
   try {
     const toDate = typeof validTo === 'string' ? new Date(validTo) : validTo;
-    return toDate < new Date();
+    return toDate <= new Date();
   } catch {
     return false;
   }
