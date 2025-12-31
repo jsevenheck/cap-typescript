@@ -165,9 +165,16 @@ export function isExpired(validTo?: string | Date | null): boolean {
 
 /**
  * Format validity status text (Active/Expired)
+ * @param validTo - The end date of the validity period
+ * @param expiredText - Text to display when expired (default: 'Expired')
+ * @param activeText - Text to display when active (default: 'Active')
  */
-export function formatValidityStatus(validTo?: string | Date | null): string {
-  return isExpired(validTo) ? 'Expired' : 'Active';
+export function formatValidityStatus(
+  validTo?: string | Date | null,
+  expiredText: string = 'Expired',
+  activeText: string = 'Active',
+): string {
+  return isExpired(validTo) ? expiredText : activeText;
 }
 
 /**
