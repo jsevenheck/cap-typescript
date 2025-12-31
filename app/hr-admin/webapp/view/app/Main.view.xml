@@ -518,7 +518,7 @@
                                         title="{= (${street} || '') + ', ' + (${city} || '') }"
                                         description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"
                                         info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
-                                        infoState="Information"/>
+                                        infoState="{= ${validTo} && new Date(${validTo}) < new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
