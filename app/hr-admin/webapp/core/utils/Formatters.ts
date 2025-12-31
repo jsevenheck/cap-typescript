@@ -164,6 +164,19 @@ export function isExpired(validTo?: string | Date | null): boolean {
 }
 
 /**
+ * Check if a validity period has not yet started (validFrom is in the future)
+ */
+export function isNotYetValid(validFrom?: string | Date | null): boolean {
+  if (!validFrom) return false;
+  try {
+    const fromDate = typeof validFrom === 'string' ? new Date(validFrom) : validFrom;
+    return fromDate > new Date();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Format validity status text (Active/Expired)
  * @param validTo - The end date of the validity period
  * @param expiredText - Text to display when expired
@@ -179,8 +192,18 @@ export function formatValidityStatus(
 
 /**
  * Format validity status state (for infoState property)
+ * Considers both validFrom (not yet valid) and validTo (expired)
+ * - Returns 'Warning' if validFrom is in the future (not yet valid)
+ * - Returns 'Error' if validTo has passed (expired)
+ * - Returns 'Success' if currently valid
  */
-export function formatValidityStatusState(validTo?: string | Date | null): string {
+export function formatValidityStatusState(
+  validFrom?: string | Date | null,
+  validTo?: string | Date | null,
+): string {
+  if (isNotYetValid(validFrom)) {
+    return 'Warning';
+  }
   return isExpired(validTo) ? 'Error' : 'Success';
 }
 
