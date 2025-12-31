@@ -195,6 +195,6 @@ export function formatValidityPeriod(
   const from = formatDate(validFrom);
   const to = validTo ? formatDate(validTo) : (openEndedText ?? '');
   if (!from && !validTo) return '';
-  if (!from) return `→ ${to}`;
+  if (!from) return to;
   return `${from} → ${to}`;
 }
