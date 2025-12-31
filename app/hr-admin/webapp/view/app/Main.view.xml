@@ -408,7 +408,7 @@
                                             ],
                                             formatter: 'hr.admin.util.Formatters.formatValidityPeriod'
                                         }"
-                                        infoState="{= ${validTo} && new Date(${validTo}) < new Date() ? 'Error' : 'Success'}"/>
+                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
@@ -523,8 +523,14 @@
                                 <StandardListItem
                                         title="{= (${street} || '') + ', ' + (${city} || '') }"
                                         description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"
-                                        info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
-                                        infoState="{= ${validTo} && new Date(${validTo}) < new Date() ? 'Error' : 'Success'}"/>
+                                        info="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.util.Formatters.formatValidityPeriod'
+                                        }"
+                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
