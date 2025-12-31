@@ -400,9 +400,9 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
-                                        description="{responsible/firstName} {responsible/lastName}"
-                                        info="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? ${i18n>expired} : ${i18n>active}}"
-                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
+                                        description="{= (${responsible/firstName} || '') + ' ' + (${responsible/lastName} || '') }"
+                                        info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
+                                        infoState="Information"/>
                             </items>
                         </List>
                     </VBox>
@@ -517,8 +517,8 @@
                                 <StandardListItem
                                         title="{= (${street} || '') + ', ' + (${city} || '') }"
                                         description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"
-                                        info="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? ${i18n>expired} : ${i18n>active}}"
-                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
+                                        info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
+                                        infoState="Information"/>
                             </items>
                         </List>
                     </VBox>
