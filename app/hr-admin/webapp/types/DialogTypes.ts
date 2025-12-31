@@ -37,6 +37,7 @@ export interface EmployeeDialogData {
   exitDate: string;
   status: EmployeeStatusKey;
   employmentType: EmploymentTypeKey;
+  isManager: boolean;
 }
 
 export interface EmployeeDialogModelData {

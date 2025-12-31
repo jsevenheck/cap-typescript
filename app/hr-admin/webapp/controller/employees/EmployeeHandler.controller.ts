@@ -130,6 +130,7 @@ export default class EmployeeHandler {
         exitDate: "",
         status: "active",
         employmentType: "internal",
+        isManager: false,
       },
       managerLookupPending: false,
     });
@@ -174,6 +175,7 @@ export default class EmployeeHandler {
         exitDate?: string | null;
         status?: EmployeeDialogModelData["employee"]["status"];
         employmentType?: EmployeeDialogModelData["employee"]["employmentType"];
+        isManager?: boolean;
       } | undefined;
       if (!currentData) {
         MessageBox.error(i18n.getText("unableToLoadEmployee"));
@@ -204,6 +206,7 @@ export default class EmployeeHandler {
           exitDate: currentData.exitDate ?? "",
           status: currentData.status ?? "active",
           employmentType: currentData.employmentType ?? "internal",
+          isManager: currentData.isManager ?? false,
         },
         managerLookupPending: false,
       });
@@ -285,6 +288,7 @@ export default class EmployeeHandler {
       exitDate: exitDateValue ? exitDateValue : null,
       status: data.employee.status,
       employmentType: data.employee.employmentType,
+      isManager: data.employee.isManager ?? false,
     };
 
     if (clientId) {
@@ -438,6 +442,7 @@ export default class EmployeeHandler {
       context.setProperty("exitDate", payload.exitDate);
       context.setProperty("status", payload.status);
       context.setProperty("employmentType", payload.employmentType);
+      context.setProperty("isManager", payload.isManager);
       model
         .submitBatch("$auto")
         .then(() => {
