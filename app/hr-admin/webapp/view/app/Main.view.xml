@@ -402,7 +402,7 @@
                                         title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
                                         description="{= (${responsible/firstName} || '') + ' ' + (${responsible/lastName} || '') }"
                                         info="{= ${validTo} ? (${validFrom} + ' → ' + ${validTo}) : (${validFrom} + ' →') }"
-                                        infoState="Information"/>
+                                        infoState="{= ${validTo} && new Date(${validTo}) < new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
