@@ -408,7 +408,13 @@
                                             ],
                                             formatter: 'hr.admin.util.Formatters.formatValidityPeriod'
                                         }"
-                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
+                                        infoState="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.util.Formatters.formatValidityStatusState'
+                                        }"/>
                             </items>
                         </List>
                     </VBox>
