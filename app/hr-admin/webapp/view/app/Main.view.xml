@@ -400,7 +400,9 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
-                                        description="{responsible/firstName} {responsible/lastName}"/>
+                                        description="{responsible/firstName} {responsible/lastName}"
+                                        info="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? ${i18n>expired} : ${i18n>active}}"
+                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
@@ -514,7 +516,9 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${street} || '') + ', ' + (${city} || '') }"
-                                        description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"/>
+                                        description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"
+                                        info="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? ${i18n>expired} : ${i18n>active}}"
+                                        infoState="{= ${validTo} &amp;&amp; new Date(${validTo}) &lt; new Date() ? 'Error' : 'Success'}"/>
                             </items>
                         </List>
                     </VBox>
