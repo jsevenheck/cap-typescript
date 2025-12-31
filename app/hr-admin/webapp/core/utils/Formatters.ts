@@ -149,3 +149,45 @@ export function formatDate(date?: string | Date | null): string {
     return '';
   }
 }
+
+/**
+ * Check if a validity period has expired (validTo is in the past)
+ */
+export function isExpired(validTo?: string | Date | null): boolean {
+  if (!validTo) return false;
+  try {
+    const toDate = typeof validTo === 'string' ? new Date(validTo) : validTo;
+    return toDate < new Date();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Format validity status text (Active/Expired)
+ */
+export function formatValidityStatus(validTo?: string | Date | null): string {
+  return isExpired(validTo) ? 'Expired' : 'Active';
+}
+
+/**
+ * Format validity status state (for infoState property)
+ */
+export function formatValidityStatusState(validTo?: string | Date | null): string {
+  return isExpired(validTo) ? 'Error' : 'Success';
+}
+
+/**
+ * Format validity period display (validFrom → validTo or "Open ended")
+ */
+export function formatValidityPeriod(
+  validFrom?: string | Date | null,
+  validTo?: string | Date | null,
+  openEndedText?: string,
+): string {
+  const from = formatDate(validFrom);
+  const to = validTo ? formatDate(validTo) : (openEndedText || 'Open ended');
+  if (!from && !validTo) return '';
+  if (!from) return `→ ${to}`;
+  return `${from} → ${to}`;
+}
