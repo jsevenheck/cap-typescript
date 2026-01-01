@@ -7,7 +7,8 @@
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-ui5-bootstrap' https://ui5.sap.com https://sapui5.hana.ondemand.com; style-src 'self' 'unsafe-inline' https://ui5.sap.com https://sapui5.hana.ondemand.com; font-src 'self' https://ui5.sap.com https://sapui5.hana.ondemand.com data:; img-src 'self' https://ui5.sap.com https://sapui5.hana.ondemand.com data:; connect-src 'self'; frame-ancestors 'none'"
   },
   "routes": [
     {

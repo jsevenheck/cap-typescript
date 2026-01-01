@@ -1,6 +1,7 @@
 {
   "welcomeFile": "/index.html",
   "authenticationMethod": "route",
+  "sessionTimeout": 30,
   "routes": [
     {
       "source": "^/odata/v4/?(.*)$",
