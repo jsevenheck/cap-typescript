@@ -217,10 +217,16 @@ export function formatValidityPeriod(
 ): string {
   const from = formatDate(validFrom);
   const to = validTo ? formatDate(validTo) : (openEndedText ?? '');
-  if (!from && !validTo) return '';
-  if (!from) {
+  const hasValidFrom = !!validFrom;
+  const hasValidTo = !!validTo;
+
+  if (!hasValidFrom && !hasValidTo) {
+    return '';
+  }
+
+  if (!hasValidFrom && hasValidTo) {
     // When only an end date is available, indicate it as an upper bound.
-    return validTo ? `→ ${to}` : to;
+    return `→ ${to}`;
   }
   return `${from} → ${to}`;
 }
