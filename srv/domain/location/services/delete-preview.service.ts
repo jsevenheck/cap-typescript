@@ -18,7 +18,7 @@ export interface LocationDeletePreview {
 /**
  * Get a preview of the impact of deleting a location.
  * Counts all affected entities (employees assigned to this location).
- * Uses parallel queries for efficiency (SAP best practice).
+ * Executes the required queries within a single transaction context.
  *
  * @param tx - The CDS transaction context
  * @param locationId - The location ID to preview deletion for
