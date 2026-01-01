@@ -2,6 +2,10 @@
   "welcomeFile": "/index.html",
   "authenticationMethod": "route",
   "sessionTimeout": 30,
+  "compression": {
+    "enabled": true,
+    "minSize": 2048
+  },
   "httpHeaders": {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
