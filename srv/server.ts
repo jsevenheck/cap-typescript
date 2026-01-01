@@ -208,85 +208,72 @@ cds.on('bootstrap', (app: Application) => {
   });
 
   /**
-   * Async handler for database connectivity check.
-   * Used by readiness and health endpoints.
+   * Configuration for health check status labels.
    */
-  const checkDatabaseConnectivity = async (_req: Request, res: Response): Promise<void> => {
-    try {
-      // Verify database connectivity by attempting a simple query
-      const db = (cds as any).db ?? (await cds.connect.to('db'));
+  interface HealthCheckConfig {
+    successStatus: string;
+    failureStatus: string;
+    logContext: string;
+  }
 
-      if (!db) {
-        throw new Error('Database connection not available');
+  /**
+   * Creates an async handler for database connectivity check.
+   * Used by readiness and health endpoints with customizable status labels.
+   */
+  const createHealthCheckHandler = (config: HealthCheckConfig) =>
+    async (_req: Request, res: Response): Promise<void> => {
+      try {
+        // Verify database connectivity by attempting a simple query
+        const db = (cds as any).db ?? (await cds.connect.to('db'));
+
+        if (!db) {
+          throw new Error('Database connection not available');
+        }
+
+        // Simple connectivity test - query for any client (limit 1)
+        const { SELECT } = cds.ql;
+        await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
+
+        res.status(200).json({
+          status: config.successStatus,
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'connected',
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, `${config.logContext} failed`);
+        res.status(503).json({
+          status: config.failureStatus,
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'disconnected',
+          },
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
-
-      // Simple connectivity test - query for any client (limit 1)
-      const { SELECT } = cds.ql;
-      await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
-
-      res.status(200).json({
-        status: 'ready',
-        timestamp: new Date().toISOString(),
-        checks: {
-          database: 'connected',
-        },
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Database connectivity check failed');
-      res.status(503).json({
-        status: 'not_ready',
-        timestamp: new Date().toISOString(),
-        checks: {
-          database: 'disconnected',
-        },
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  };
+    };
 
   /**
    * Readiness probe endpoint - verifies application and database connectivity
    * Returns 200 OK if ready to accept traffic, 503 Service Unavailable if not.
    * Use for Kubernetes/CF readiness probes to control traffic routing.
    */
-  app.get('/health/ready', wrapAsyncMiddleware(checkDatabaseConnectivity));
+  app.get('/health/ready', wrapAsyncMiddleware(createHealthCheckHandler({
+    successStatus: 'ready',
+    failureStatus: 'not_ready',
+    logContext: 'Readiness check',
+  })));
 
   /**
    * Health check endpoint - verifies application and database connectivity
    * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
    */
-  app.get('/health', wrapAsyncMiddleware(async (_req: Request, res: Response): Promise<void> => {
-    try {
-      // Verify database connectivity by attempting a simple query
-      const db = (cds as any).db ?? (await cds.connect.to('db'));
-
-      if (!db) {
-        throw new Error('Database connection not available');
-      }
-
-      // Simple connectivity test - query for any client (limit 1)
-      const { SELECT } = cds.ql;
-      await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
-
-      res.status(200).json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        checks: {
-          database: 'connected',
-        },
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'Health check failed');
-      res.status(503).json({
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        checks: {
-          database: 'disconnected',
-        },
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }));
+  app.get('/health', wrapAsyncMiddleware(createHealthCheckHandler({
+    successStatus: 'healthy',
+    failureStatus: 'unhealthy',
+    logContext: 'Health check',
+  })));
 
   logger.info('Application bootstrap complete');
 });
