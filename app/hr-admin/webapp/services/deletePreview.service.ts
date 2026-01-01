@@ -3,23 +3,14 @@
  * Used to show informative confirmation dialogs before deletion.
  */
 
-export interface ClientDeletePreview {
-  clientName: string;
-  employeeCount: number;
-  costCenterCount: number;
-  locationCount: number;
-  assignmentCount: number;
-}
-
 /**
- * Fetches a preview of what will be deleted when a client is removed.
- * @param clientId - The client ID to preview deletion for
- * @returns Promise resolving to delete preview data
+ * Fetch JSON data from an OData function endpoint.
+ * Handles HTTP error responses by extracting error details from the response body.
+ * @param url - The URL to fetch
+ * @param errorContext - Context string for error messages (e.g., "delete preview")
+ * @returns Promise resolving to parsed JSON data
  */
-export async function fetchClientDeletePreview(clientId: string): Promise<ClientDeletePreview> {
-  const encodedClientId = encodeURIComponent(clientId);
-  const url = `/odata/v4/clients/clientDeletePreview(clientId='${encodedClientId}')`;
-
+async function fetchODataFunction<T>(url: string, errorContext: string): Promise<T> {
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -56,17 +47,37 @@ export async function fetchClientDeletePreview(clientId: string): Promise<Client
     }
 
     throw new Error(
-      `Failed to fetch delete preview: ${response.status} ${response.statusText}${errorDetails}`,
+      `Failed to fetch ${errorContext}: ${response.status} ${response.statusText}${errorDetails}`,
     );
   }
 
-  const data = await response.json();
+  return response.json() as Promise<T>;
+}
+
+export interface ClientDeletePreview {
+  clientName: string;
+  employeeCount: number;
+  costCenterCount: number;
+  locationCount: number;
+  assignmentCount: number;
+}
+
+/**
+ * Fetches a preview of what will be deleted when a client is removed.
+ * @param clientId - The client ID to preview deletion for
+ * @returns Promise resolving to delete preview data
+ */
+export async function fetchClientDeletePreview(clientId: string): Promise<ClientDeletePreview> {
+  const encodedClientId = encodeURIComponent(clientId);
+  const url = `/odata/v4/clients/clientDeletePreview(clientId='${encodedClientId}')`;
+
+  const data = await fetchODataFunction<Record<string, unknown>>(url, 'delete preview');
   return {
-    clientName: data.clientName ?? '',
-    employeeCount: data.employeeCount ?? 0,
-    costCenterCount: data.costCenterCount ?? 0,
-    locationCount: data.locationCount ?? 0,
-    assignmentCount: data.assignmentCount ?? 0,
+    clientName: (data.clientName as string) ?? '',
+    employeeCount: (data.employeeCount as number) ?? 0,
+    costCenterCount: (data.costCenterCount as number) ?? 0,
+    locationCount: (data.locationCount as number) ?? 0,
+    assignmentCount: (data.assignmentCount as number) ?? 0,
   };
 }
 
@@ -112,52 +123,12 @@ export async function fetchCostCenterDeletePreview(costCenterId: string): Promis
   const encodedCostCenterId = encodeURIComponent(costCenterId);
   const url = `/odata/v4/clients/costCenterDeletePreview(costCenterId='${encodedCostCenterId}')`;
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    let errorDetails = '';
-
-    try {
-      const contentType = response.headers.get('content-type') || '';
-
-      if (contentType.includes('application/json')) {
-        const errorBody = await response.json();
-        const bodyMessage =
-          (errorBody && (errorBody.error?.message || errorBody.message)) || undefined;
-
-        if (bodyMessage) {
-          errorDetails = ` - ${bodyMessage}`;
-        } else {
-          errorDetails = ` - ${JSON.stringify(errorBody)}`;
-        }
-      } else {
-        const text = await response.text();
-        if (text) {
-          errorDetails = ` - ${text}`;
-        }
-      }
-    } catch {
-      // Ignore errors while reading/processing the error response body.
-    }
-
-    throw new Error(
-      `Failed to fetch delete preview: ${response.status} ${response.statusText}${errorDetails}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await fetchODataFunction<Record<string, unknown>>(url, 'cost center delete preview');
   return {
-    costCenterName: data.costCenterName ?? '',
-    costCenterCode: data.costCenterCode ?? '',
-    employeeCount: data.employeeCount ?? 0,
-    assignmentCount: data.assignmentCount ?? 0,
+    costCenterName: (data.costCenterName as string) ?? '',
+    costCenterCode: (data.costCenterCode as string) ?? '',
+    employeeCount: (data.employeeCount as number) ?? 0,
+    assignmentCount: (data.assignmentCount as number) ?? 0,
   };
 }
 
@@ -196,51 +167,11 @@ export async function fetchLocationDeletePreview(locationId: string): Promise<Lo
   const encodedLocationId = encodeURIComponent(locationId);
   const url = `/odata/v4/clients/locationDeletePreview(locationId='${encodedLocationId}')`;
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    let errorDetails = '';
-
-    try {
-      const contentType = response.headers.get('content-type') || '';
-
-      if (contentType.includes('application/json')) {
-        const errorBody = await response.json();
-        const bodyMessage =
-          (errorBody && (errorBody.error?.message || errorBody.message)) || undefined;
-
-        if (bodyMessage) {
-          errorDetails = ` - ${bodyMessage}`;
-        } else {
-          errorDetails = ` - ${JSON.stringify(errorBody)}`;
-        }
-      } else {
-        const text = await response.text();
-        if (text) {
-          errorDetails = ` - ${text}`;
-        }
-      }
-    } catch {
-      // Ignore errors while reading/processing the error response body.
-    }
-
-    throw new Error(
-      `Failed to fetch delete preview: ${response.status} ${response.statusText}${errorDetails}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await fetchODataFunction<Record<string, unknown>>(url, 'location delete preview');
   return {
-    locationCity: data.locationCity ?? '',
-    locationStreet: data.locationStreet ?? '',
-    employeeCount: data.employeeCount ?? 0,
+    locationCity: (data.locationCity as string) ?? '',
+    locationStreet: (data.locationStreet as string) ?? '',
+    employeeCount: (data.employeeCount as number) ?? 0,
   };
 }
 

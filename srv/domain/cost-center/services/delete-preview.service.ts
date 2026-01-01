@@ -5,6 +5,8 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 
+import { extractCount } from '../../../shared/utils/query';
+
 const ql = cds.ql as typeof cds.ql;
 
 export interface CostCenterDeletePreview {
@@ -13,18 +15,6 @@ export interface CostCenterDeletePreview {
   employeeCount: number;
   assignmentCount: number;
 }
-
-/**
- * Extract count from CDS query result
- */
-const extractCount = (result: unknown): number => {
-  if (Array.isArray(result) && result.length > 0) {
-    const row = result[0] as { count?: number | string };
-    return typeof row.count === 'number' ? row.count : parseInt(String(row.count || '0'), 10);
-  }
-  const row = result as { count?: number | string } | undefined;
-  return typeof row?.count === 'number' ? row.count : parseInt(String(row?.count || '0'), 10);
-};
 
 /**
  * Get a preview of the impact of deleting a cost center.
