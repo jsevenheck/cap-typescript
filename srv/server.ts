@@ -196,12 +196,32 @@ cds.on('bootstrap', (app: Application) => {
   app.use(correlationIdMiddleware);
 
   /**
-   * Health check endpoint - verifies application and database connectivity
-   * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
+   * Liveness probe endpoint - simple check that the application is running
+   * Returns 200 OK immediately without any dependency checks.
+   * Use for Kubernetes/CF liveness probes to detect crashed containers.
    */
-  app.get('/health', (_req, res) => {
-    // Wrap async logic to satisfy @typescript-eslint/no-misused-promises
-    void (async () => {
+  app.get('/health/live', (_req, res) => {
+    res.status(200).json({
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Configuration for health check status labels.
+   */
+  interface HealthCheckConfig {
+    successStatus: string;
+    failureStatus: string;
+    logContext: string;
+  }
+
+  /**
+   * Creates an async handler for database connectivity check.
+   * Used by readiness and health endpoints with customizable status labels.
+   */
+  const createHealthCheckHandler = (config: HealthCheckConfig) =>
+    async (_req: Request, res: Response): Promise<void> => {
       try {
         // Verify database connectivity by attempting a simple query
         const db = (cds as any).db ?? (await cds.connect.to('db'));
@@ -215,16 +235,16 @@ cds.on('bootstrap', (app: Application) => {
         await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
 
         res.status(200).json({
-          status: 'healthy',
+          status: config.successStatus,
           timestamp: new Date().toISOString(),
           checks: {
             database: 'connected',
           },
         });
       } catch (error) {
-        logger.error({ err: error }, 'Health check failed');
+        logger.error({ err: error }, `${config.logContext} failed`);
         res.status(503).json({
-          status: 'unhealthy',
+          status: config.failureStatus,
           timestamp: new Date().toISOString(),
           checks: {
             database: 'disconnected',
@@ -232,8 +252,28 @@ cds.on('bootstrap', (app: Application) => {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
-    })();
-  });
+    };
+
+  /**
+   * Readiness probe endpoint - verifies application and database connectivity
+   * Returns 200 OK if ready to accept traffic, 503 Service Unavailable if not.
+   * Use for Kubernetes/CF readiness probes to control traffic routing.
+   */
+  app.get('/health/ready', wrapAsyncMiddleware(createHealthCheckHandler({
+    successStatus: 'ready',
+    failureStatus: 'not_ready',
+    logContext: 'Readiness check',
+  })));
+
+  /**
+   * Health check endpoint - verifies application and database connectivity
+   * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
+   */
+  app.get('/health', wrapAsyncMiddleware(createHealthCheckHandler({
+    successStatus: 'healthy',
+    failureStatus: 'unhealthy',
+    logContext: 'Health check',
+  })));
 
   logger.info('Application bootstrap complete');
 });

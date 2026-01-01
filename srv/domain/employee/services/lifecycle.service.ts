@@ -399,6 +399,8 @@ const validateManagerAndCostCenter = async (
   return updates;
 };
 
+const MAX_EMPLOYEE_ID_LENGTH = 60;
+
 const ensureUniqueEmployeeId = async (
   tx: Transaction,
   data: Partial<EmployeeEntity>,
@@ -413,6 +415,15 @@ const ensureUniqueEmployeeId = async (
 
   if (data.employeeId) {
     data.employeeId = data.employeeId.trim().toUpperCase();
+
+    // Validate length constraint (matches database schema: String(60))
+    if (data.employeeId.length > MAX_EMPLOYEE_ID_LENGTH) {
+      throw createServiceError(
+        400,
+        `Employee ID cannot exceed ${MAX_EMPLOYEE_ID_LENGTH} characters.`,
+      );
+    }
+
     if (
       currentEmployeeIdentifier &&
       data.employeeId === currentEmployeeIdentifier.trim().toUpperCase()
