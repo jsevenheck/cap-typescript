@@ -19,7 +19,7 @@
       "source": "^/resources/(.*)\\.(js|css|json|woff2?|ttf|svg|png|gif|jpg)$",
       "target": "/resources/$1.$2",
       "service": "html5-apps-repo-rt",
-      "authenticationType": "none",
+      "authenticationType": "ias",
       "cacheControl": "public, max-age=31536000, immutable"
     },
     {
