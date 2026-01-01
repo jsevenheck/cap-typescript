@@ -2,27 +2,43 @@
 
 /**
  * Calculate the date N days ago from today in ISO format (YYYY-MM-DD).
+ * Uses local timezone to avoid date shifts when converting to/from UTC.
  */
 export const daysAgo = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().split('T')[0];
+  // Use local date components to avoid timezone issues with toISOString()
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /**
  * Calculate the date N days from today in ISO format (YYYY-MM-DD).
+ * Uses local timezone to avoid date shifts when converting to/from UTC.
  */
 export const daysFromNow = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
+  // Use local date components to avoid timezone issues with toISOString()
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /**
  * Get today's date in ISO format (YYYY-MM-DD).
+ * Uses local timezone to avoid date shifts when converting to/from UTC.
  */
 export const today = (): string => {
-  return new Date().toISOString().split('T')[0];
+  const date = new Date();
+  // Use local date components to avoid timezone issues with toISOString()
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /** Converts a variety of input types into a valid Date or undefined. */

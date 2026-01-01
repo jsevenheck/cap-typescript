@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
 import {
+  daysAgo,
+  daysFromNow,
+  today,
   normalizeDateToMidnight,
   todayAtMidnight,
 } from '../../shared/utils/date';
@@ -7,6 +10,134 @@ import {
 describe('Date Utilities', () => {
   beforeEach(() => {
     jest.useRealTimers();
+  });
+
+  describe('today', () => {
+    it('should return today\'s date in YYYY-MM-DD format', () => {
+      const result = today();
+      const now = new Date();
+      const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      expect(result).toBe(expected);
+    });
+
+    it('should return a string in ISO date format', () => {
+      const result = today();
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return consistent results when called multiple times', () => {
+      const result1 = today();
+      const result2 = today();
+
+      expect(result1).toBe(result2);
+    });
+
+    it('should use local timezone, not UTC', () => {
+      const result = today();
+      const now = new Date();
+      
+      // Extract local date components
+      const localYear = now.getFullYear();
+      const localMonth = now.getMonth() + 1;
+      const localDay = now.getDate();
+
+      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+    });
+  });
+
+  describe('daysAgo', () => {
+    it('should return date 1 day ago in YYYY-MM-DD format', () => {
+      const result = daysAgo(1);
+      const expected = new Date();
+      expected.setDate(expected.getDate() - 1);
+      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+
+      expect(result).toBe(expectedStr);
+    });
+
+    it('should return date 7 days ago', () => {
+      const result = daysAgo(7);
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return date 30 days ago', () => {
+      const result = daysAgo(30);
+      const expected = new Date();
+      expected.setDate(expected.getDate() - 30);
+      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+
+      expect(result).toBe(expectedStr);
+    });
+
+    it('should handle 0 days ago (today)', () => {
+      const result = daysAgo(0);
+      const todayResult = today();
+
+      expect(result).toBe(todayResult);
+    });
+
+    it('should use local timezone, not UTC', () => {
+      const result = daysAgo(1);
+      const expected = new Date();
+      expected.setDate(expected.getDate() - 1);
+      
+      const localYear = expected.getFullYear();
+      const localMonth = expected.getMonth() + 1;
+      const localDay = expected.getDate();
+
+      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+    });
+  });
+
+  describe('daysFromNow', () => {
+    it('should return date 1 day from now in YYYY-MM-DD format', () => {
+      const result = daysFromNow(1);
+      const expected = new Date();
+      expected.setDate(expected.getDate() + 1);
+      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+
+      expect(result).toBe(expectedStr);
+    });
+
+    it('should return date 7 days from now', () => {
+      const result = daysFromNow(7);
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return date 30 days from now', () => {
+      const result = daysFromNow(30);
+      const expected = new Date();
+      expected.setDate(expected.getDate() + 30);
+      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+
+      expect(result).toBe(expectedStr);
+    });
+
+    it('should handle 0 days from now (today)', () => {
+      const result = daysFromNow(0);
+      const todayResult = today();
+
+      expect(result).toBe(todayResult);
+    });
+
+    it('should use local timezone, not UTC', () => {
+      const result = daysFromNow(1);
+      const expected = new Date();
+      expected.setDate(expected.getDate() + 1);
+      
+      const localYear = expected.getFullYear();
+      const localMonth = expected.getMonth() + 1;
+      const localDay = expected.getDate();
+
+      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+    });
   });
 
   describe('normalizeDateToMidnight', () => {
