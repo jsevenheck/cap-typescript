@@ -358,7 +358,7 @@
                                 id="costCentersList"
                                 mode="SingleSelectMaster"
                                 includeItemInSelection="true"
-                                items="{path: 'costCenters'}"
+                                items="{path: 'costCenters', parameters: {$expand: 'employees($count=true;$top=0)'}}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
                                 noDataText="{i18n>noCostCentersFound}"
                                 selectionChange=".onCostCentersSelectionChange">
@@ -486,7 +486,7 @@
                                 id="locationsList"
                                 mode="SingleSelectMaster"
                                 includeItemInSelection="true"
-                                items="{path: 'locations'}"
+                                items="{path: 'locations', parameters: {$expand: 'employees($count=true;$top=0)'}}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
                                 noDataText="{i18n>noLocationsFound}"
                                 selectionChange=".onLocationsSelectionChange">

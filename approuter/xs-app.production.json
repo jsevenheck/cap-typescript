@@ -2,6 +2,10 @@
   "welcomeFile": "/index.html",
   "authenticationMethod": "route",
   "sessionTimeout": 30,
+  "compression": {
+    "enabled": true,
+    "minSize": 1024
+  },
   "httpHeaders": {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
@@ -11,6 +15,13 @@
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-ui5-bootstrap' https://ui5.sap.com https://sapui5.hana.ondemand.com; style-src 'self' 'unsafe-inline' https://ui5.sap.com https://sapui5.hana.ondemand.com; font-src 'self' https://ui5.sap.com https://sapui5.hana.ondemand.com data:; img-src 'self' https://ui5.sap.com https://sapui5.hana.ondemand.com data:; connect-src 'self'; frame-ancestors 'none'"
   },
   "routes": [
+    {
+      "source": "^/resources/(.*)\\.(js|css|json|woff2?|ttf|svg|png|gif|jpg)$",
+      "target": "/resources/$1.$2",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "none",
+      "cacheControl": "public, max-age=31536000, immutable"
+    },
     {
       "source": "^/odata/v4/(.*)$",
       "target": "/odata/v4/$1",
