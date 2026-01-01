@@ -15,7 +15,7 @@
       id="notFoundMessage"
       title="{i18n>pageNotFoundTitle}"
       description="{i18n>pageNotFoundDescription}"
-      icon="sap-icon://document"
+      icon="sap-icon://message-error"
       showHeader="false">
       <customDescription>
         <Link
