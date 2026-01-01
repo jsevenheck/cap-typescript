@@ -44,10 +44,11 @@ describe('Date Utilities', () => {
       const date = new Date('2024-06-15T14:30:45.123Z');
       const normalized = normalizeDateToMidnight(date);
 
-      // Check that the date part is preserved (in local timezone)
-      expect(normalized.getDate()).toBe(new Date('2024-06-15').getDate());
-      expect(normalized.getMonth()).toBe(new Date('2024-06-15').getMonth());
-      expect(normalized.getFullYear()).toBe(2024);
+      // Derive the expected value from the same base Date to avoid timezone issues
+      const expected = new Date(date);
+      expected.setHours(0, 0, 0, 0);
+
+      expect(normalized.getTime()).toBe(expected.getTime());
     });
 
     it('should not mutate the original Date object', () => {
