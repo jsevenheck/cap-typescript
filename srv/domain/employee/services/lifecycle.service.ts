@@ -418,7 +418,13 @@ const ensureUniqueEmployeeId = async (
     return false;
   }
 
-  const clientCompanyId = client.companyId ?? '';
+  const clientCompanyId = client.companyId;
+  if (!clientCompanyId) {
+    throw createServiceError(
+      400,
+      'Client is missing a valid companyId required for employee ID operations.',
+    );
+  }
 
   if (data.employeeId) {
     data.employeeId = data.employeeId.trim().toUpperCase();
