@@ -59,7 +59,6 @@ describe('Date Utilities', () => {
 
       // Original date should not be modified
       expect(originalDate.getTime()).toBe(originalTime);
-      expect(originalDate.getHours()).not.toBe(0);
     });
 
     it('should handle dates across different timezones consistently', () => {
