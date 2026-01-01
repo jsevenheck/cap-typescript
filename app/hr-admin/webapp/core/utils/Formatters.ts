@@ -149,3 +149,84 @@ export function formatDate(date?: string | Date | null): string {
     return '';
   }
 }
+
+/**
+ * Check if a validity period has expired (validTo is in the past or equal to now)
+ */
+export function isExpired(validTo?: string | Date | null): boolean {
+  if (!validTo) return false;
+  try {
+    const toDate = typeof validTo === 'string' ? new Date(validTo) : validTo;
+    return toDate <= new Date();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a validity period has not yet started (validFrom is in the future)
+ */
+export function isNotYetValid(validFrom?: string | Date | null): boolean {
+  if (!validFrom) return false;
+  try {
+    const fromDate = typeof validFrom === 'string' ? new Date(validFrom) : validFrom;
+    return fromDate > new Date();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Format validity status text (Active/Expired)
+ * @param validTo - The end date of the validity period
+ * @param expiredText - Text to display when expired
+ * @param activeText - Text to display when active
+ */
+export function formatValidityStatus(
+  validTo?: string | Date | null,
+  expiredText: string,
+  activeText: string,
+): string {
+  return isExpired(validTo) ? expiredText : activeText;
+}
+
+/**
+ * Format validity status state (for infoState property)
+ * Considers both validFrom (not yet valid) and validTo (expired)
+ * - Returns 'Warning' if validFrom is in the future (not yet valid)
+ * - Returns 'Error' if validTo has passed (expired)
+ * - Returns 'Success' if currently valid
+ */
+export function formatValidityStatusState(
+  validFrom?: string | Date | null,
+  validTo?: string | Date | null,
+): string {
+  if (isNotYetValid(validFrom)) {
+    return 'Warning';
+  }
+  return isExpired(validTo) ? 'Error' : 'Success';
+}
+
+/**
+ * Format validity period display (validFrom → validTo or "Open ended")
+ */
+export function formatValidityPeriod(
+  validFrom?: string | Date | null,
+  validTo?: string | Date | null,
+  openEndedText?: string,
+): string {
+  const from = formatDate(validFrom);
+  const to = validTo ? formatDate(validTo) : (openEndedText ?? '');
+  const hasValidFrom = !!validFrom;
+  const hasValidTo = !!validTo;
+
+  if (!hasValidFrom && !hasValidTo) {
+    return '';
+  }
+
+  if (!hasValidFrom && hasValidTo) {
+    // When only an end date is available, indicate it as an upper bound.
+    return `→ ${to}`;
+  }
+  return `${from} → ${to}`;
+}

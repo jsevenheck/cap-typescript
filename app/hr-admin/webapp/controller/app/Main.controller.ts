@@ -14,6 +14,7 @@ import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Filter from "sap/ui/model/Filter";
 import FilterOperator from "sap/ui/model/FilterOperator";
 import Log from "sap/base/Log";
+import { SearchHelper, SEARCH_CONFIGS } from "../../core/utils/SearchHelper";
 
 import initializeModels from "../../model/modelInitialization";
 import ClientHandler from "../clients/ClientHandler.controller";
@@ -52,7 +53,9 @@ export default class Main extends Controller {
   private cacheCleanupIntervalId?: number;
   private initialCacheCleanupTimeoutId?: number;
   private lastHash?: string;
-  private searchDebounceTimeoutId?: number;
+  private employeeSearch!: SearchHelper;
+  private costCenterSearch!: SearchHelper;
+  private locationSearch!: SearchHelper;
 
   public onInit(): void {
     const view = this.getView();
@@ -76,6 +79,12 @@ export default class Main extends Controller {
     this.costCenters = new CostCenterHandler(this, this.models, this.selection, this.guard);
     this.locations = new LocationHandler(this, this.models, this.selection, this.guard);
     this.assignments = new AssignmentHandler(this, this.models, this.selection, this.guard);
+
+    // Initialize search helpers
+    const byIdFn = (id: string) => this.byId(id) as List | undefined;
+    this.employeeSearch = new SearchHelper(SEARCH_CONFIGS.employees, byIdFn);
+    this.costCenterSearch = new SearchHelper(SEARCH_CONFIGS.costCenters, byIdFn);
+    this.locationSearch = new SearchHelper(SEARCH_CONFIGS.locations, byIdFn);
 
     // Attach navigation guards to the router (already initialized in Component)
     const router = this.getOwnerComponent()?.getRouter();
@@ -544,10 +553,11 @@ export default class Main extends Controller {
       clearTimeout(this.initialCacheCleanupTimeoutId);
       this.initialCacheCleanupTimeoutId = undefined;
     }
-    if (this.searchDebounceTimeoutId !== undefined) {
-      clearTimeout(this.searchDebounceTimeoutId);
-      this.searchDebounceTimeoutId = undefined;
-    }
+
+    // Destroy search helpers
+    this.employeeSearch?.destroy();
+    this.costCenterSearch?.destroy();
+    this.locationSearch?.destroy();
 
     // Destroy handler instances
     if (this.clients && typeof (this.clients as any).destroy === 'function') {
@@ -695,13 +705,7 @@ export default class Main extends Controller {
       searchField.setValue("");
     }
     // Clear any filters on the employees list
-    const employeesList = this.byId("employeesList") as List;
-    if (employeesList) {
-      const binding = employeesList.getBinding("items") as ODataListBinding;
-      if (binding) {
-        binding.filter([]);
-      }
-    }
+    this.employeeSearch.clearFilter();
     this.employees.refresh();
 
     // Refresh statistics as well
@@ -716,7 +720,7 @@ export default class Main extends Controller {
    */
   public onEmployeeSearch(event: Event): void {
     const query = event.getParameter("query") as string;
-    this.filterEmployees(query);
+    this.employeeSearch.onSearch(query);
   }
 
   /**
@@ -725,59 +729,7 @@ export default class Main extends Controller {
    */
   public onEmployeeSearchLiveChange(event: Event): void {
     const query = event.getParameter("newValue") as string;
-    
-    // Clear any pending debounce timeout
-    if (this.searchDebounceTimeoutId !== undefined) {
-      clearTimeout(this.searchDebounceTimeoutId);
-    }
-    
-    // Debounce search to avoid excessive requests (300ms delay)
-    this.searchDebounceTimeoutId = setTimeout(() => {
-      this.filterEmployees(query);
-      this.searchDebounceTimeoutId = undefined;
-    }, 300) as unknown as number;
-  }
-
-  /**
-   * Apply filter to employees list based on search query.
-   * Filters by firstName, lastName, email, and employeeId.
-   * Note: OData V4 Contains filter is case-insensitive by default.
-   */
-  private filterEmployees(query: string): void {
-    const employeesList = this.byId("employeesList") as List;
-    if (!employeesList) {
-      return;
-    }
-
-    const binding = employeesList.getBinding("items") as ODataListBinding;
-    if (!binding) {
-      return;
-    }
-
-    if (!query || query.trim().length === 0) {
-      // Clear filters when search is empty
-      binding.filter([]);
-      return;
-    }
-
-    const searchValue = query.trim();
-
-    // Create filters for each searchable field
-    // In OData V4, FilterOperator.Contains is inherently case-insensitive
-    const filters = [
-      new Filter("firstName", FilterOperator.Contains, searchValue),
-      new Filter("lastName", FilterOperator.Contains, searchValue),
-      new Filter("email", FilterOperator.Contains, searchValue),
-      new Filter("employeeId", FilterOperator.Contains, searchValue),
-    ];
-
-    // Combine with OR logic - match any of the fields
-    const combinedFilter = new Filter({
-      filters: filters,
-      and: false,
-    });
-
-    binding.filter([combinedFilter]);
+    this.employeeSearch.onLiveChange(query);
   }
 
   public onAddEmployee(): void {
@@ -901,6 +853,13 @@ export default class Main extends Controller {
   public onRefreshCostCenters(): void {
     // Clear cost center entity cache and refresh list
     this.cacheManager.clearEntity('CostCenters');
+    // Clear search field
+    const searchField = this.byId("costCenterSearchField") as SearchField;
+    if (searchField) {
+      searchField.setValue("");
+    }
+    // Clear any filters on the cost centers list
+    this.costCenterSearch.clearFilter();
     this.costCenters.refresh();
 
     // Refresh cost center statistics as well
@@ -908,6 +867,23 @@ export default class Main extends Controller {
     if (clientId) {
       this.loadCostCenterStatistics(clientId);
     }
+  }
+
+  /**
+   * Handle cost center search - triggered on search submit (Enter key)
+   */
+  public onCostCenterSearch(event: Event): void {
+    const query = event.getParameter("query") as string;
+    this.costCenterSearch.onSearch(query);
+  }
+
+  /**
+   * Handle cost center search live change - triggered as user types
+   * Uses debouncing to avoid excessive OData requests
+   */
+  public onCostCenterSearchLiveChange(event: Event): void {
+    const query = event.getParameter("newValue") as string;
+    this.costCenterSearch.onLiveChange(query);
   }
 
   public onAddCostCenter(): void {
@@ -951,6 +927,13 @@ export default class Main extends Controller {
   public onRefreshLocations(): void {
     // Clear location entity cache and refresh list
     this.cacheManager.clearEntity('Locations');
+    // Clear search field
+    const searchField = this.byId("locationSearchField") as SearchField;
+    if (searchField) {
+      searchField.setValue("");
+    }
+    // Clear any filters on the locations list
+    this.locationSearch.clearFilter();
     this.locations.refresh();
 
     // Refresh location statistics as well
@@ -958,6 +941,23 @@ export default class Main extends Controller {
     if (clientId) {
       this.loadLocationStatistics(clientId);
     }
+  }
+
+  /**
+   * Handle location search - triggered on search submit (Enter key)
+   */
+  public onLocationSearch(event: Event): void {
+    const query = event.getParameter("query") as string;
+    this.locationSearch.onSearch(query);
+  }
+
+  /**
+   * Handle location search live change - triggered as user types
+   * Uses debouncing to avoid excessive OData requests
+   */
+  public onLocationSearchLiveChange(event: Event): void {
+    const query = event.getParameter("newValue") as string;
+    this.locationSearch.onLiveChange(query);
   }
 
   public onAddLocation(): void {

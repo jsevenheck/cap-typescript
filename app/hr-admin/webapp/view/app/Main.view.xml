@@ -366,6 +366,12 @@
                                 <Toolbar>
                                     <Title text="{i18n>costCenters}" level="H3"/>
                                     <ToolbarSpacer/>
+                                    <SearchField
+                                            id="costCenterSearchField"
+                                            width="16rem"
+                                            placeholder="{i18n>searchCostCenters}"
+                                            search=".onCostCenterSearch"
+                                            liveChange=".onCostCenterSearchLiveChange"/>
                                     <Button
                                             type="Emphasized"
                                             text="{i18n>add}"
@@ -394,7 +400,21 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${code} || '') + ( ${name} ? ' - ' + ${name} : '' ) }"
-                                        description="{responsible/firstName} {responsible/lastName}"/>
+                                        description="{= (${responsible/firstName} || '') + ' ' + (${responsible/lastName} || '') }"
+                                        info="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.core.utils.Formatters.formatValidityPeriod'
+                                        }"
+                                        infoState="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.core.utils.Formatters.formatValidityStatusState'
+                                        }"/>
                             </items>
                         </List>
                     </VBox>
@@ -474,6 +494,12 @@
                                 <Toolbar>
                                     <Title text="{i18n>locations}" level="H3"/>
                                     <ToolbarSpacer/>
+                                    <SearchField
+                                            id="locationSearchField"
+                                            width="16rem"
+                                            placeholder="{i18n>searchLocations}"
+                                            search=".onLocationSearch"
+                                            liveChange=".onLocationSearchLiveChange"/>
                                     <Button
                                             type="Emphasized"
                                             text="{i18n>add}"
@@ -502,7 +528,21 @@
                             <items>
                                 <StandardListItem
                                         title="{= (${street} || '') + ', ' + (${city} || '') }"
-                                        description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"/>
+                                        description="{= (${zipCode} || '') + ' • ' + (${country_code} || '') }"
+                                        info="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.core.utils.Formatters.formatValidityPeriod'
+                                        }"
+                                        infoState="{
+                                            parts: [
+                                                { path: 'validFrom' },
+                                                { path: 'validTo' }
+                                            ],
+                                            formatter: 'hr.admin.core.utils.Formatters.formatValidityStatusState'
+                                        }"/>
                             </items>
                         </List>
                     </VBox>
