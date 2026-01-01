@@ -172,4 +172,33 @@ service ClientService @(path:'/clients', impl:'./handlers.ts') {
     expiredLocations: Integer;
     upcomingExpiry: Integer;
   };
+
+  /**
+   * Preview the impact of deleting a cost center.
+   * Returns counts of child entities that will be affected.
+   * Used by frontend to show informative delete confirmation dialogs.
+   * @param costCenterId - The cost center ID to preview deletion for
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor']
+  function costCenterDeletePreview(costCenterId: UUID) returns {
+    costCenterName: String;
+    costCenterCode: String;
+    employeeCount: Integer;
+    assignmentCount: Integer;
+  };
+
+  /**
+   * Preview the impact of deleting a location.
+   * Returns counts of child entities that will be affected.
+   * Used by frontend to show informative delete confirmation dialogs.
+   * @param locationId - The location ID to preview deletion for
+   */
+  @readonly
+  @requires: ['HRAdmin', 'HREditor']
+  function locationDeletePreview(locationId: UUID) returns {
+    locationCity: String;
+    locationStreet: String;
+    employeeCount: Integer;
+  };
 }

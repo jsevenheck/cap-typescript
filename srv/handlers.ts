@@ -19,6 +19,8 @@ import { getEmployeeStatistics } from './domain/employee/services/statistics.ser
 import { getCostCenterStatistics } from './domain/cost-center/services/statistics.service';
 import { getLocationStatistics } from './domain/location/services/statistics.service';
 import { getClientDeletePreview } from './domain/client/services/delete-preview.service';
+import { getCostCenterDeletePreview } from './domain/cost-center/services/delete-preview.service';
+import { getLocationDeletePreview } from './domain/location/services/delete-preview.service';
 import type { CapServiceError } from './shared/utils/errors';
 
 type ServiceWithOn = Service & {
@@ -148,6 +150,58 @@ const registerHandlers = (srv: Service): void => {
       return statistics;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retrieve location statistics';
+      const serviceError = error as CapServiceError;
+      const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
+      return req.reject(status, message);
+    }
+  });
+
+  // Register costCenterDeletePreview function handler
+  (srv as ServiceWithOn).on('costCenterDeletePreview', async (req: Request) => {
+    const costCenterId = (req.data as { costCenterId?: string })?.costCenterId;
+
+    if (!costCenterId) {
+      return req.reject(400, 'Cost Center ID is required');
+    }
+
+    try {
+      // Verify authorization for the cost center's client
+      const tx = cds.transaction(req);
+      const preview = await getCostCenterDeletePreview(tx, costCenterId);
+
+      if (!preview) {
+        return req.reject(404, 'Cost center not found');
+      }
+
+      return preview;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve delete preview';
+      const serviceError = error as CapServiceError;
+      const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
+      return req.reject(status, message);
+    }
+  });
+
+  // Register locationDeletePreview function handler
+  (srv as ServiceWithOn).on('locationDeletePreview', async (req: Request) => {
+    const locationId = (req.data as { locationId?: string })?.locationId;
+
+    if (!locationId) {
+      return req.reject(400, 'Location ID is required');
+    }
+
+    try {
+      // Verify authorization for the location's client
+      const tx = cds.transaction(req);
+      const preview = await getLocationDeletePreview(tx, locationId);
+
+      if (!preview) {
+        return req.reject(404, 'Location not found');
+      }
+
+      return preview;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to retrieve delete preview';
       const serviceError = error as CapServiceError;
       const status = typeof serviceError?.status === 'number' ? serviceError.status : 500;
       return req.reject(status, message);

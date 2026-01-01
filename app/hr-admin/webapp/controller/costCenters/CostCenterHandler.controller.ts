@@ -9,12 +9,14 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
 import UnsavedChangesGuard from "../../core/guards/UnsavedChangesGuard";
 import { getOptionalListBinding } from "../../core/services/odata";
 import { getEventParameter } from "../../core/utils/EventParam";
+import { fetchCostCenterDeletePreview, buildCostCenterDeleteSummary } from "../../services/deletePreview.service";
 
 type ODataContext = NonNullable<Context>;
 type CreationContext = {
@@ -134,28 +136,82 @@ export default class CostCenterHandler {
       MessageBox.error(i18n.getText("noCostCenterSelected"));
       return;
     }
-    const costCenter = context.getObject() as { code?: string; name?: string };
+    const costCenter = context.getObject() as { ID?: string; code?: string; name?: string };
+    const costCenterId = costCenter.ID;
     const title = costCenter.code
       ? `${costCenter.code}${costCenter.name ? " - " + costCenter.name : ""}`
       : costCenter.name ?? "";
-    MessageBox.confirm(`${i18n.getText("deleteCostCenterMessage")} ${title}?`, {
-      title: i18n.getText("confirm"),
-      emphasizedAction: MessageBox.Action.OK,
-      actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-      onClose: (action: string) => {
-        if (action === MessageBox.Action.OK) {
-          context
-            .delete("$auto")
-            .then(() => {
-              MessageToast.show(i18n.getText("costCenterDeleted"));
-              this.selection.clearCostCenter();
-            })
-            .catch((error: Error) => {
-              MessageBox.error(error.message ?? i18n.getText("failedToDeleteCostCenter"));
-            });
+
+    if (!costCenterId) {
+      MessageBox.error(i18n.getText("noCostCenterSelected"));
+      return;
+    }
+
+    // Fetch delete preview to show impact
+    const view = this.controller.getView();
+    if (view) {
+      view.setBusy(true);
+    }
+
+    fetchCostCenterDeletePreview(costCenterId)
+      .then((preview) => {
+        if (view) {
+          view.setBusy(false);
         }
-      },
-    });
+
+        const summary = buildCostCenterDeleteSummary(preview);
+        let confirmMessage = `${i18n.getText("deleteCostCenterMessage")} ${title}?`;
+
+        if (summary) {
+          confirmMessage += `\n\n${i18n.getText("deleteCostCenterWarning") || "This will affect:"}\n${summary}`;
+        }
+
+        MessageBox.confirm(confirmMessage, {
+          title: i18n.getText("confirm"),
+          emphasizedAction: MessageBox.Action.OK,
+          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+          onClose: (action: string) => {
+            if (action === MessageBox.Action.OK) {
+              context
+                .delete("$auto")
+                .then(() => {
+                  MessageToast.show(i18n.getText("costCenterDeleted"));
+                  this.selection.clearCostCenter();
+                })
+                .catch((error: Error) => {
+                  MessageBox.error(error.message ?? i18n.getText("failedToDeleteCostCenter"));
+                });
+            }
+          },
+        });
+      })
+      .catch((error) => {
+        if (view) {
+          view.setBusy(false);
+        }
+        Log.warning("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error), "hr.admin.CostCenterHandler");
+
+        // Fall back to basic confirmation if preview fails
+        MessageBox.confirm(`${i18n.getText("deleteCostCenterMessage")} ${title}?`, {
+          title: i18n.getText("confirm"),
+          emphasizedAction: MessageBox.Action.OK,
+          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+          onClose: (action: string) => {
+            if (action === MessageBox.Action.OK) {
+              context
+                .delete("$auto")
+                .then(() => {
+                  MessageToast.show(i18n.getText("costCenterDeleted"));
+                  this.selection.clearCostCenter();
+                })
+                .catch((deleteError: Error) => {
+                  Log.error("Error deleting cost center", deleteError.message, "hr.admin.CostCenterHandler");
+                  MessageBox.error(deleteError.message ?? i18n.getText("failedToDeleteCostCenter"));
+                });
+            }
+          },
+        });
+      });
   }
 
   public save(): void {
