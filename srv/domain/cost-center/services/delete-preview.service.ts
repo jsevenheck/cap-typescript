@@ -10,6 +10,7 @@ import { extractCount } from '../../../shared/utils/query';
 const ql = cds.ql as typeof cds.ql;
 
 export interface CostCenterDeletePreview {
+  clientId: string;
   costCenterName: string;
   costCenterCode: string;
   employeeCount: number;
@@ -29,16 +30,17 @@ export async function getCostCenterDeletePreview(
   tx: Transaction,
   costCenterId: string,
 ): Promise<CostCenterDeletePreview | null> {
-  // First, verify the cost center exists and get its name/code
+  // First, verify the cost center exists and get its name/code/client
   const costCenterResult = await tx.run(
-    ql.SELECT.one.from('clientmgmt.CostCenters').columns('name', 'code').where({ ID: costCenterId }),
+    ql.SELECT.one.from('clientmgmt.CostCenters').columns('name', 'code', 'client_ID').where({ ID: costCenterId }),
   );
 
   if (!costCenterResult) {
     return null;
   }
 
-  const costCenterData = costCenterResult as { name?: string; code?: string };
+  const costCenterData = costCenterResult as { name?: string; code?: string; client_ID?: string };
+  const clientId = costCenterData.client_ID ?? '';
   const costCenterName = costCenterData.name ?? '';
   const costCenterCode = costCenterData.code ?? '';
 
@@ -55,6 +57,7 @@ export async function getCostCenterDeletePreview(
   ]);
 
   return {
+    clientId,
     costCenterName,
     costCenterCode,
     employeeCount: extractCount(employeeResult),

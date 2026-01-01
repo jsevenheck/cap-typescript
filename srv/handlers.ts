@@ -165,13 +165,16 @@ const registerHandlers = (srv: Service): void => {
     }
 
     try {
-      // Verify authorization for the cost center's client
       const tx = cds.transaction(req);
       const preview = await getCostCenterDeletePreview(tx, costCenterId);
 
       if (!preview) {
         return req.reject(404, 'Cost center not found');
       }
+
+      // Verify authorization for the cost center's client
+      const authorization = new CompanyAuthorization(req);
+      await authorization.resolveAuthorizedClientScope(preview.clientId);
 
       return preview;
     } catch (error) {
@@ -191,13 +194,16 @@ const registerHandlers = (srv: Service): void => {
     }
 
     try {
-      // Verify authorization for the location's client
       const tx = cds.transaction(req);
       const preview = await getLocationDeletePreview(tx, locationId);
 
       if (!preview) {
         return req.reject(404, 'Location not found');
       }
+
+      // Verify authorization for the location's client
+      const authorization = new CompanyAuthorization(req);
+      await authorization.resolveAuthorizedClientScope(preview.clientId);
 
       return preview;
     } catch (error) {

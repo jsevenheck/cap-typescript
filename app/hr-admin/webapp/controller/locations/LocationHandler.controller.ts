@@ -9,7 +9,6 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
-import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -191,7 +190,7 @@ export default class LocationHandler {
         if (view) {
           view.setBusy(false);
         }
-        Log.warning("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error), "hr.admin.LocationHandler");
+        console.warn("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error));
 
         // Fall back to basic confirmation if preview fails
         MessageBox.confirm(`${i18n.getText("deleteLocationMessage")} ${title}?`, {

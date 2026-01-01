@@ -10,6 +10,7 @@ import { extractCount } from '../../../shared/utils/query';
 const ql = cds.ql as typeof cds.ql;
 
 export interface LocationDeletePreview {
+  clientId: string;
   locationCity: string;
   locationStreet: string;
   employeeCount: number;
@@ -30,14 +31,15 @@ export async function getLocationDeletePreview(
 ): Promise<LocationDeletePreview | null> {
   // First, verify the location exists and get its identifying info
   const locationResult = await tx.run(
-    ql.SELECT.one.from('clientmgmt.Locations').columns('city', 'street').where({ ID: locationId }),
+    ql.SELECT.one.from('clientmgmt.Locations').columns('city', 'street', 'client_ID').where({ ID: locationId }),
   );
 
   if (!locationResult) {
     return null;
   }
 
-  const locationData = locationResult as { city?: string; street?: string };
+  const locationData = locationResult as { city?: string; street?: string; client_ID?: string };
+  const clientId = locationData.client_ID ?? '';
   const locationCity = locationData.city ?? '';
   const locationStreet = locationData.street ?? '';
 
@@ -47,6 +49,7 @@ export async function getLocationDeletePreview(
   );
 
   return {
+    clientId,
     locationCity,
     locationStreet,
     employeeCount: extractCount(employeeResult),
