@@ -78,3 +78,28 @@ export const validateDateRange = (
     );
   }
 };
+
+/**
+ * Normalize a Date object to midnight (00:00:00.000) in local timezone.
+ * Useful for date-only comparisons to avoid time-of-day issues.
+ *
+ * @param date - Date object or ISO date string to normalize
+ * @returns Normalized Date object at midnight
+ */
+export const normalizeDateToMidnight = (date: Date | string): Date => {
+  const d = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+/**
+ * Get today's date normalized to midnight in local timezone.
+ * Use for date-only business logic comparisons.
+ *
+ * @returns Today's date at midnight
+ */
+export const todayAtMidnight = (): Date => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
