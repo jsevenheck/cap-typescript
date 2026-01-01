@@ -108,12 +108,12 @@ export function createInitialAssignmentDialogData(): AssignmentDialogModelData {
 }
 
 export function createInitialAuthorizationState(): AuthorizationState {
-  // In local development, default to full access so UI is usable.
-  // Backend authorization still enforces real security.
+  // Default to restrictive (read-only) until backend auth is verified.
+  // This is safer as the backend still enforces real security.
   return {
-    canWrite: true,
-    isAdmin: true,
-    isReadOnly: false,
+    canWrite: false,
+    isAdmin: false,
+    isReadOnly: true,
     loaded: false,
   };
 }

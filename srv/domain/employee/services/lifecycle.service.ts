@@ -155,6 +155,7 @@ const sanitizeEmployeeStrings = (data: Partial<EmployeeEntity>): void => {
   if (data.lastName) data.lastName = data.lastName.trim();
   if (data.email) data.email = data.email.trim().toLowerCase();
   if (data.positionLevel) data.positionLevel = data.positionLevel.trim();
+  if (data.phoneNumber) data.phoneNumber = data.phoneNumber.trim();
 };
 
 /**

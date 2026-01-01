@@ -22,6 +22,7 @@ export interface EmployeeEntity {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber?: string;
   location_ID: string;
   positionLevel?: string;
   entryDate: string;
