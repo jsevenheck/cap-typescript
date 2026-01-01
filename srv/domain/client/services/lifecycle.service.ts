@@ -117,8 +117,8 @@ export const prepareClientUpsert = async ({
     updates.companyId = normalized ?? undefined;
   }
 
-  // For CREATE, companyId is required
-  if (event === 'CREATE' && !updates.companyId && !data.companyId) {
+  // For CREATE, companyId is required (check normalized value, not original which could be empty string)
+  if (event === 'CREATE' && !updates.companyId) {
     throw createServiceError(400, 'Client ID is required.');
   }
 

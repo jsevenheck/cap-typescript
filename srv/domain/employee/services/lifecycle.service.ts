@@ -10,7 +10,6 @@ import { toDateValue } from '../../../shared/utils/date';
 import {
   identifiersMatch,
   isInactiveStatus,
-  normalizeCompanyId,
   normalizeIdentifier,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
@@ -383,6 +382,7 @@ const validateManagerAndCostCenter = async (
 /** Employee ID format: {clientId}-{counter} (e.g., 1010-0001) */
 const EMPLOYEE_ID_FORMAT_REGEX = /^[0-9]{4}-[0-9]{4}$/;
 const MAX_EMPLOYEE_ID_LENGTH = 9;
+const CLIENT_ID_PREFIX_LENGTH = 4;
 
 /**
  * Validates employee ID format matches the pattern {clientId}-{counter}.
@@ -397,7 +397,7 @@ const validateEmployeeIdFormat = (employeeId: string, clientCompanyId: string): 
   }
 
   // Ensure the prefix matches the client's company ID
-  const prefix = employeeId.substring(0, 4);
+  const prefix = employeeId.substring(0, CLIENT_ID_PREFIX_LENGTH);
   if (prefix !== clientCompanyId) {
     throw createServiceError(
       400,
