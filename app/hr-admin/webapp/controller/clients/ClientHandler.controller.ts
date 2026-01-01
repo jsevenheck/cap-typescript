@@ -29,6 +29,14 @@ type CreationContext = {
 };
 
 
+/**
+ * Validates client ID format: exactly 4 numeric characters (e.g., 1010, 1026, 1069)
+ */
+function isValidClientId(clientId: string): boolean {
+  return /^[0-9]{4}$/.test(clientId);
+}
+
+
 export default class ClientHandler {
   private static readonly DIALOG_ID = "clientDialog";
 
@@ -199,6 +207,12 @@ export default class ClientHandler {
     // Enhanced validation
     if (!payload.companyId || !payload.name) {
       MessageBox.error(i18n.getText("clientIdRequired"));
+      return;
+    }
+
+    // Validate client ID format (4 numeric characters)
+    if (!isValidClientId(payload.companyId)) {
+      MessageBox.error(i18n.getText("invalidClientIdFormat"));
       return;
     }
 

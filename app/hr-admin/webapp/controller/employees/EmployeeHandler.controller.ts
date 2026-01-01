@@ -502,7 +502,7 @@ export default class EmployeeHandler {
       // Validate and sanitize employee ID
       const trimmedEmployeeId = employeeIdValue?.trim();
       if (trimmedEmployeeId) {
-        if (trimmedEmployeeId.length > 60) {
+        if (trimmedEmployeeId.length > 9) {
           dialog.setBusy(false);
           MessageBox.error(i18n.getText("employeeIdTooLongError"));
           return;

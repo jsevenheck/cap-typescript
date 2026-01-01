@@ -60,7 +60,7 @@ describe('CostCenterService', () => {
   });
 
   describe('prepareCostCenterUpsert', () => {
-    const mockClient = { ID: 'client-1', companyId: 'COMP-001' };
+    const mockClient = { ID: 'client-1', companyId: '1010' };
     const mockEmployee = { ID: 'emp-1', client_ID: 'client-1' };
 
     beforeEach(() => {
@@ -214,7 +214,7 @@ describe('CostCenterService', () => {
       expect(result).toHaveProperty('client');
       expect(result.updates.client_ID).toBe('client-1');
       expect(result.updates.responsible_ID).toBe('emp-1');
-      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, 'COMP-001');
+      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, '1010');
     });
 
     it('should normalize cost center code to uppercase', async () => {
@@ -285,12 +285,12 @@ describe('CostCenterService', () => {
 
       expect(result).toHaveProperty('updates');
       expect(result).toHaveProperty('client');
-      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, 'COMP-001');
+      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, '1010');
     });
   });
 
   describe('validateCostCenterDeletion', () => {
-    const mockClient = { ID: 'client-1', companyId: 'COMP-001' };
+    const mockClient = { ID: 'client-1', companyId: '1010' };
     const mockCostCenter = { ID: 'cc-1', client_ID: 'client-1' };
 
     beforeEach(() => {
@@ -354,7 +354,7 @@ describe('CostCenterService', () => {
         })
       ).resolves.toBeUndefined();
 
-      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, 'COMP-001');
+      expect(ensureUserAuthorizedForCompany).toHaveBeenCalledWith(user, '1010');
     });
   });
 });

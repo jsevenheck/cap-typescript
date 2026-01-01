@@ -116,8 +116,8 @@ describe('RetentionService', () => {
     });
 
     it('should anonymize employees filtered by company code for non-admin user', async () => {
-      const user = createEditorUser(['COMP-001']);
-      const employees = [{ ID: 'emp-1', employeeId: 'EMP001' }];
+      const user = createEditorUser(['1010']);
+      const employees = [{ ID: 'emp-1', employeeId: '1010-0001' }];
       (listEmployeesForAnonymization as jest.Mock).mockResolvedValueOnce(employees);
       (anonymizeEmployeeRecord as jest.Mock).mockResolvedValue(undefined);
 
@@ -127,7 +127,7 @@ describe('RetentionService', () => {
       expect(listEmployeesForAnonymization).toHaveBeenCalledWith(
         mockTx,
         expect.objectContaining({
-          'client.companyId': { in: ['COMP-001'] },
+          'client.companyId': { in: ['1010'] },
         })
       );
     });
@@ -219,7 +219,7 @@ describe('RetentionService', () => {
       const user: UserContext = {
         roles: new Set(['HREditor']),
         attributes: {
-          CompanyCode: ['  COMP-001  ', 'comp-002'],
+          CompanyCode: ['  1010  ', '1020'],
         },
       };
       (listEmployeesForAnonymization as jest.Mock).mockResolvedValueOnce([]);
@@ -229,7 +229,7 @@ describe('RetentionService', () => {
       expect(listEmployeesForAnonymization).toHaveBeenCalledWith(
         mockTx,
         expect.objectContaining({
-          'client.companyId': { in: expect.arrayContaining(['COMP-001', 'COMP-002']) },
+          'client.companyId': { in: expect.arrayContaining(['1010', '1020']) },
         })
       );
     });
