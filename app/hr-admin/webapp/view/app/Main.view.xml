@@ -358,7 +358,7 @@
                                 id="costCentersList"
                                 mode="SingleSelectMaster"
                                 includeItemInSelection="true"
-                                items="{path: 'costCenters', parameters: {$expand: 'employees($count=true;$top=0)'}}"
+                                items="{path: 'costCenters'}"
                                 growing="true" growingThreshold="20" growingScrollToLoad="true"
                                 noDataText="{i18n>noCostCentersFound}"
                                 selectionChange=".onCostCentersSelectionChange">
