@@ -19,8 +19,8 @@ import { getEmployeeStatistics } from './domain/employee/services/statistics.ser
 import { getCostCenterStatistics } from './domain/cost-center/services/statistics.service';
 import { getLocationStatistics } from './domain/location/services/statistics.service';
 import { getClientDeletePreview } from './domain/client/services/delete-preview.service';
-import { getCostCenterDeletePreview } from './domain/cost-center/services/delete-preview.service';
-import { getLocationDeletePreview } from './domain/location/services/delete-preview.service';
+import { getCostCenterDeletePreview, getCostCenterClientId } from './domain/cost-center/services/delete-preview.service';
+import { getLocationDeletePreview, getLocationClientId } from './domain/location/services/delete-preview.service';
 import type { CapServiceError } from './shared/utils/errors';
 
 type ServiceWithOn = Service & {
@@ -166,15 +166,22 @@ const registerHandlers = (srv: Service): void => {
 
     try {
       const tx = cds.transaction(req);
-      const preview = await getCostCenterDeletePreview(tx, costCenterId);
 
-      if (!preview) {
+      // First, get the client ID for authorization check (prevents information disclosure)
+      const clientId = await getCostCenterClientId(tx, costCenterId);
+      if (!clientId) {
         return req.reject(404, 'Cost center not found');
       }
 
-      // Verify authorization for the cost center's client
+      // Verify authorization for the cost center's client before fetching entity data
       const authorization = new CompanyAuthorization(req);
-      await authorization.resolveAuthorizedClientScope(preview.clientId);
+      await authorization.resolveAuthorizedClientScope(clientId);
+
+      // Only fetch full preview after authorization passes
+      const preview = await getCostCenterDeletePreview(tx, costCenterId);
+      if (!preview) {
+        return req.reject(404, 'Cost center not found');
+      }
 
       return preview;
     } catch (error) {
@@ -195,15 +202,22 @@ const registerHandlers = (srv: Service): void => {
 
     try {
       const tx = cds.transaction(req);
-      const preview = await getLocationDeletePreview(tx, locationId);
 
-      if (!preview) {
+      // First, get the client ID for authorization check (prevents information disclosure)
+      const clientId = await getLocationClientId(tx, locationId);
+      if (!clientId) {
         return req.reject(404, 'Location not found');
       }
 
-      // Verify authorization for the location's client
+      // Verify authorization for the location's client before fetching entity data
       const authorization = new CompanyAuthorization(req);
-      await authorization.resolveAuthorizedClientScope(preview.clientId);
+      await authorization.resolveAuthorizedClientScope(clientId);
+
+      // Only fetch full preview after authorization passes
+      const preview = await getLocationDeletePreview(tx, locationId);
+      if (!preview) {
+        return req.reject(404, 'Location not found');
+      }
 
       return preview;
     } catch (error) {

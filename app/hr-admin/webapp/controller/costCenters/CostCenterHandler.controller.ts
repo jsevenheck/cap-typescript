@@ -9,6 +9,7 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -37,6 +38,36 @@ export default class CostCenterHandler {
     const view = this.controller.getView();
     const model = view?.getModel("i18n") as ResourceModel;
     return model.getResourceBundle() as ResourceBundle;
+  }
+
+  /**
+   * Shows a delete confirmation dialog and performs the deletion if confirmed.
+   * Extracted to avoid code duplication between success and fallback paths.
+   */
+  private showDeleteConfirmation(
+    confirmMessage: string,
+    context: ODataContext,
+    i18n: ResourceBundle
+  ): void {
+    MessageBox.confirm(confirmMessage, {
+      title: i18n.getText("confirm"),
+      emphasizedAction: MessageBox.Action.OK,
+      actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
+      onClose: (action: string) => {
+        if (action === MessageBox.Action.OK) {
+          context
+            .delete("$auto")
+            .then(() => {
+              MessageToast.show(i18n.getText("costCenterDeleted"));
+              this.selection.clearCostCenter();
+            })
+            .catch((error: Error) => {
+              Log.error("Error deleting cost center", error.message, "hr.admin.CostCenterHandler");
+              MessageBox.error(error.message ?? i18n.getText("failedToDeleteCostCenter"));
+            });
+        }
+      },
+    });
   }
 
   public refresh(): void {
@@ -165,51 +196,17 @@ export default class CostCenterHandler {
           confirmMessage += `\n\n${i18n.getText("deleteCostCenterWarning") || "This will affect:"}\n${summary}`;
         }
 
-        MessageBox.confirm(confirmMessage, {
-          title: i18n.getText("confirm"),
-          emphasizedAction: MessageBox.Action.OK,
-          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-          onClose: (action: string) => {
-            if (action === MessageBox.Action.OK) {
-              context
-                .delete("$auto")
-                .then(() => {
-                  MessageToast.show(i18n.getText("costCenterDeleted"));
-                  this.selection.clearCostCenter();
-                })
-                .catch((error: Error) => {
-                  MessageBox.error(error.message ?? i18n.getText("failedToDeleteCostCenter"));
-                });
-            }
-          },
-        });
+        this.showDeleteConfirmation(confirmMessage, context, i18n);
       })
       .catch((error) => {
         if (view) {
           view.setBusy(false);
         }
-        console.warn("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error));
+        Log.warning("Failed to fetch delete preview, proceeding with basic confirmation", error instanceof Error ? error.message : String(error), "hr.admin.CostCenterHandler");
 
         // Fall back to basic confirmation if preview fails
-        MessageBox.confirm(`${i18n.getText("deleteCostCenterMessage")} ${title}?`, {
-          title: i18n.getText("confirm"),
-          emphasizedAction: MessageBox.Action.OK,
-          actions: [MessageBox.Action.OK, MessageBox.Action.CANCEL],
-          onClose: (action: string) => {
-            if (action === MessageBox.Action.OK) {
-              context
-                .delete("$auto")
-                .then(() => {
-                  MessageToast.show(i18n.getText("costCenterDeleted"));
-                  this.selection.clearCostCenter();
-                })
-                .catch((deleteError: Error) => {
-                  console.error("Error deleting cost center", deleteError);
-                  MessageBox.error(deleteError.message ?? i18n.getText("failedToDeleteCostCenter"));
-                });
-            }
-          },
-        });
+        const confirmMessage = `${i18n.getText("deleteCostCenterMessage")} ${title}?`;
+        this.showDeleteConfirmation(confirmMessage, context, i18n);
       });
   }
 

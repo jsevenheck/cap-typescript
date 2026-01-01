@@ -18,6 +18,26 @@ export interface CostCenterDeletePreview {
 }
 
 /**
+ * Get the client ID for a cost center (for authorization checks).
+ * Returns null if the cost center doesn't exist.
+ */
+export async function getCostCenterClientId(
+  tx: Transaction,
+  costCenterId: string,
+): Promise<string | null> {
+  const result = await tx.run(
+    ql.SELECT.one.from('clientmgmt.CostCenters').columns('client_ID').where({ ID: costCenterId }),
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  const data = result as { client_ID?: string };
+  return data.client_ID ?? null;
+}
+
+/**
  * Get a preview of the impact of deleting a cost center.
  * Counts all affected entities (employees with this cost center, assignments).
  * Uses parallel queries for efficiency (SAP best practice).

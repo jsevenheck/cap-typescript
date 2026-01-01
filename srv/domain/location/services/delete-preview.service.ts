@@ -17,6 +17,26 @@ export interface LocationDeletePreview {
 }
 
 /**
+ * Get the client ID for a location (for authorization checks).
+ * Returns null if the location doesn't exist.
+ */
+export async function getLocationClientId(
+  tx: Transaction,
+  locationId: string,
+): Promise<string | null> {
+  const result = await tx.run(
+    ql.SELECT.one.from('clientmgmt.Locations').columns('client_ID').where({ ID: locationId }),
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  const data = result as { client_ID?: string };
+  return data.client_ID ?? null;
+}
+
+/**
  * Get a preview of the impact of deleting a location.
  * Counts all affected entities (employees assigned to this location).
  * Executes the required queries within a single transaction context.
