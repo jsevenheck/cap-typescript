@@ -59,7 +59,7 @@ describe('EmployeeThirdPartyNotifier', () => {
         {
           ID: 'emp-1',
           client_ID: '11111111-1111-1111-1111-111111111111',
-          employeeId: 'EMP-001',
+          employeeId: '1010-0001',
           firstName: 'Alice',
           lastName: 'Anderson',
           email: 'alice@example.com',
@@ -67,7 +67,7 @@ describe('EmployeeThirdPartyNotifier', () => {
         {
           ID: 'emp-2',
           client_ID: '22222222-2222-2222-2222-222222222222',
-          employeeId: 'EMP-002',
+          employeeId: '1020-0001',
           firstName: 'Bob',
           lastName: 'Baker',
           email: 'bob@example.com',
@@ -84,13 +84,13 @@ describe('EmployeeThirdPartyNotifier', () => {
     expect(destinationPayloads?.length).toBe(2);
 
     expect(destinationPayloads?.[0].body).toMatchObject({
-      client: expect.objectContaining({ companyId: 'COMP-001' }),
-      employees: [expect.objectContaining({ employeeId: 'EMP-001' })],
+      client: expect.objectContaining({ companyId: '1010' }),
+      employees: [expect.objectContaining({ employeeId: '1010-0001' })],
     });
 
     expect(destinationPayloads?.[1].body).toMatchObject({
-      client: expect.objectContaining({ companyId: 'COMP-002' }),
-      employees: [expect.objectContaining({ employeeId: 'EMP-002' })],
+      client: expect.objectContaining({ companyId: '1020' }),
+      employees: [expect.objectContaining({ employeeId: '1020-0001' })],
     });
   });
 
@@ -115,8 +115,8 @@ describe('EmployeeThirdPartyNotifier', () => {
             {
               body: {
                 eventType: 'EMPLOYEE_CREATED',
-                client: { id: 'client-1', companyId: 'COMP-001' },
-                employees: [{ employeeId: 'EMP-100' }],
+                client: { id: 'client-1', companyId: '1010' },
+                employees: [{ employeeId: '1010-0100' }],
               },
             },
           ],
@@ -132,7 +132,7 @@ describe('EmployeeThirdPartyNotifier', () => {
 
     const [{ destination, payload: body, secret }] = mockPostEmployeeNotification.mock.calls[0];
     expect(destination.name).toBe(destinationName);
-    expect(body).toContain('EMP-100');
+    expect(body).toContain('1010-0100');
     expect(secret).toBe('super-secret');
   });
 });

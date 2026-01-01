@@ -32,7 +32,7 @@ jest.mock('../../../shared/utils/logger', () => ({
   }),
 }));
 
-import { findEmployeeByEmployeeId } from '../../../domain/employee/repository/employee.repo';
+import { findEmployeeByEmployeeId, findEmployeeIdCounterForUpdate } from '../../../domain/employee/repository/employee.repo';
 
 describe('LifecycleService', () => {
   describe('ensureEmployeeIdentifier', () => {
@@ -40,7 +40,7 @@ describe('LifecycleService', () => {
 
     const createMockClient = (): ClientEntity => ({
       ID: 'client-123',
-      companyId: 'COMP-001',
+      companyId: '1010',
     });
 
     beforeEach(() => {
@@ -48,9 +48,9 @@ describe('LifecycleService', () => {
     });
 
     describe('employee ID length validation', () => {
-      it('should reject employee ID exceeding 60 characters', async () => {
+      it('should reject employee ID exceeding 9 characters', async () => {
         const client = createMockClient();
-        const longEmployeeId = 'A'.repeat(61); // 61 characters
+        const longEmployeeId = '1010-12345'; // 10 characters
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -58,16 +58,16 @@ describe('LifecycleService', () => {
         };
 
         await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
-          'Employee ID cannot exceed 60 characters.',
+          'Employee ID cannot exceed 9 characters.',
         );
 
         // Should not attempt to check for duplicates if length validation fails
         expect(findEmployeeByEmployeeId).not.toHaveBeenCalled();
       });
 
-      it('should accept employee ID with exactly 60 characters', async () => {
+      it('should accept employee ID with exactly 9 characters', async () => {
         const client = createMockClient();
-        const exactLengthEmployeeId = 'A'.repeat(60); // 60 characters
+        const exactLengthEmployeeId = '1010-0001'; // 9 characters
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -81,26 +81,37 @@ describe('LifecycleService', () => {
         expect(findEmployeeByEmployeeId).toHaveBeenCalled();
       });
 
-      it('should accept employee ID with less than 60 characters', async () => {
+      it('should reject employee ID with invalid format', async () => {
         const client = createMockClient();
-        const shortEmployeeId = 'EMP001';
+        const invalidEmployeeId = 'EMP001'; // Invalid format
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
-          employeeId: shortEmployeeId,
+          employeeId: invalidEmployeeId,
         };
 
-        // Mock no duplicate found
-        (findEmployeeByEmployeeId as jest.Mock).mockResolvedValueOnce(null);
-
-        await expect(ensureEmployeeIdentifier(mockTx, data, client)).resolves.not.toThrow();
-        expect(findEmployeeByEmployeeId).toHaveBeenCalled();
+        await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
+          'Employee ID must follow the format {clientId}-{counter}',
+        );
       });
 
-      it('should trim whitespace before validating length', async () => {
+      it('should reject employee ID with wrong client prefix', async () => {
         const client = createMockClient();
-        // 59 chars with leading/trailing spaces, trimmed should be 57 chars
-        const employeeIdWithSpaces = '  ' + 'A'.repeat(57) + '  ';
+        const wrongPrefixEmployeeId = '9999-0001'; // Wrong client prefix
+
+        const data: Partial<EmployeeEntity> = {
+          client_ID: client.ID,
+          employeeId: wrongPrefixEmployeeId,
+        };
+
+        await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
+          'Employee ID prefix must match the client ID (1010).',
+        );
+      });
+
+      it('should trim whitespace before validating', async () => {
+        const client = createMockClient();
+        const employeeIdWithSpaces = '  1010-0001  ';
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -115,7 +126,7 @@ describe('LifecycleService', () => {
 
       it('should convert employee ID to uppercase', async () => {
         const client = createMockClient();
-        const lowercaseEmployeeId = 'emp001lowercase';
+        const lowercaseEmployeeId = '1010-0001';
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -127,15 +138,15 @@ describe('LifecycleService', () => {
 
         await ensureEmployeeIdentifier(mockTx, data, client);
 
-        // Verify that data.employeeId is now uppercase
-        expect(data.employeeId).toBe('EMP001LOWERCASE');
+        // Verify that data.employeeId is uppercase (already uppercase in this case)
+        expect(data.employeeId).toBe('1010-0001');
       });
     });
 
     describe('duplicate employee ID detection', () => {
       it('should reject duplicate employee ID', async () => {
         const client = createMockClient();
-        const existingEmployeeId = 'EMP001';
+        const existingEmployeeId = '1010-0001';
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -149,13 +160,13 @@ describe('LifecycleService', () => {
         });
 
         await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
-          'Employee ID EMP001 already exists.',
+          'Employee ID 1010-0001 already exists.',
         );
       });
 
       it('should allow same employee ID when it matches current identifier', async () => {
         const client = createMockClient();
-        const existingEmployeeId = 'EMP001';
+        const existingEmployeeId = '1010-0001';
 
         const data: Partial<EmployeeEntity> = {
           client_ID: client.ID,
@@ -172,6 +183,26 @@ describe('LifecycleService', () => {
 
         expect(result).toBe(false);
         expect(findEmployeeByEmployeeId).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('employee ID auto-generation limits', () => {
+      it('should throw error when maximum employee capacity is reached', async () => {
+        const client = createMockClient();
+
+        const data: Partial<EmployeeEntity> = {
+          client_ID: client.ID,
+          // No employeeId provided, so it will be auto-generated
+        };
+
+        // Mock counter at maximum value (9999)
+        (findEmployeeIdCounterForUpdate as jest.Mock).mockResolvedValueOnce({
+          lastCounter: 9999,
+        });
+
+        await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
+          'Maximum employee capacity reached for client 1010. Cannot create more than 9999 employees.',
+        );
       });
     });
   });

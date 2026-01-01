@@ -17,6 +17,22 @@ export const HR_ADMIN_ROLE = 'HRAdmin';
 export const HR_VIEWER_ROLE = 'HRViewer';
 export const HR_EDITOR_ROLE = 'HREditor';
 
+/** Client ID must be exactly 4 numeric characters (e.g., 1010, 1026, 1069) */
+const CLIENT_ID_FORMAT_REGEX = /^[0-9]{4}$/;
+
+/**
+ * Validates that a client ID follows the required 4-digit format.
+ * @param companyId - The company/client ID to validate
+ */
+const validateClientIdFormat = (companyId: string): void => {
+  if (!CLIENT_ID_FORMAT_REGEX.test(companyId)) {
+    throw createServiceError(
+      400,
+      'Client ID must be exactly 4 numeric characters (e.g., 1010, 1026, 1069).',
+    );
+  }
+};
+
 const hasHrScope = (user: UserContext): boolean => userHasRole(user, HR_VIEWER_ROLE) || userHasRole(user, HR_EDITOR_ROLE);
 
 export const ensureUserAuthorizedForCompany = (user: UserContext, companyId?: string | null): void => {
@@ -95,7 +111,25 @@ export const prepareClientUpsert = async ({
 
   if (data.companyId !== undefined) {
     const normalized = normalizeCompanyId(data.companyId);
-    updates.companyId = normalized ?? undefined;
+    if (normalized) {
+      validateClientIdFormat(normalized);
+    }
+
+    if (event === 'UPDATE') {
+      // For UPDATE, if companyId is provided it must not be empty/invalid after normalization
+      if (!normalized) {
+        throw createServiceError(400, 'Client ID must not be empty.');
+      }
+      updates.companyId = normalized;
+    } else {
+      // For CREATE, keep existing behavior and rely on the explicit required check below
+      updates.companyId = normalized ?? undefined;
+    }
+  }
+
+  // For CREATE, companyId is required (check normalized value, not original which could be empty string)
+  if (event === 'CREATE' && !updates.companyId) {
+    throw createServiceError(400, 'Client ID is required.');
   }
 
   const targetCompanyId =

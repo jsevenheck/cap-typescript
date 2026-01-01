@@ -1,7 +1,6 @@
 /**
  * Business rules for employee lifecycle operations, including validation and identifier management.
  */
-import { createHash } from 'node:crypto';
 
 import type { Transaction } from '@sap/cds';
 
@@ -11,9 +10,7 @@ import { toDateValue } from '../../../shared/utils/date';
 import {
   identifiersMatch,
   isInactiveStatus,
-  normalizeCompanyId,
   normalizeIdentifier,
-  sanitizeIdentifier,
 } from '../../../shared/utils/normalization';
 import type { UserContext } from '../../../shared/utils/auth';
 import { extractAssociationId, isAssociationProvided } from '../../../shared/utils/associations';
@@ -31,9 +28,9 @@ import {
 import { findClientById } from '../../client/repository/client.repo';
 
 export const EMPLOYEE_ID_RETRIES = 5;
-const EMPLOYEE_ID_PREFIX_LENGTH = 8;
-const EMPLOYEE_ID_TOTAL_LENGTH = 14;
-const EMPLOYEE_ID_COUNTER_LENGTH = Math.max(1, EMPLOYEE_ID_TOTAL_LENGTH - EMPLOYEE_ID_PREFIX_LENGTH);
+/** Employee IDs follow the format {clientId}-{counter} where counter is 4 digits (0001-9999) */
+const EMPLOYEE_ID_COUNTER_LENGTH = 4;
+const MAX_EMPLOYEE_COUNTER = 9999;
 
 const ensureClientExists = async (tx: Transaction, clientId?: string | null): Promise<ClientEntity> => {
   if (!clientId) {
@@ -61,24 +58,6 @@ const loadExistingEmployee = async (tx: Transaction, employeeId: string): Promis
     'manager_ID',
     'location_ID',
   ]);
-
-const deriveClientPrefix = (client: ClientEntity | undefined, clientId: string): string => {
-  const normalizedCompany = sanitizeIdentifier(normalizeCompanyId(client?.companyId) ?? '');
-  const sanitizedClientId = sanitizeIdentifier(clientId);
-  // Always hash sanitized input for consistency
-  const hashSource = sanitizedClientId || clientId;
-  const hashed = createHash('sha256').update(hashSource).digest('hex').toUpperCase();
-
-  if (normalizedCompany) {
-    return (normalizedCompany + hashed).slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
-  }
-
-  if (sanitizedClientId) {
-    return (sanitizedClientId + hashed).slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
-  }
-
-  return hashed.slice(0, EMPLOYEE_ID_PREFIX_LENGTH);
-};
 
 export const isUniqueConstraintError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') {
@@ -400,7 +379,32 @@ const validateManagerAndCostCenter = async (
   return updates;
 };
 
-const MAX_EMPLOYEE_ID_LENGTH = 60;
+/** Employee ID format: {clientId}-{counter} (e.g., 1010-0001) */
+const EMPLOYEE_ID_FORMAT_REGEX = /^[0-9]{4}-[0-9]{4}$/;
+const MAX_EMPLOYEE_ID_LENGTH = 9;
+const CLIENT_ID_PREFIX_LENGTH = 4;
+
+/**
+ * Validates employee ID format matches the pattern {clientId}-{counter}.
+ * Format: 4-digit client ID, hyphen, 4-digit counter (e.g., 1010-0001)
+ */
+const validateEmployeeIdFormat = (employeeId: string, clientCompanyId: string): void => {
+  if (!EMPLOYEE_ID_FORMAT_REGEX.test(employeeId)) {
+    throw createServiceError(
+      400,
+      `Employee ID must follow the format {clientId}-{counter} (e.g., ${clientCompanyId}-0001).`,
+    );
+  }
+
+  // Ensure the prefix matches the client's company ID
+  const prefix = employeeId.substring(0, CLIENT_ID_PREFIX_LENGTH);
+  if (prefix !== clientCompanyId) {
+    throw createServiceError(
+      400,
+      `Employee ID prefix must match the client ID (${clientCompanyId}).`,
+    );
+  }
+};
 
 const ensureUniqueEmployeeId = async (
   tx: Transaction,
@@ -414,16 +418,27 @@ const ensureUniqueEmployeeId = async (
     return false;
   }
 
+  const clientCompanyId = client.companyId;
+  if (!clientCompanyId) {
+    throw createServiceError(
+      400,
+      'Client is missing a valid companyId required for employee ID operations.',
+    );
+  }
+
   if (data.employeeId) {
     data.employeeId = data.employeeId.trim().toUpperCase();
 
-    // Validate length constraint (matches database schema: String(60))
+    // Validate length constraint (matches database schema: String(9))
     if (data.employeeId.length > MAX_EMPLOYEE_ID_LENGTH) {
       throw createServiceError(
         400,
         `Employee ID cannot exceed ${MAX_EMPLOYEE_ID_LENGTH} characters.`,
       );
     }
+
+    // Validate format: {clientId}-{counter}
+    validateEmployeeIdFormat(data.employeeId, clientCompanyId);
 
     if (
       currentEmployeeIdentifier &&
@@ -442,9 +457,17 @@ const ensureUniqueEmployeeId = async (
     try {
       const counter = await findEmployeeIdCounterForUpdate(tx, clientId);
       const nextCounter = (counter?.lastCounter ?? 0) + 1;
-      const prefix = deriveClientPrefix(client, clientId);
+
+      // Check if we've exceeded the maximum counter value (9999)
+      if (nextCounter > MAX_EMPLOYEE_COUNTER) {
+        throw createServiceError(
+          400,
+          `Maximum employee capacity reached for client ${clientCompanyId}. Cannot create more than ${MAX_EMPLOYEE_COUNTER} employees.`,
+        );
+      }
+
       const counterPart = String(nextCounter).padStart(EMPLOYEE_ID_COUNTER_LENGTH, '0');
-      const generatedId = `${prefix}${counterPart}`;
+      const generatedId = `${clientCompanyId}-${counterPart}`;
 
       const existingEmployeeWithId = await findEmployeeByEmployeeId(tx, clientId, generatedId, excludeUuid);
 

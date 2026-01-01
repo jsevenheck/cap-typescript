@@ -114,12 +114,12 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001",
-                  "COMP-002"
+                  "1010",
+                  "1020"
                 ],
                 "CompanyCode": [
-                  "COMP-001",
-                  "COMP-002"
+                  "1010",
+                  "1020"
                 ]
               }
             },
@@ -130,10 +130,10 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001"
+                  "1010"
                 ],
                 "CompanyCode": [
-                  "COMP-001"
+                  "1010"
                 ]
               }
             },
@@ -144,10 +144,10 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001"
+                  "1010"
                 ],
                 "CompanyCode": [
-                  "COMP-001"
+                  "1010"
                 ]
               }
             }
@@ -190,12 +190,12 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001",
-                  "COMP-002"
+                  "1010",
+                  "1020"
                 ],
                 "CompanyCode": [
-                  "COMP-001",
-                  "COMP-002"
+                  "1010",
+                  "1020"
                 ]
               }
             },
@@ -206,10 +206,10 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001"
+                  "1010"
                 ],
                 "CompanyCode": [
-                  "COMP-001"
+                  "1010"
                 ]
               }
             },
@@ -220,10 +220,10 @@
               ],
               "attributes": {
                 "companyCodes": [
-                  "COMP-001"
+                  "1010"
                 ],
                 "CompanyCode": [
-                  "COMP-001"
+                  "1010"
                 ]
               }
             }
