@@ -1,4 +1,5 @@
 import Dialog from "sap/m/Dialog";
+import Input from "sap/m/Input";
 import List from "sap/m/List";
 import MessageBox from "sap/m/MessageBox";
 import MessageToast from "sap/m/MessageToast";
@@ -99,6 +100,34 @@ export default class EmployeeHandler {
     const view = this.controller.getView();
     const model = view?.getModel("i18n") as ResourceModel;
     return model.getResourceBundle() as ResourceBundle;
+  }
+
+  /**
+   * Clear all validation states on form fields.
+   * Called before validation to reset previous error states.
+   */
+  private clearValidationStates(): void {
+    const fieldIds = [
+      "employeeFirstName",
+      "employeeLastName",
+      "employeeEmail",
+      "employeePhoneNumber",
+      "employeeLocation",
+      "employeeEntryDate",
+      "employeeExitDate",
+      "employeeStatus",
+      "employeeEmploymentType",
+    ];
+
+    for (const fieldId of fieldIds) {
+      const field = this.byId(fieldId) as Input | DatePicker | Select | undefined;
+      if (field && typeof field.setValueState === "function") {
+        field.setValueState(ValueState.None);
+        if (typeof field.setValueStateText === "function") {
+          field.setValueStateText("");
+        }
+      }
+    }
   }
 
   public refresh(): void {
@@ -300,28 +329,83 @@ export default class EmployeeHandler {
     }
     // Allow edits even if employeeId is not yet assigned; backend keeps existing value
 
-    if (
-      !payload.firstName ||
-      !payload.lastName ||
-      !payload.email ||
-      !payload.location_ID ||
-      !payload.entryDate ||
-      !payload.status ||
-      !payload.employmentType
-    ) {
-      MessageBox.error(i18n.getText("employeeFieldsRequired"));
-      return;
+    // Clear previous validation states before validating
+    this.clearValidationStates();
+
+    // Validate required fields with visual feedback
+    let hasValidationError = false;
+    const requiredFieldText = i18n.getText("requiredField");
+
+    // First Name
+    const firstNameInput = this.byId("employeeFirstName") as Input | undefined;
+    if (!payload.firstName) {
+      firstNameInput?.setValueState(ValueState.Error);
+      firstNameInput?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
     }
 
-    // Validate email format
-    if (typeof payload.email === 'string' && !isValidEmail(payload.email)) {
-      MessageBox.error(i18n.getText("invalidEmail"));
-      return;
+    // Last Name
+    const lastNameInput = this.byId("employeeLastName") as Input | undefined;
+    if (!payload.lastName) {
+      lastNameInput?.setValueState(ValueState.Error);
+      lastNameInput?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
     }
 
-    // Validate phone number format
+    // Email (required + format validation)
+    const emailInput = this.byId("employeeEmail") as Input | undefined;
+    if (!payload.email) {
+      emailInput?.setValueState(ValueState.Error);
+      emailInput?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
+    } else if (typeof payload.email === 'string' && !isValidEmail(payload.email)) {
+      emailInput?.setValueState(ValueState.Error);
+      emailInput?.setValueStateText(i18n.getText("invalidEmail"));
+      hasValidationError = true;
+    }
+
+    // Phone Number (optional but format validation)
+    const phoneInput = this.byId("employeePhoneNumber") as Input | undefined;
     if (typeof payload.phoneNumber === 'string' && !isValidPhoneNumber(payload.phoneNumber)) {
-      MessageBox.error(i18n.getText("invalidPhoneNumber"));
+      phoneInput?.setValueState(ValueState.Error);
+      phoneInput?.setValueStateText(i18n.getText("invalidPhoneNumber"));
+      hasValidationError = true;
+    }
+
+    // Location
+    const locationSelect = this.byId("employeeLocation") as Select | undefined;
+    if (!payload.location_ID) {
+      locationSelect?.setValueState(ValueState.Error);
+      locationSelect?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
+    }
+
+    // Entry Date
+    const entryDatePicker = this.byId("employeeEntryDate") as DatePicker | undefined;
+    if (!payload.entryDate) {
+      entryDatePicker?.setValueState(ValueState.Error);
+      entryDatePicker?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
+    }
+
+    // Status
+    const statusSelect = this.byId("employeeStatus") as Select | undefined;
+    if (!payload.status) {
+      statusSelect?.setValueState(ValueState.Error);
+      statusSelect?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
+    }
+
+    // Employment Type
+    const employmentTypeSelect = this.byId("employeeEmploymentType") as Select | undefined;
+    if (!payload.employmentType) {
+      employmentTypeSelect?.setValueState(ValueState.Error);
+      employmentTypeSelect?.setValueStateText(requiredFieldText);
+      hasValidationError = true;
+    }
+
+    if (hasValidationError) {
+      MessageBox.error(i18n.getText("employeeFieldsRequired"));
       return;
     }
 
@@ -330,11 +414,6 @@ export default class EmployeeHandler {
     const statusValue = (payload.status as string | undefined) ?? "";
 
     const exitDatePicker = this.byId("employeeExitDate") as DatePicker | undefined;
-    const statusSelect = this.byId("employeeStatus") as Select | undefined;
-    exitDatePicker?.setValueState(ValueState.None);
-    exitDatePicker?.setValueStateText("");
-    statusSelect?.setValueState(ValueState.None);
-    statusSelect?.setValueStateText("");
 
     // Compare as strings (YYYY-MM-DD) to avoid timezone issues
     if (exitDate && entryDate && exitDate < entryDate) {
@@ -598,6 +677,8 @@ export default class EmployeeHandler {
   private openDialog(): void {
     const dialog = this.byId("employeeDialog") as Dialog;
     dialog.setBusy(false);
+    // Clear any previous validation states when opening the dialog
+    this.clearValidationStates();
     const clientContext = this.selection.getSelectedClientContext();
     if (clientContext) {
       dialog.setBindingContext(clientContext);
