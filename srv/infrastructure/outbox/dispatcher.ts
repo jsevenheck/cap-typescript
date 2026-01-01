@@ -131,7 +131,6 @@ const moveToDlq = async (
         attempts,
         lastError,
         failedAt: new Date(),
-        
       }),
     );
 
@@ -335,7 +334,7 @@ export class ParallelDispatcher {
     }
 
     const delay = Math.max(1, Math.pow(2, attempts - 1) * this.config.retryDelay);
-    const nextAttemptAt = new Date(Date.now() + delay + 1);
+    const nextAttemptAt = new Date(Date.now() + delay);
 
     await db.run(
       ql

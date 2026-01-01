@@ -1,3 +1,5 @@
+import Log from "sap/base/Log";
+
 /**
  * User roles for the HR Admin application
  */
@@ -54,7 +56,7 @@ export class AuthorizationService {
       });
 
       if (!response.ok) {
-        console.error('Failed to fetch user info:', response.status, response.statusText);
+        Log.error(`Failed to fetch user info: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch user info: ${response.status}`);
       }
 
@@ -75,8 +77,8 @@ export class AuthorizationService {
         isViewer: isViewer && !isEditor && !isAdmin,
       };
 
-      console.log('AuthorizationService: User info loaded', {
-        roles: userInfoCache.roles,
+      Log.info('AuthorizationService: User info loaded', {
+        roles: userInfoCache.roles.join(', '),
         isAdmin: userInfoCache.isAdmin,
         isEditor: userInfoCache.isEditor,
         isViewer: userInfoCache.isViewer,
@@ -84,9 +86,8 @@ export class AuthorizationService {
 
       return userInfoCache;
     } catch (error) {
-      console.error(
-        'AuthorizationService: Error fetching user info, defaulting to read-only',
-        error,
+      Log.error(
+        'AuthorizationService: Error fetching user info, defaulting to read-only - ' + String(error)
       );
 
       // Fall back to least-privileged (viewer-only) on error, but do not cache

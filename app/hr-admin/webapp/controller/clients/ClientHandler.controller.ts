@@ -155,7 +155,7 @@ export default class ClientHandler {
                   this.selection.clearClient();
                 })
                 .catch((error: Error) => {
-                  console.error("Error deleting client:", error);
+                  Log.error("Error deleting client: " + String(error));
                   MessageBox.error(error.message ?? i18n.getText("errorDeleting", ["client"]));
                 });
             }
@@ -226,7 +226,7 @@ export default class ClientHandler {
       try {
         creationContext = listBinding.create(payload) as Context | undefined;
       } catch (error) {
-        console.error("Failed to start client creation:", error);
+        Log.error("Failed to start client creation: " + String(error));
         dialog.setBusy(false);
 
         const message =
@@ -247,7 +247,7 @@ export default class ClientHandler {
           const model = readyContext.getModel() as ODataModel;
 
           const handleError = (error: unknown): void => {
-            console.error("Error creating client:", error);
+            Log.error("Error creating client: " + String(error));
             dialog.setBusy(false);
 
             let message = i18n.getText("errorSaving", ["client"]);
@@ -277,7 +277,7 @@ export default class ClientHandler {
             
             MessageBox.error(message);
             void readyContext.delete("$auto").catch((cleanupError) => {
-              console.error("Failed to clean up failed creation context:", cleanupError);
+              Log.error("Failed to clean up failed creation context: " + String(cleanupError));
             });
           };
 
@@ -298,7 +298,7 @@ export default class ClientHandler {
             {
               timeout: 30000,
               onTimeout: () => {
-                console.warn("Client creation timed out");
+                Log.warning("Client creation timed out");
               },
             }
           );
@@ -349,7 +349,7 @@ export default class ClientHandler {
           this.getClientsBinding().refresh();
         })
         .catch((error: Error) => {
-          console.error("Error updating client:", error);
+          Log.error("Error updating client: " + String(error));
           dialog.setBusy(false);
           MessageBox.error(error.message ?? i18n.getText("errorSaving", ["client"]));
         });
@@ -388,7 +388,7 @@ export default class ClientHandler {
     const context = listItem.getBindingContext() as Context;
     const list = this.byId("clientsList") as List;
     if (!list) {
-      console.error("Client list not found");
+      Log.error("Client list not found");
       return;
     }
     list.setSelectedItem(listItem, true);

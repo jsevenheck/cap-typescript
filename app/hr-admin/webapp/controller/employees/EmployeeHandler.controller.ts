@@ -14,6 +14,7 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
+import Log from "sap/base/Log";
 
 import DialogModelAccessor from "../../services/dialogModel.service";
 import SelectionState from "../../services/selection.service";
@@ -466,7 +467,7 @@ export default class EmployeeHandler {
                 : i18n.getText("failedToCreateEmployee");
             MessageBox.error(message);
             void readyContext.delete("$auto").catch((cleanupError) => {
-              console.error("Failed to clean up failed creation context:", cleanupError);
+              Log.error("Failed to clean up failed creation context: " + String(cleanupError));
             });
           };
 
