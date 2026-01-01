@@ -207,7 +207,7 @@ export default class LocationHandler {
                   this.selection.clearLocation();
                 })
                 .catch((deleteError: Error) => {
-                  Log.error("Error deleting location", deleteError.message, "hr.admin.LocationHandler");
+                  console.error("Error deleting location", deleteError);
                   MessageBox.error(deleteError.message ?? i18n.getText("failedToDeleteLocation"));
                 });
             }
