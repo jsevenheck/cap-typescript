@@ -1,0 +1,30 @@
+<mvc:View
+  controllerName="hr.admin.controller.app.NotFound"
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core">
+
+  <Page
+    id="notFoundPage"
+    showHeader="true"
+    title="{i18n>pageNotFound}"
+    showNavButton="true"
+    navButtonPress=".onNavBack">
+    
+    <MessagePage
+      id="notFoundMessage"
+      title="{i18n>pageNotFoundTitle}"
+      description="{i18n>pageNotFoundDescription}"
+      icon="sap-icon://document"
+      showHeader="false">
+      <customDescription>
+        <Link
+          id="homeLink"
+          text="{i18n>goToHome}"
+          press=".onGoHome"/>
+      </customDescription>
+    </MessagePage>
+
+  </Page>
+
+</mvc:View>

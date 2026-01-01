@@ -196,6 +196,59 @@ cds.on('bootstrap', (app: Application) => {
   app.use(correlationIdMiddleware);
 
   /**
+   * Liveness probe endpoint - simple check that the application is running
+   * Returns 200 OK immediately without any dependency checks.
+   * Use for Kubernetes/CF liveness probes to detect crashed containers.
+   */
+  app.get('/health/live', (_req, res) => {
+    res.status(200).json({
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Readiness probe endpoint - verifies application and database connectivity
+   * Returns 200 OK if ready to accept traffic, 503 Service Unavailable if not.
+   * Use for Kubernetes/CF readiness probes to control traffic routing.
+   */
+  app.get('/health/ready', (_req, res) => {
+    // Wrap async logic to satisfy @typescript-eslint/no-misused-promises
+    void (async () => {
+      try {
+        // Verify database connectivity by attempting a simple query
+        const db = (cds as any).db ?? (await cds.connect.to('db'));
+
+        if (!db) {
+          throw new Error('Database connection not available');
+        }
+
+        // Simple connectivity test - query for any client (limit 1)
+        const { SELECT } = cds.ql;
+        await db.run(SELECT.one.from('clientmgmt.Clients').columns('ID'));
+
+        res.status(200).json({
+          status: 'ready',
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'connected',
+          },
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Readiness check failed');
+        res.status(503).json({
+          status: 'not_ready',
+          timestamp: new Date().toISOString(),
+          checks: {
+            database: 'disconnected',
+          },
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    })();
+  });
+
+  /**
    * Health check endpoint - verifies application and database connectivity
    * Returns 200 OK if healthy, 503 Service Unavailable if unhealthy
    */
