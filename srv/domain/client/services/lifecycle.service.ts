@@ -114,7 +114,17 @@ export const prepareClientUpsert = async ({
     if (normalized) {
       validateClientIdFormat(normalized);
     }
-    updates.companyId = normalized ?? undefined;
+
+    if (event === 'UPDATE') {
+      // For UPDATE, if companyId is provided it must not be empty/invalid after normalization
+      if (!normalized) {
+        throw createServiceError(400, 'Client ID must not be empty.');
+      }
+      updates.companyId = normalized;
+    } else {
+      // For CREATE, keep existing behavior and rely on the explicit required check below
+      updates.companyId = normalized ?? undefined;
+    }
   }
 
   // For CREATE, companyId is required (check normalized value, not original which could be empty string)
