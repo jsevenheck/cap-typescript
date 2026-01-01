@@ -32,7 +32,7 @@ jest.mock('../../../shared/utils/logger', () => ({
   }),
 }));
 
-import { findEmployeeByEmployeeId } from '../../../domain/employee/repository/employee.repo';
+import { findEmployeeByEmployeeId, findEmployeeIdCounterForUpdate } from '../../../domain/employee/repository/employee.repo';
 
 describe('LifecycleService', () => {
   describe('ensureEmployeeIdentifier', () => {
@@ -183,6 +183,26 @@ describe('LifecycleService', () => {
 
         expect(result).toBe(false);
         expect(findEmployeeByEmployeeId).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('employee ID auto-generation limits', () => {
+      it('should throw error when maximum employee capacity is reached', async () => {
+        const client = createMockClient();
+
+        const data: Partial<EmployeeEntity> = {
+          client_ID: client.ID,
+          // No employeeId provided, so it will be auto-generated
+        };
+
+        // Mock counter at maximum value (9999)
+        (findEmployeeIdCounterForUpdate as jest.Mock).mockResolvedValueOnce({
+          lastCounter: 9999,
+        });
+
+        await expect(ensureEmployeeIdentifier(mockTx, data, client)).rejects.toThrow(
+          'Maximum employee capacity reached for client 1010. Cannot create more than 9999 employees.',
+        );
       });
     });
   });
