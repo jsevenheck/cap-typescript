@@ -4,7 +4,7 @@
   "sessionTimeout": 30,
   "compression": {
     "enabled": true,
-    "minSize": 1024
+    "minSize": 2048
   },
   "httpHeaders": {
     "X-Frame-Options": "DENY",
