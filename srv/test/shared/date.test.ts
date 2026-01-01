@@ -209,9 +209,10 @@ describe('Date Utilities', () => {
       // Simulating checking if an assignment with no end date is active
       const today = todayAtMidnight();
       const validFrom = normalizeDateToMidnight('2024-01-01');
-      const validTo = null;
+      const validTo: string | null = null;
 
-      const isActive = validFrom <= today && (validTo === null || today <= normalizeDateToMidnight(validTo as any));
+      // Check if assignment is active (no end date means always active if started)
+      const isActive = validFrom <= today && (validTo === null || normalizeDateToMidnight(validTo) >= today);
 
       // If validFrom is in the past and validTo is null, it should be active
       if (validFrom < today) {
