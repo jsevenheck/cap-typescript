@@ -1,3 +1,5 @@
+import Log from "sap/base/Log";
+
 /**
  * CacheService - Browser storage caching with TTL support
  *
@@ -101,7 +103,7 @@ export default class CacheService {
     } catch (error) {
       // Handle storage quota exceeded errors
       if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.warn('Cache storage quota exceeded, clearing old entries');
+        Log.warning('Cache storage quota exceeded, clearing old entries');
         this.clearExpired();
 
         // Retry once after cleanup
@@ -115,12 +117,12 @@ export default class CacheService {
           this.storage.setItem(namespacedKey, JSON.stringify(entry));
           return true;
         } catch (retryError) {
-          console.error('Failed to cache after cleanup:', retryError);
+          Log.error('Failed to cache after cleanup: ' + String(retryError));
           return false;
         }
       }
 
-      console.error('Failed to cache value:', error);
+      Log.error('Failed to cache value: ' + String(error));
       return false;
     }
   }
@@ -151,7 +153,7 @@ export default class CacheService {
 
       return entry.value;
     } catch (error) {
-      console.error('Failed to retrieve cached value:', error);
+      Log.error('Failed to retrieve cached value: ' + String(error));
       return undefined;
     }
   }
@@ -222,7 +224,7 @@ export default class CacheService {
     keysToRemove.forEach(key => this.storage.removeItem(key));
 
     if (keysToRemove.length > 0) {
-      console.log(`Cleared ${keysToRemove.length} expired cache entries`);
+      Log.info(`Cleared ${keysToRemove.length} expired cache entries`);
     }
   }
 

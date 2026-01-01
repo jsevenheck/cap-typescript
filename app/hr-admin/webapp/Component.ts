@@ -97,7 +97,7 @@ export default UIComponent.extend("hr.admin.Component", {
     // Create bound handler for unhandled promise rejections
     // Store reference for cleanup in exit()
     this._fnUnhandledRejectionHandler = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason);
+      Log.error('Unhandled promise rejection: ' + (event.reason?.message || String(event.reason)));
 
       // Prevent default browser error handling
       event.preventDefault();

@@ -1,5 +1,6 @@
 import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
+import { normalizeDateToMidnight, todayAtMidnight } from '../../../shared/utils/date';
 
 const ql = cds.ql as typeof cds.ql;
 
@@ -7,11 +8,8 @@ const ql = cds.ql as typeof cds.ql;
  * Check if an assignment period is currently active (contains today's date)
  */
 export const isAssignmentCurrentlyActive = (validFrom: string, validTo: string | null | undefined): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // normalize to midnight for date-only comparison
-
-  const fromDate = new Date(validFrom);
-  fromDate.setHours(0, 0, 0, 0);
+  const today = todayAtMidnight();
+  const fromDate = normalizeDateToMidnight(validFrom);
 
   // Assignment must have started
   if (fromDate > today) {
@@ -23,8 +21,7 @@ export const isAssignmentCurrentlyActive = (validFrom: string, validTo: string |
     return true;
   }
 
-  const toDate = new Date(validTo);
-  toDate.setHours(0, 0, 0, 0);
+  const toDate = normalizeDateToMidnight(validTo);
 
   // Assignment must not have ended
   return toDate >= today;
@@ -138,8 +135,7 @@ const findCurrentResponsibleAssignment = async (
   tx: Transaction,
   costCenterId: string,
 ): Promise<string | null> => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayAtMidnight();
 
   // Find all responsible assignments for this cost center
   const assignments = await tx.run(
@@ -157,8 +153,7 @@ const findCurrentResponsibleAssignment = async (
 
   // Filter for currently active assignments
   const activeAssignments = assignments.filter((assignment: any) => {
-    const fromDate = new Date(assignment.validFrom as string);
-    fromDate.setHours(0, 0, 0, 0);
+    const fromDate = normalizeDateToMidnight(assignment.validFrom as string);
 
     if (fromDate > today) {
       return false; // Not started yet
@@ -168,8 +163,7 @@ const findCurrentResponsibleAssignment = async (
       return true; // No end date, currently active
     }
 
-    const toDate = new Date(assignment.validTo as string);
-    toDate.setHours(0, 0, 0, 0);
+    const toDate = normalizeDateToMidnight(assignment.validTo as string);
 
     return toDate >= today; // Check if not ended
   });

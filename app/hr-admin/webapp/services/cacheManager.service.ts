@@ -1,4 +1,5 @@
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import Log from "sap/base/Log";
 import CacheService from "./cache.service";
 
 /**
@@ -46,7 +47,7 @@ export default class CacheManager {
    * Use this for global refresh or user-initiated cache clear
    */
   public clearAll(): void {
-    console.log('Clearing all caches (OData model + browser storage)');
+    Log.info('Clearing all caches (OData model + browser storage)');
 
     // Clear browser storage cache
     this.browserCache.clear();
@@ -55,7 +56,7 @@ export default class CacheManager {
     // Note: This will trigger refresh of all active bindings
     this.odataModel.resetChanges();
 
-    console.log('All caches cleared successfully');
+    Log.info('All caches cleared successfully');
   }
 
   /**
@@ -71,7 +72,7 @@ export default class CacheManager {
    * This will reload data from server while respecting model cache settings
    */
   public refreshModel(): void {
-    console.log('Refreshing OData model bindings');
+    Log.info('Refreshing OData model bindings');
 
     // Get all bindings and refresh them
     const bindings = this.odataModel.getAllBindings();
@@ -87,7 +88,7 @@ export default class CacheManager {
    * @param entityType Entity set name (e.g., 'Clients', 'Employees')
    */
   public clearEntity(entityType: string): void {
-    console.log(`Clearing cache for entity: ${entityType}`);
+    Log.info(`Clearing cache for entity: ${entityType}`);
 
     // Clear browser storage entries for this entity
     this.browserCache.remove(entityType);
