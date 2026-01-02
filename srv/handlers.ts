@@ -15,6 +15,7 @@ import {
   CompanyAuthorization,
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
+import { requireRequestUser } from './domain/shared/request-context';
 import { getEmployeeStatistics } from './domain/employee/services/statistics.service';
 import { getCostCenterStatistics } from './domain/cost-center/services/statistics.service';
 import { getLocationStatistics } from './domain/location/services/statistics.service';
@@ -38,7 +39,7 @@ const registerHandlers = (srv: Service): void => {
 
   // Register userInfo function handler
   srv.on('userInfo', (req: Request) => {
-    const userContext = buildUserContext(req.user);
+    const userContext = buildUserContext(requireRequestUser(req));
 
     const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
     const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));
