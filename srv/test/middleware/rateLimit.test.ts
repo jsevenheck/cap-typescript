@@ -47,7 +47,13 @@ describe('createRateLimiter', () => {
 
     await rateLimiter(req, res as Response, next);
 
-    expect(debugSpy).not.toHaveBeenCalled();
+    // The cleanup process may log when it finds expired entries
+    // Verify that only cleanup logs are present, not eviction logs
+    const calls = debugSpy.mock.calls;
+    const evictionCalls = calls.filter((call) =>
+      call.some((arg) => typeof arg === 'string' && arg.includes('Evicted oldest'))
+    );
+    expect(evictionCalls.length).toBe(0);
 
     jest.runOnlyPendingTimers();
   });

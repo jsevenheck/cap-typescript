@@ -101,13 +101,42 @@ const parseMaxKeys = (maxKeys?: number): number => {
 class InMemoryRateLimitStore implements RateLimitStore {
   private readonly store = new Map<string, RateLimitEntry>();
   private readonly effectiveMaxKeys: number;
+  private cleanupTimer: NodeJS.Timeout | undefined;
+  private readonly cleanupIntervalMs: number;
 
   constructor(private readonly options: InMemoryStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
+    // Run cleanup every 5 minutes by default, or use RATE_LIMIT_CLEANUP_INTERVAL_MS env var
+    const envInterval = process.env.RATE_LIMIT_CLEANUP_INTERVAL_MS;
+    this.cleanupIntervalMs = envInterval ? Number.parseInt(envInterval, 10) : 5 * 60 * 1000;
+    
+    // Only start cleanup timer if interval is valid and positive
+    if (Number.isFinite(this.cleanupIntervalMs) && this.cleanupIntervalMs > 0) {
+      this.startCleanupTimer();
+    }
+  }
+
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      return;
+    }
+
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupExpired(Date.now());
+    }, this.cleanupIntervalMs);
+
+    // Prevent the timer from keeping the process alive in Node.js
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
   }
 
   shutdown = async (): Promise<void> => {
-    // No periodic resources to clean up.
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+    this.store.clear();
   };
 
   private evictOldestKey(): void {
@@ -128,7 +157,13 @@ class InMemoryRateLimitStore implements RateLimitStore {
       }
     }
 
-    expiredKeys.forEach((key) => this.store.delete(key));
+    if (expiredKeys.length > 0) {
+      expiredKeys.forEach((key) => this.store.delete(key));
+      logger.debug(
+        { expired: expiredKeys.length, remaining: this.store.size },
+        'Cleaned up expired rate limit entries'
+      );
+    }
   }
 
   increment = async (key: string, windowMs: number, now: number, resetTime: number): Promise<RateLimitEntry> => {
