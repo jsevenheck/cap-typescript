@@ -19,7 +19,7 @@ const handleClientUpsert = async (req: Request): Promise<void> => {
     data: req.data as Partial<ClientEntity>,
     targetId: deriveTargetId(req),
     user,
-    tx: cds.transaction(req),
+    tx: cds.tx(req),
     concurrency,
   });
   Object.assign(req.data, updates);

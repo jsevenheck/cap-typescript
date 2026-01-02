@@ -15,7 +15,7 @@ export const onDelete = async (req: Request): Promise<void> => {
   }
 
   // Store assignment data for after-delete cleanup
-  const tx = cds.transaction(req);
+  const tx = cds.tx(req);
   const assignment = await findAssignmentById(tx, targetId, [
     'ID',
     'client_ID',

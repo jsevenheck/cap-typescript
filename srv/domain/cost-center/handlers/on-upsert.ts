@@ -28,7 +28,7 @@ export const onUpsert = async (req: Request): Promise<void> => {
     event: req.event as 'CREATE' | 'UPDATE',
     data,
     targetId: deriveTargetId(req),
-    tx: cds.transaction(req),
+    tx: cds.tx(req),
     user,
     concurrency,
   });

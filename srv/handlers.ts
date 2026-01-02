@@ -15,6 +15,7 @@ import {
   CompanyAuthorization,
 } from './middleware/company-authorization';
 import { buildUserContext, getAttributeValues, userHasRole } from './shared/utils/auth';
+import { requireRequestUser } from './domain/shared/request-context';
 import { getEmployeeStatistics } from './domain/employee/services/statistics.service';
 import { getCostCenterStatistics } from './domain/cost-center/services/statistics.service';
 import { getLocationStatistics } from './domain/location/services/statistics.service';
@@ -22,21 +23,6 @@ import { getClientDeletePreview } from './domain/client/services/delete-preview.
 import { getCostCenterDeletePreview, getCostCenterClientId } from './domain/cost-center/services/delete-preview.service';
 import { getLocationDeletePreview, getLocationClientId } from './domain/location/services/delete-preview.service';
 import type { CapServiceError } from './shared/utils/errors';
-
-type ServiceWithOn = Service & {
-  on: (
-    event: string | string[],
-    entityOrHandler: string | ((...args: any[]) => unknown),
-    maybeHandler?: (...args: any[]) => unknown,
-  ) => unknown;
-};
-
-// Define a minimal User interface if strict typing is required and standard types are insufficient
-interface CAPUser {
-  id: string;
-  roles: { [key: string]: any } | string[];
-  attr: { [key: string]: any };
-}
 
 const registerHandlers = (srv: Service): void => {
   // Register company authorization middleware for all write operations
@@ -52,11 +38,8 @@ const registerHandlers = (srv: Service): void => {
   );
 
   // Register userInfo function handler
-  (srv as ServiceWithOn).on('userInfo', (req: Request) => {
-    // req.user is usually present but not strictly typed in older definitions
-    // We cast it to our expected shape or use 'any' if necessary
-    const user = (req as unknown as { user: CAPUser }).user;
-    const userContext = buildUserContext(user);
+  srv.on('userInfo', (req: Request) => {
+    const userContext = buildUserContext(requireRequestUser(req));
 
     const requiredRoles = ['HRAdmin', 'HREditor', 'HRViewer'];
     const hasRequiredRole = requiredRoles.some((role) => userHasRole(userContext, role));
@@ -74,13 +57,13 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register employeeStatistics function handler
-  (srv as ServiceWithOn).on('employeeStatistics', async (req: Request) => {
+  srv.on('employeeStatistics', async (req: Request) => {
     const clientId = (req.data as { clientId?: string })?.clientId ?? null;
 
     try {
       const authorization = new CompanyAuthorization(req);
       const clientScope = await authorization.resolveAuthorizedClientScope(clientId);
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
       const statistics = await getEmployeeStatistics(tx, clientScope);
       return statistics;
     } catch (error) {
@@ -92,7 +75,7 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register clientDeletePreview function handler
-  (srv as ServiceWithOn).on('clientDeletePreview', async (req: Request) => {
+  srv.on('clientDeletePreview', async (req: Request) => {
     const clientId = (req.data as { clientId?: string })?.clientId;
 
     if (!clientId) {
@@ -104,7 +87,7 @@ const registerHandlers = (srv: Service): void => {
       const authorization = new CompanyAuthorization(req);
       await authorization.resolveAuthorizedClientScope(clientId);
 
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
       const preview = await getClientDeletePreview(tx, clientId);
 
       if (!preview) {
@@ -121,13 +104,13 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register costCenterStatistics function handler
-  (srv as ServiceWithOn).on('costCenterStatistics', async (req: Request) => {
+  srv.on('costCenterStatistics', async (req: Request) => {
     const clientId = (req.data as { clientId?: string })?.clientId ?? null;
 
     try {
       const authorization = new CompanyAuthorization(req);
       const clientScope = await authorization.resolveAuthorizedClientScope(clientId);
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
       const statistics = await getCostCenterStatistics(tx, clientScope);
       return statistics;
     } catch (error) {
@@ -139,13 +122,13 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register locationStatistics function handler
-  (srv as ServiceWithOn).on('locationStatistics', async (req: Request) => {
+  srv.on('locationStatistics', async (req: Request) => {
     const clientId = (req.data as { clientId?: string })?.clientId ?? null;
 
     try {
       const authorization = new CompanyAuthorization(req);
       const clientScope = await authorization.resolveAuthorizedClientScope(clientId);
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
       const statistics = await getLocationStatistics(tx, clientScope);
       return statistics;
     } catch (error) {
@@ -157,7 +140,7 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register costCenterDeletePreview function handler
-  (srv as ServiceWithOn).on('costCenterDeletePreview', async (req: Request) => {
+  srv.on('costCenterDeletePreview', async (req: Request) => {
     const costCenterId = (req.data as { costCenterId?: string })?.costCenterId;
 
     if (!costCenterId) {
@@ -165,7 +148,7 @@ const registerHandlers = (srv: Service): void => {
     }
 
     try {
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
 
       // First, get the client ID for authorization check (prevents information disclosure)
       const clientId = await getCostCenterClientId(tx, costCenterId);
@@ -193,7 +176,7 @@ const registerHandlers = (srv: Service): void => {
   });
 
   // Register locationDeletePreview function handler
-  (srv as ServiceWithOn).on('locationDeletePreview', async (req: Request) => {
+  srv.on('locationDeletePreview', async (req: Request) => {
     const locationId = (req.data as { locationId?: string })?.locationId;
 
     if (!locationId) {
@@ -201,7 +184,7 @@ const registerHandlers = (srv: Service): void => {
     }
 
     try {
-      const tx = cds.transaction(req);
+      const tx = cds.tx(req);
 
       // First, get the client ID for authorization check (prevents information disclosure)
       const clientId = await getLocationClientId(tx, locationId);

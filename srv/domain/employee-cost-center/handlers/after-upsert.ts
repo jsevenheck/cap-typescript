@@ -8,7 +8,7 @@ export const afterUpsert = async (req: Request): Promise<void> => {
     return;
   }
 
-  const tx = cds.transaction(req);
+  const tx = cds.tx(req);
   const isUpdate = req.event === 'UPDATE';
 
   const data = req.data as {

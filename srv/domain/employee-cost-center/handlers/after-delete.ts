@@ -4,7 +4,7 @@ import type { Request } from '@sap/cds';
 import { handleResponsibilityRemoval, isAssignmentCurrentlyActive } from '../services/manager-responsibility.service';
 
 export const afterDelete = async (req: Request): Promise<void> => {
-  const tx = cds.transaction(req);
+  const tx = cds.tx(req);
 
   // Get the deleted assignment data from request context (stored in on-delete handler)
   const deletedAssignment = (req as any)._deletedAssignment;

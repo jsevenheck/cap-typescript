@@ -14,7 +14,7 @@ export const onDelete = async (req: Request): Promise<void> => {
   }
   await validateCostCenterDeletion({
     targetId,
-    tx: cds.transaction(req),
+    tx: cds.tx(req),
     user,
     concurrency: buildConcurrencyContext(req, 'clientmgmt.CostCenters'),
   });

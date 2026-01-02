@@ -21,7 +21,7 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
   if (req.event === 'CREATE' && req.data.employeeId) {
     // User manually provided an employeeId during CREATE - validate uniqueness
     await ensureEmployeeIdentifier(
-      cds.transaction(req),
+      cds.tx(req),
       req.data as Partial<EmployeeEntity>,
       result.client,
       undefined,
@@ -32,7 +32,7 @@ export const handleEmployeeUpsert = async (req: Request): Promise<void> => {
     // Employee ID changed during UPDATE - validate uniqueness
     // Pass the employee UUID to exclude them from the uniqueness check
     await ensureEmployeeIdentifier(
-      cds.transaction(req),
+      cds.tx(req),
       req.data as Partial<EmployeeEntity>,
       result.client,
       result.existingEmployee?.employeeId ?? undefined,

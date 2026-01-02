@@ -23,7 +23,7 @@ export const onCreateEvent = async (
   next: () => Promise<unknown>,
 ): Promise<unknown> => {
   const user = buildUserContext(requireRequestUser(req));
-  const tx = cds.transaction(req);
+  const tx = cds.tx(req);
 
   for (let attempt = 0; attempt < EMPLOYEE_ID_RETRIES; attempt += 1) {
     let generatedEmployeeId = false;

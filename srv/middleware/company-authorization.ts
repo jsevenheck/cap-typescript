@@ -5,6 +5,7 @@ import { buildUserContext, collectAttributeValues, userHasRole } from '../shared
 import { normalizeCompanyId } from '../shared/utils/normalization';
 import { createServiceError } from '../shared/utils/errors';
 import { extractEntityId, resolveAssociationId } from '../shared/utils/associations';
+import { requireRequestUser } from '../domain/shared/request-context';
 
 type ClientRow = {
   ID: string;
@@ -57,7 +58,7 @@ export class CompanyAuthorization {
   private readonly clientCompanyCache = new Map<string, string | null>();
 
   constructor(private readonly req: Request) {
-    const transaction = cds.transaction(req);
+    const transaction = cds.tx(req);
     if (transaction && typeof (transaction as { run?: unknown }).run === 'function') {
       this.runner = transaction as { run: (query: any) => Promise<any> };
     } else if (typeof (req as unknown as { run?: unknown }).run === 'function') {
@@ -65,7 +66,7 @@ export class CompanyAuthorization {
     } else {
       throw createServiceError(500, 'Unable to obtain database runner for authorization checks.');
     }
-    this.user = buildUserContext((req as any).user);
+    this.user = buildUserContext(requireRequestUser(req));
     this.allowedCompanies = this.resolveAllowedCompanies();
   }
 

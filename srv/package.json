@@ -12,6 +12,7 @@
     "ams:generate": "node ./scripts/generate-ams.mjs"
   },
   "dependencies": {
+    "@cap-js/cds-types": "^0.15.0",
     "@cap-js/hana": "^2",
     "@sap-cloud-sdk/connectivity": "^3.23.0",
     "@sap-cloud-sdk/http-client": "^3.23.0",
@@ -20,6 +21,7 @@
     "@sap/cds": "^9.6.1",
     "@sap/logging": "^8.2.0",
     "@sap/xsenv": "^5.3.0",
+    "@sap/xssec": "^4.11.1",
     "axios": "^1.13.2",
     "cockatiel": "^3.2.1",
     "cross-env": "^7.0.3",
@@ -27,8 +29,7 @@
     "p-limit": "^5.0.0",
     "prom-client": "^15.1.0",
     "redis": "^5.10.0",
-    "ts-node": "^10.9.2",
-    "@sap/xssec": "^4.11.1"
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@cap-js/cds-test": "^0.4.1",
