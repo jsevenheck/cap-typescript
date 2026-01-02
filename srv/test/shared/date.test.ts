@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
 import {
+  daysAgo,
+  daysFromNow,
+  today,
   normalizeDateToMidnight,
   todayAtMidnight,
 } from '../../shared/utils/date';
@@ -7,6 +10,181 @@ import {
 describe('Date Utilities', () => {
   beforeEach(() => {
     jest.useRealTimers();
+  });
+
+  describe('today', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
+      const result = today();
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return consistent results when called multiple times', () => {
+      const result1 = today();
+      const result2 = today();
+
+      expect(result1).toBe(result2);
+    });
+
+    it('should match the current local date when parsed', () => {
+      const result = today();
+      const now = new Date();
+      
+      // Parse the returned string and compare date components
+      const [year, month, day] = result.split('-').map(Number);
+      
+      expect(year).toBe(now.getFullYear());
+      expect(month).toBe(now.getMonth() + 1);
+      expect(day).toBe(now.getDate());
+    });
+
+    it('should not be affected by time of day', () => {
+      // Call at different times (simulated by multiple calls)
+      const morning = today();
+      const evening = today();
+
+      expect(morning).toBe(evening);
+    });
+  });
+
+  describe('daysAgo', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
+      const result = daysAgo(1);
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return a date before today', () => {
+      const result = daysAgo(1);
+      const todayResult = today();
+
+      expect(result).not.toBe(todayResult);
+      expect(new Date(result).getTime()).toBeLessThan(new Date(todayResult).getTime());
+    });
+
+    it('should handle 0 days ago (today)', () => {
+      const result = daysAgo(0);
+      const todayResult = today();
+
+      expect(result).toBe(todayResult);
+    });
+
+    it('should correctly calculate dates across month boundaries', () => {
+      // Use a fixed date for testing boundary conditions
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-03-01T12:00:00'));
+
+      const result = daysAgo(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 28, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(28);
+
+      jest.useRealTimers();
+    });
+
+    it('should correctly calculate dates across year boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-01T12:00:00'));
+
+      const result = daysAgo(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be December 31, 2025
+      expect(year).toBe(2025);
+      expect(month).toBe(12);
+      expect(day).toBe(31);
+
+      jest.useRealTimers();
+    });
+
+    it('should calculate correct date for 30 days ago', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-02-15T12:00:00'));
+
+      const result = daysAgo(30);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be January 16, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(1);
+      expect(day).toBe(16);
+
+      jest.useRealTimers();
+    });
+  });
+
+  describe('daysFromNow', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
+      const result = daysFromNow(1);
+
+      expect(typeof result).toBe('string');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return a date after today', () => {
+      const result = daysFromNow(1);
+      const todayResult = today();
+
+      expect(result).not.toBe(todayResult);
+      expect(new Date(result).getTime()).toBeGreaterThan(new Date(todayResult).getTime());
+    });
+
+    it('should handle 0 days from now (today)', () => {
+      const result = daysFromNow(0);
+      const todayResult = today();
+
+      expect(result).toBe(todayResult);
+    });
+
+    it('should correctly calculate dates across month boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-31T12:00:00'));
+
+      const result = daysFromNow(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 1, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(1);
+
+      jest.useRealTimers();
+    });
+
+    it('should correctly calculate dates across year boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-12-31T12:00:00'));
+
+      const result = daysFromNow(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be January 1, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(1);
+      expect(day).toBe(1);
+
+      jest.useRealTimers();
+    });
+
+    it('should calculate correct date for 30 days from now', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-15T12:00:00'));
+
+      const result = daysFromNow(30);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 14, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(14);
+
+      jest.useRealTimers();
+    });
   });
 
   describe('normalizeDateToMidnight', () => {

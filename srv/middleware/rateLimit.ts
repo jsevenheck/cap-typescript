@@ -47,6 +47,7 @@ interface RedisStoreOptions {
 interface InMemoryStoreOptions {
   namespace: string;
   maxKeys: number;
+  enableAutoCleanup?: boolean; // Allow disabling automatic cleanup for testing
 }
 
 interface RateLimitConfig {
@@ -83,6 +84,11 @@ interface RateLimitConfig {
    * Provide a custom store implementation (e.g., SAP Cache adapter) for advanced deployments.
    */
   store?: RateLimitStore;
+  /**
+   * Enable automatic cleanup of expired entries in the in-memory store.
+   * Defaults to true. Can be set to false for testing or specific use cases.
+   */
+  enableAutoCleanup?: boolean;
 }
 
 const parseMaxKeys = (maxKeys?: number): number => {
@@ -98,16 +104,52 @@ const parseMaxKeys = (maxKeys?: number): number => {
   return resolved > 0 ? resolved : Number.POSITIVE_INFINITY;
 };
 
+const DEFAULT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 class InMemoryRateLimitStore implements RateLimitStore {
   private readonly store = new Map<string, RateLimitEntry>();
   private readonly effectiveMaxKeys: number;
+  private cleanupTimer: NodeJS.Timeout | undefined;
+  private readonly cleanupIntervalMs: number;
 
   constructor(private readonly options: InMemoryStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
+    // Run cleanup every 5 minutes by default (configurable via RATE_LIMIT_CLEANUP_INTERVAL_MS).
+    const envInterval = process.env.RATE_LIMIT_CLEANUP_INTERVAL_MS;
+    const parsedInterval = envInterval ? Number.parseInt(envInterval, 10) : NaN;
+    this.cleanupIntervalMs = Number.isFinite(parsedInterval) && parsedInterval > 0
+      ? parsedInterval
+      : DEFAULT_CLEANUP_INTERVAL_MS;
+
+    // Start cleanup timer if auto-cleanup is enabled (default: true)
+    // Can be disabled via options for testing or specific use cases
+    const shouldStartCleanup = options.enableAutoCleanup !== false;
+    if (shouldStartCleanup) {
+      this.startCleanupTimer();
+    }
+  }
+
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      return;
+    }
+
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupExpired(Date.now());
+    }, this.cleanupIntervalMs);
+
+    // Prevent the timer from keeping the process alive in Node.js
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
   }
 
   shutdown = async (): Promise<void> => {
-    // No periodic resources to clean up.
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+    this.store.clear();
   };
 
   private evictOldestKey(): void {
@@ -128,7 +170,13 @@ class InMemoryRateLimitStore implements RateLimitStore {
       }
     }
 
-    expiredKeys.forEach((key) => this.store.delete(key));
+    if (expiredKeys.length > 0) {
+      expiredKeys.forEach((key) => this.store.delete(key));
+      logger.debug(
+        { expired: expiredKeys.length, remaining: this.store.size },
+        'Cleaned up expired rate limit entries'
+      );
+    }
   }
 
   increment = async (key: string, windowMs: number, now: number, resetTime: number): Promise<RateLimitEntry> => {
@@ -278,7 +326,7 @@ const toBucketKey = (baseKey: string, namespace: string, windowMs: number, now: 
 };
 
 const resolveStore = (
-  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store'> & { windowMs: number },
+  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store' | 'enableAutoCleanup'> & { windowMs: number },
 ): RateLimitStore => {
   if (options.store) {
     return options.store;
@@ -305,6 +353,7 @@ const resolveStore = (
   return new InMemoryRateLimitStore({
     namespace,
     maxKeys: options.maxKeys ?? 10_000,
+    enableAutoCleanup: options.enableAutoCleanup,
   });
 };
 
@@ -341,6 +390,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     redisUrl,
     store,
     failOpenOnError = true,
+    enableAutoCleanup,
   } = config;
 
   const effectiveNamespace = resolveNamespace(namespace);
@@ -352,6 +402,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     maxKeys,
     windowMs,
     store,
+    enableAutoCleanup,
   });
   const shouldCreateFallback = failOpenOnError && effectiveBackend === 'redis';
   let fallbackStore: InMemoryRateLimitStore | null = null;
@@ -366,6 +417,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
       fallbackStore = new InMemoryRateLimitStore({
         namespace: effectiveNamespace,
         maxKeys: maxKeys ?? 10_000,
+        enableAutoCleanup,
       });
     }
 
