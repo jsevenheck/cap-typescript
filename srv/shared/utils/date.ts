@@ -1,17 +1,25 @@
 /** Utility helpers for parsing and normalising date values. */
 
 /**
+ * Formats a Date object to ISO date string (YYYY-MM-DD) using local timezone.
+ * @param date - Date object to format
+ * @returns ISO date string in YYYY-MM-DD format
+ */
+const formatDateToISOString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * Calculate the date N days ago from today in ISO format (YYYY-MM-DD).
  * Uses local timezone to avoid date shifts when converting to/from UTC.
  */
 export const daysAgo = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  // Use local date components to avoid timezone issues with toISOString()
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDateToISOString(date);
 };
 
 /**
@@ -21,11 +29,7 @@ export const daysAgo = (days: number): string => {
 export const daysFromNow = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  // Use local date components to avoid timezone issues with toISOString()
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDateToISOString(date);
 };
 
 /**
@@ -33,12 +37,7 @@ export const daysFromNow = (days: number): string => {
  * Uses local timezone to avoid date shifts when converting to/from UTC.
  */
 export const today = (): string => {
-  const date = new Date();
-  // Use local date components to avoid timezone issues with toISOString()
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDateToISOString(new Date());
 };
 
 /** Converts a variety of input types into a valid Date or undefined. */

@@ -98,6 +98,8 @@ const parseMaxKeys = (maxKeys?: number): number => {
   return resolved > 0 ? resolved : Number.POSITIVE_INFINITY;
 };
 
+const DEFAULT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 class InMemoryRateLimitStore implements RateLimitStore {
   private readonly store = new Map<string, RateLimitEntry>();
   private readonly effectiveMaxKeys: number;
@@ -108,12 +110,13 @@ class InMemoryRateLimitStore implements RateLimitStore {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
     // Run cleanup every 5 minutes by default, or use RATE_LIMIT_CLEANUP_INTERVAL_MS env var
     const envInterval = process.env.RATE_LIMIT_CLEANUP_INTERVAL_MS;
-    this.cleanupIntervalMs = envInterval ? Number.parseInt(envInterval, 10) : 5 * 60 * 1000;
+    const parsedInterval = envInterval ? Number.parseInt(envInterval, 10) : NaN;
+    this.cleanupIntervalMs = Number.isFinite(parsedInterval) && parsedInterval > 0
+      ? parsedInterval
+      : DEFAULT_CLEANUP_INTERVAL_MS;
     
-    // Only start cleanup timer if interval is valid and positive
-    if (Number.isFinite(this.cleanupIntervalMs) && this.cleanupIntervalMs > 0) {
-      this.startCleanupTimer();
-    }
+    // Start cleanup timer with validated interval
+    this.startCleanupTimer();
   }
 
   private startCleanupTimer(): void {
