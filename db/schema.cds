@@ -17,6 +17,14 @@ type EmploymentType : String enum {
   external;
 };
 
+type OutboxStatus : String enum {
+  PENDING;
+  PROCESSING;
+  COMPLETED;
+  DELIVERED;
+  FAILED;
+};
+
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
   { name: 'Clients_companyId_idx', elements: ['companyId'] }
@@ -147,7 +155,7 @@ entity EmployeeNotificationOutbox : managed, cuid {
   eventType     : String(60)  not null;
   destinationName: String(500) not null;
   payload       : LargeString not null;
-  status        : String(20)  default 'PENDING';
+  status        : OutboxStatus default PENDING;
   attempts      : Integer     default 0;
   nextAttemptAt : Timestamp;
   claimedAt     : Timestamp;
@@ -162,8 +170,8 @@ entity EmployeeNotificationDLQ : managed, cuid {
   eventType       : String(60)   not null;
   destinationName : String(500)  not null;
   payload         : LargeString  not null;
+  status          : OutboxStatus default FAILED;
   attempts        : Integer      not null;
   lastError       : LargeString;
   failedAt        : Timestamp    not null;
 }
-
