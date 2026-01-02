@@ -85,6 +85,10 @@ function resolveStatisticsPayload(data: Record<string, unknown>): Record<string,
     if (isPlainObject(value)) {
       return value;
     }
+
+    throw new Error(
+      "Invalid statistics payload: 'value' must be a plain object when present."
+    );
   }
   return data;
 }
