@@ -98,7 +98,16 @@ function resolveStatisticsPayload(data: Record<string, unknown>): Record<string,
 }
 
 function getDefaultODataModel(): ODataModel {
-  const model = Core.getModel();
+  let model;
+  try {
+    model = Core.getModel();
+  } catch (error) {
+    const message = extractErrorMessage(
+      error,
+      "Failed to retrieve default OData model from sap.ui.core.Core. Ensure the application has been initialized properly and a default OData model is set."
+    );
+    throw new Error(message);
+  }
   if (!model) {
     throw new Error(
       "Default OData model not found. Ensure the application has been initialized properly and a default OData model is set on sap.ui.core.Core."
