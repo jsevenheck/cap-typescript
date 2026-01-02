@@ -41,42 +41,46 @@ type ODataErrorResponse = {
   };
 };
 
-function extractErrorMessage(error: ODataErrorResponse, fallback: string): string {
-  if (error.error?.message) {
-    return error.error.message;
-  }
-
-  if (error.message) {
+function extractErrorMessage(error: unknown, fallback: string): string {
+  // Handle native Error instances first
+  if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  if (error.responseText) {
-    try {
-      const parsed = JSON.parse(error.responseText) as { error?: { message?: string } };
-      if (parsed.error?.message) {
-        return parsed.error.message;
+  if (typeof error === "object" && error !== null) {
+    const odataError = error as ODataErrorResponse;
+
+    if (odataError.error?.message) {
+      return odataError.error.message;
+    }
+
+    if (odataError.message) {
+      return odataError.message;
+    }
+
+    if (typeof odataError.responseText === "string" && odataError.responseText) {
+      try {
+        const parsed = JSON.parse(odataError.responseText) as { error?: { message?: string } };
+        if (parsed.error?.message) {
+          return parsed.error.message;
+        }
+      } catch {
+        return fallback;
       }
-    } catch {
-      return fallback;
+    }
+
+    if (odataError.statusText) {
+      return odataError.statusText;
     }
   }
 
-  return error.statusText || fallback;
+  return fallback;
 }
 
 function buildODataErrorMessage(error: unknown, entityName: string): string {
   const fallback = "Unexpected error";
-
-  if (error instanceof Error) {
-    return `Failed to fetch ${entityName}: ${error.message}`;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const message = extractErrorMessage(error as ODataErrorResponse, fallback);
-    return `Failed to fetch ${entityName}: ${message}`;
-  }
-
-  return `Failed to fetch ${entityName}: ${fallback}`;
+  const message = extractErrorMessage(error, fallback);
+  return `Failed to fetch ${entityName}: ${message}`;
 }
 
 function resolveStatisticsPayload(data: Record<string, unknown>): Record<string, unknown> {
