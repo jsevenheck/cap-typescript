@@ -55,7 +55,8 @@ describe('createRateLimiter', () => {
     );
     expect(evictionCalls.length).toBe(0);
 
-    jest.runOnlyPendingTimers();
+    // Advance by the cleanup interval (5 minutes) so the cleanup timer fires and is cleared
+    jest.advanceTimersByTime(5 * 60 * 1000);
   });
 
   it('evicts the oldest entry when adding a new key past the limit', async () => {
