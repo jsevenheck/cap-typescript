@@ -99,7 +99,10 @@ function getDefaultODataModel(): ODataModel {
   if (!model) {
     throw new Error("OData model not found");
   }
-  return model as ODataModel;
+  if (!(model instanceof ODataModel)) {
+    throw new Error("Default model is not an OData v4 ODataModel");
+  }
+  return model;
 }
 
 /**
