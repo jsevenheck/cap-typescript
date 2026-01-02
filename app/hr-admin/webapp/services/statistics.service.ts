@@ -57,7 +57,7 @@ function extractErrorMessage(error: ODataErrorResponse, fallback: string): strin
         return parsed.error.message;
       }
     } catch {
-      return error.responseText;
+      return fallback;
     }
   }
 
