@@ -137,13 +137,13 @@ async function fetchStatistics(
   entityName: string = "statistics"
 ): Promise<Record<string, unknown>> {
   const model = getDefaultODataModel();
-  const action = model.bindContext(`/${functionName}(...)`);
+  const functionContext = model.bindContext(`/${functionName}(...)`);
   if (clientId) {
-    action.setParameter("clientId", clientId);
+    functionContext.setParameter("clientId", clientId);
   }
 
   try {
-    const result = await action.requestObject();
+    const result = await functionContext.requestObject();
 
     // Validate that we received a plain object
     if (!isPlainObject(result)) {
