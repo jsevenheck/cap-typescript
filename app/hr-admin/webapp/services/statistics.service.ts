@@ -1,3 +1,6 @@
+import Core from "sap/ui/core/Core";
+import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+
 /**
  * Statistics service for fetching statistics from the backend.
  * Used by dashboard components to display aggregated data.
@@ -29,6 +32,102 @@ export interface LocationStatistics {
   upcomingExpiry: number;
 }
 
+type ODataErrorResponse = {
+  message?: string;
+  statusText?: string;
+  responseText?: string;
+  error?: {
+    message?: string;
+  };
+};
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  // Handle native Error instances first
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const odataError = error as ODataErrorResponse;
+
+    if (odataError.error?.message) {
+      return odataError.error.message;
+    }
+
+    if (odataError.message) {
+      return odataError.message;
+    }
+
+    if (typeof odataError.responseText === "string" && odataError.responseText) {
+      try {
+        const parsed = JSON.parse(odataError.responseText) as { error?: { message?: string } };
+        if (parsed.error?.message) {
+          return parsed.error.message;
+        }
+      } catch {
+        return fallback;
+      }
+    }
+
+    if (odataError.statusText) {
+      return odataError.statusText;
+    }
+  }
+
+  return fallback;
+}
+
+function buildODataErrorMessage(error: unknown, entityName: string): string {
+  const fallback = "Unexpected error";
+  const message = extractErrorMessage(error, fallback);
+  return `Failed to fetch ${entityName}: ${message}`;
+}
+
+function resolveStatisticsPayload(data: Record<string, unknown>): Record<string, unknown> {
+  if ("value" in data) {
+    const value = (data as { value?: unknown }).value;
+    if (isPlainObject(value)) {
+      return value;
+    }
+
+    throw new Error(
+      "Invalid statistics payload: 'value' must be a plain object when present."
+    );
+  }
+  return data;
+}
+
+function getDefaultODataModel(): ODataModel {
+  let model;
+  try {
+    model = Core.getModel();
+  } catch (error) {
+    const message = extractErrorMessage(
+      error,
+      "Failed to retrieve default OData model from sap.ui.core.Core. Ensure the application has been initialized properly and a default OData model is set."
+    );
+    throw new Error(message);
+  }
+  if (!model) {
+    throw new Error(
+      "Default OData model not found. Ensure the application has been initialized properly and a default OData model is set on sap.ui.core.Core."
+    );
+  }
+  if (!(model instanceof ODataModel)) {
+    throw new Error("Default model is not an OData V4 ODataModel");
+  }
+  return model;
+}
+
+/**
+ * Type guard to validate that a value is a plain object (not null and not an array).
+ * @param value - The value to check
+ * @returns true if the value is a plain object, false otherwise
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * Generic statistics fetcher that handles common fetch logic.
  * @param functionName - The OData function name to call
@@ -36,26 +135,30 @@ export interface LocationStatistics {
  * @param entityName - Name of the entity for error messages
  * @returns Promise resolving to the raw JSON response data
  */
-async function fetchStatistics(functionName: string, clientId?: string, entityName: string = 'statistics'): Promise<Record<string, unknown>> {
-  const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
-  const url = encodedClientId
-    ? `/odata/v4/clients/${functionName}(clientId='${encodedClientId}')`
-    : `/odata/v4/clients/${functionName}()`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${entityName}: ${response.status} ${response.statusText}`);
+async function fetchStatistics(
+  functionName: string,
+  clientId?: string,
+  entityName: string = "statistics"
+): Promise<Record<string, unknown>> {
+  const model = getDefaultODataModel();
+  const functionContext = model.bindContext(`/${functionName}(...)`);
+  if (clientId) {
+    functionContext.setParameter("clientId", clientId);
   }
 
-  return response.json();
+  try {
+    const result = await functionContext.requestObject();
+
+    // Validate that we received a plain object
+    if (!isPlainObject(result)) {
+      throw new Error(
+        `Invalid response from ${entityName}: Expected a plain object, but received ${typeof result}`
+      );
+    }
+    return result;
+  } catch (error: unknown) {
+    throw new Error(buildODataErrorMessage(error, entityName), { cause: error });
+  }
 }
 
 /**
@@ -64,7 +167,9 @@ async function fetchStatistics(functionName: string, clientId?: string, entityNa
  * @returns Promise resolving to employee statistics
  */
 export async function fetchEmployeeStatistics(clientId?: string): Promise<EmployeeStatistics> {
-  const data = await fetchStatistics('employeeStatistics', clientId, 'employee statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("employeeStatistics", clientId, "employee statistics")
+  );
   return {
     totalEmployees: (data.totalEmployees as number) ?? 0,
     activeEmployees: (data.activeEmployees as number) ?? 0,
@@ -83,7 +188,9 @@ export async function fetchEmployeeStatistics(clientId?: string): Promise<Employ
  * @returns Promise resolving to cost center statistics
  */
 export async function fetchCostCenterStatistics(clientId?: string): Promise<CostCenterStatistics> {
-  const data = await fetchStatistics('costCenterStatistics', clientId, 'cost center statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("costCenterStatistics", clientId, "cost center statistics")
+  );
   return {
     totalCostCenters: (data.totalCostCenters as number) ?? 0,
     activeCostCenters: (data.activeCostCenters as number) ?? 0,
@@ -99,7 +206,9 @@ export async function fetchCostCenterStatistics(clientId?: string): Promise<Cost
  * @returns Promise resolving to location statistics
  */
 export async function fetchLocationStatistics(clientId?: string): Promise<LocationStatistics> {
-  const data = await fetchStatistics('locationStatistics', clientId, 'location statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("locationStatistics", clientId, "location statistics")
+  );
   return {
     totalLocations: (data.totalLocations as number) ?? 0,
     activeLocations: (data.activeLocations as number) ?? 0,
