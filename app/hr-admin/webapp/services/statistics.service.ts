@@ -1,3 +1,6 @@
+import Core from "sap/ui/core/Core";
+import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+
 /**
  * Statistics service for fetching statistics from the backend.
  * Used by dashboard components to display aggregated data.
@@ -29,6 +32,68 @@ export interface LocationStatistics {
   upcomingExpiry: number;
 }
 
+type ODataErrorResponse = {
+  message?: string;
+  statusText?: string;
+  responseText?: string;
+  error?: {
+    message?: string;
+  };
+};
+
+function extractErrorMessage(error: ODataErrorResponse, fallback: string): string {
+  if (error.error?.message) {
+    return error.error.message;
+  }
+
+  if (error.message) {
+    return error.message;
+  }
+
+  if (error.responseText) {
+    try {
+      const parsed = JSON.parse(error.responseText) as { error?: { message?: string } };
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+    } catch {
+      return error.responseText;
+    }
+  }
+
+  return error.statusText ?? fallback;
+}
+
+function buildODataErrorMessage(error: unknown, entityName: string): string {
+  const fallback = "Unexpected error";
+
+  if (error instanceof Error) {
+    return `Failed to fetch ${entityName}: ${error.message}`;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const message = extractErrorMessage(error as ODataErrorResponse, fallback);
+    return `Failed to fetch ${entityName}: ${message}`;
+  }
+
+  return `Failed to fetch ${entityName}: ${fallback}`;
+}
+
+function resolveStatisticsPayload(data: Record<string, unknown>): Record<string, unknown> {
+  if ("value" in data && typeof data.value === "object" && data.value !== null) {
+    return data.value as Record<string, unknown>;
+  }
+  return data;
+}
+
+function getDefaultODataModel(): ODataModel {
+  const model = Core.getModel();
+  if (!model) {
+    throw new Error("OData model not found");
+  }
+  return model as ODataModel;
+}
+
 /**
  * Generic statistics fetcher that handles common fetch logic.
  * @param functionName - The OData function name to call
@@ -36,26 +101,20 @@ export interface LocationStatistics {
  * @param entityName - Name of the entity for error messages
  * @returns Promise resolving to the raw JSON response data
  */
-async function fetchStatistics(functionName: string, clientId?: string, entityName: string = 'statistics'): Promise<Record<string, unknown>> {
-  const encodedClientId = clientId ? encodeURIComponent(clientId) : null;
-  const url = encodedClientId
-    ? `/odata/v4/clients/${functionName}(clientId='${encodedClientId}')`
-    : `/odata/v4/clients/${functionName}()`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${entityName}: ${response.status} ${response.statusText}`);
+async function fetchStatistics(
+  functionName: string,
+  clientId?: string,
+  entityName: string = "statistics"
+): Promise<Record<string, unknown>> {
+  const model = getDefaultODataModel();
+  const action = model.bindContext(`/${functionName}(...)`);
+  if (clientId) {
+    action.setParameter("clientId", clientId);
   }
 
-  return response.json();
+  return action.requestObject().catch((error: unknown) => {
+    throw new Error(buildODataErrorMessage(error, entityName));
+  }) as Promise<Record<string, unknown>>;
 }
 
 /**
@@ -64,7 +123,9 @@ async function fetchStatistics(functionName: string, clientId?: string, entityNa
  * @returns Promise resolving to employee statistics
  */
 export async function fetchEmployeeStatistics(clientId?: string): Promise<EmployeeStatistics> {
-  const data = await fetchStatistics('employeeStatistics', clientId, 'employee statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("employeeStatistics", clientId, "employee statistics")
+  );
   return {
     totalEmployees: (data.totalEmployees as number) ?? 0,
     activeEmployees: (data.activeEmployees as number) ?? 0,
@@ -83,7 +144,9 @@ export async function fetchEmployeeStatistics(clientId?: string): Promise<Employ
  * @returns Promise resolving to cost center statistics
  */
 export async function fetchCostCenterStatistics(clientId?: string): Promise<CostCenterStatistics> {
-  const data = await fetchStatistics('costCenterStatistics', clientId, 'cost center statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("costCenterStatistics", clientId, "cost center statistics")
+  );
   return {
     totalCostCenters: (data.totalCostCenters as number) ?? 0,
     activeCostCenters: (data.activeCostCenters as number) ?? 0,
@@ -99,7 +162,9 @@ export async function fetchCostCenterStatistics(clientId?: string): Promise<Cost
  * @returns Promise resolving to location statistics
  */
 export async function fetchLocationStatistics(clientId?: string): Promise<LocationStatistics> {
-  const data = await fetchStatistics('locationStatistics', clientId, 'location statistics');
+  const data = resolveStatisticsPayload(
+    await fetchStatistics("locationStatistics", clientId, "location statistics")
+  );
   return {
     totalLocations: (data.totalLocations as number) ?? 0,
     activeLocations: (data.activeLocations as number) ?? 0,
