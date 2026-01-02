@@ -141,14 +141,13 @@ async function fetchStatistics(
 
   try {
     const result = await action.requestObject();
-    
+
     // Validate that we received a plain object
     if (!isPlainObject(result)) {
       throw new Error(
         `Invalid response from ${entityName}: Expected a plain object, but received ${typeof result}`
       );
     }
-    
     return result;
   } catch (error: unknown) {
     if (error instanceof Error) {
