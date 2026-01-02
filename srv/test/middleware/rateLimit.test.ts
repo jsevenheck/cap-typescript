@@ -34,6 +34,7 @@ describe('createRateLimiter', () => {
       maxRequests: 5,
       maxKeys: 1,
       keyGenerator,
+      enableAutoCleanup: false, // Disable auto-cleanup for testing
     });
 
     const req = createRequest('client-1');
@@ -54,9 +55,6 @@ describe('createRateLimiter', () => {
       call.some((arg) => typeof arg === 'string' && arg.includes('Evicted oldest'))
     );
     expect(evictionCalls.length).toBe(0);
-
-    // Advance by the cleanup interval (5 minutes) so the cleanup timer fires and is cleared
-    jest.advanceTimersByTime(5 * 60 * 1000);
   });
 
   it('evicts the oldest entry when adding a new key past the limit', async () => {
@@ -67,6 +65,7 @@ describe('createRateLimiter', () => {
       maxRequests: 5,
       maxKeys: 1,
       keyGenerator,
+      enableAutoCleanup: false, // Disable auto-cleanup for testing
     });
 
     const res = createResponse();
@@ -183,6 +182,7 @@ describe('createRateLimiter', () => {
       windowMs: 1_000,
       maxRequests: 1,
       keyGenerator,
+      enableAutoCleanup: false, // Disable auto-cleanup for testing
     });
 
     const res = createResponse();

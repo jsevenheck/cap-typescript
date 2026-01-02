@@ -47,6 +47,7 @@ interface RedisStoreOptions {
 interface InMemoryStoreOptions {
   namespace: string;
   maxKeys: number;
+  enableAutoCleanup?: boolean; // Allow disabling automatic cleanup for testing
 }
 
 interface RateLimitConfig {
@@ -83,6 +84,11 @@ interface RateLimitConfig {
    * Provide a custom store implementation (e.g., SAP Cache adapter) for advanced deployments.
    */
   store?: RateLimitStore;
+  /**
+   * Enable automatic cleanup of expired entries in the in-memory store.
+   * Defaults to true. Can be set to false for testing or specific use cases.
+   */
+  enableAutoCleanup?: boolean;
 }
 
 const parseMaxKeys = (maxKeys?: number): number => {
@@ -115,8 +121,10 @@ class InMemoryRateLimitStore implements RateLimitStore {
       ? parsedInterval
       : DEFAULT_CLEANUP_INTERVAL_MS;
 
-    // Start cleanup timer with validated interval, but avoid creating timers in test runs
-    if (process.env.NODE_ENV !== 'test') {
+    // Start cleanup timer if auto-cleanup is enabled (default: true)
+    // Can be disabled via options for testing or specific use cases
+    const shouldStartCleanup = options.enableAutoCleanup !== false;
+    if (shouldStartCleanup) {
       this.startCleanupTimer();
     }
   }
@@ -318,7 +326,7 @@ const toBucketKey = (baseKey: string, namespace: string, windowMs: number, now: 
 };
 
 const resolveStore = (
-  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store'> & { windowMs: number },
+  options: Pick<RateLimitConfig, 'backend' | 'redisUrl' | 'maxKeys' | 'namespace' | 'store' | 'enableAutoCleanup'> & { windowMs: number },
 ): RateLimitStore => {
   if (options.store) {
     return options.store;
@@ -345,6 +353,7 @@ const resolveStore = (
   return new InMemoryRateLimitStore({
     namespace,
     maxKeys: options.maxKeys ?? 10_000,
+    enableAutoCleanup: options.enableAutoCleanup,
   });
 };
 
@@ -381,6 +390,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     redisUrl,
     store,
     failOpenOnError = true,
+    enableAutoCleanup,
   } = config;
 
   const effectiveNamespace = resolveNamespace(namespace);
@@ -392,6 +402,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
     maxKeys,
     windowMs,
     store,
+    enableAutoCleanup,
   });
   const shouldCreateFallback = failOpenOnError && effectiveBackend === 'redis';
   let fallbackStore: InMemoryRateLimitStore | null = null;
@@ -406,6 +417,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
       fallbackStore = new InMemoryRateLimitStore({
         namespace: effectiveNamespace,
         maxKeys: maxKeys ?? 10_000,
+        enableAutoCleanup,
       });
     }
 

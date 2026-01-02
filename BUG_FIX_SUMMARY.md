@@ -29,8 +29,8 @@ This PR addresses critical bugs in the CAP TypeScript application across backend
 - Critical for date-based business logic (validFrom/validTo ranges, employee entry/exit dates)
 
 **Testing**:
-- Added 14 new comprehensive test cases
-- All 35 date utility tests passing
+- Added comprehensive test coverage for `today()`, `daysAgo()`, and `daysFromNow()`
+- All 37 date utility tests passing
 - Tests verify local timezone handling
 
 ### 2. ✅ Rate Limiter Memory Management (Major)
@@ -160,7 +160,7 @@ this.cleanupIntervalMs = Number.isFinite(parsedInterval) && parsedInterval > 0
 
 ```
 Test Suites: 16 passed, 16 total
-Tests:       139 passed, 139 total
+Tests:       141 passed, 141 total
 Code Coverage: Maintained
 Linter: ✅ No errors
 CodeQL: ✅ No security alerts
