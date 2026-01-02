@@ -13,15 +13,7 @@ describe('Date Utilities', () => {
   });
 
   describe('today', () => {
-    it('should return today\'s date in YYYY-MM-DD format', () => {
-      const result = today();
-      const now = new Date();
-      const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-      expect(result).toBe(expected);
-    });
-
-    it('should return a string in ISO date format', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
       const result = today();
 
       expect(typeof result).toBe('string');
@@ -35,43 +27,41 @@ describe('Date Utilities', () => {
       expect(result1).toBe(result2);
     });
 
-    it('should use local timezone, not UTC', () => {
+    it('should match the current local date when parsed', () => {
       const result = today();
       const now = new Date();
       
-      // Extract local date components
-      const localYear = now.getFullYear();
-      const localMonth = now.getMonth() + 1;
-      const localDay = now.getDate();
+      // Parse the returned string and compare date components
+      const [year, month, day] = result.split('-').map(Number);
+      
+      expect(year).toBe(now.getFullYear());
+      expect(month).toBe(now.getMonth() + 1);
+      expect(day).toBe(now.getDate());
+    });
 
-      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+    it('should not be affected by time of day', () => {
+      // Call at different times (simulated by multiple calls)
+      const morning = today();
+      const evening = today();
+
+      expect(morning).toBe(evening);
     });
   });
 
   describe('daysAgo', () => {
-    it('should return date 1 day ago in YYYY-MM-DD format', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
       const result = daysAgo(1);
-      const expected = new Date();
-      expected.setDate(expected.getDate() - 1);
-      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
-
-      expect(result).toBe(expectedStr);
-    });
-
-    it('should return date 7 days ago', () => {
-      const result = daysAgo(7);
 
       expect(typeof result).toBe('string');
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
-    it('should return date 30 days ago', () => {
-      const result = daysAgo(30);
-      const expected = new Date();
-      expected.setDate(expected.getDate() - 30);
-      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+    it('should return a date before today', () => {
+      const result = daysAgo(1);
+      const todayResult = today();
 
-      expect(result).toBe(expectedStr);
+      expect(result).not.toBe(todayResult);
+      expect(new Date(result).getTime()).toBeLessThan(new Date(todayResult).getTime());
     });
 
     it('should handle 0 days ago (today)', () => {
@@ -81,43 +71,67 @@ describe('Date Utilities', () => {
       expect(result).toBe(todayResult);
     });
 
-    it('should use local timezone, not UTC', () => {
-      const result = daysAgo(1);
-      const expected = new Date();
-      expected.setDate(expected.getDate() - 1);
-      
-      const localYear = expected.getFullYear();
-      const localMonth = expected.getMonth() + 1;
-      const localDay = expected.getDate();
+    it('should correctly calculate dates across month boundaries', () => {
+      // Use a fixed date for testing boundary conditions
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-03-01T12:00:00'));
 
-      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+      const result = daysAgo(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 28, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(28);
+
+      jest.useRealTimers();
+    });
+
+    it('should correctly calculate dates across year boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-01T12:00:00'));
+
+      const result = daysAgo(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be December 31, 2025
+      expect(year).toBe(2025);
+      expect(month).toBe(12);
+      expect(day).toBe(31);
+
+      jest.useRealTimers();
+    });
+
+    it('should calculate correct date for 30 days ago', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-02-15T12:00:00'));
+
+      const result = daysAgo(30);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be January 16, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(1);
+      expect(day).toBe(16);
+
+      jest.useRealTimers();
     });
   });
 
   describe('daysFromNow', () => {
-    it('should return date 1 day from now in YYYY-MM-DD format', () => {
+    it('should return a string in YYYY-MM-DD format', () => {
       const result = daysFromNow(1);
-      const expected = new Date();
-      expected.setDate(expected.getDate() + 1);
-      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
-
-      expect(result).toBe(expectedStr);
-    });
-
-    it('should return date 7 days from now', () => {
-      const result = daysFromNow(7);
 
       expect(typeof result).toBe('string');
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
-    it('should return date 30 days from now', () => {
-      const result = daysFromNow(30);
-      const expected = new Date();
-      expected.setDate(expected.getDate() + 30);
-      const expectedStr = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
+    it('should return a date after today', () => {
+      const result = daysFromNow(1);
+      const todayResult = today();
 
-      expect(result).toBe(expectedStr);
+      expect(result).not.toBe(todayResult);
+      expect(new Date(result).getTime()).toBeGreaterThan(new Date(todayResult).getTime());
     });
 
     it('should handle 0 days from now (today)', () => {
@@ -127,16 +141,49 @@ describe('Date Utilities', () => {
       expect(result).toBe(todayResult);
     });
 
-    it('should use local timezone, not UTC', () => {
-      const result = daysFromNow(1);
-      const expected = new Date();
-      expected.setDate(expected.getDate() + 1);
-      
-      const localYear = expected.getFullYear();
-      const localMonth = expected.getMonth() + 1;
-      const localDay = expected.getDate();
+    it('should correctly calculate dates across month boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-31T12:00:00'));
 
-      expect(result).toBe(`${localYear}-${String(localMonth).padStart(2, '0')}-${String(localDay).padStart(2, '0')}`);
+      const result = daysFromNow(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 1, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(1);
+
+      jest.useRealTimers();
+    });
+
+    it('should correctly calculate dates across year boundaries', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-12-31T12:00:00'));
+
+      const result = daysFromNow(1);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be January 1, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(1);
+      expect(day).toBe(1);
+
+      jest.useRealTimers();
+    });
+
+    it('should calculate correct date for 30 days from now', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-15T12:00:00'));
+
+      const result = daysFromNow(30);
+      const [year, month, day] = result.split('-').map(Number);
+
+      // Should be February 14, 2026
+      expect(year).toBe(2026);
+      expect(month).toBe(2);
+      expect(day).toBe(14);
+
+      jest.useRealTimers();
     });
   });
 

@@ -6,14 +6,16 @@ This document tracks security vulnerabilities found in dependencies and their mi
 
 ### High Severity - qs Package (< 6.14.1)
 
-**Status**: Acknowledged - Awaiting upstream fix
+**Status**: Acknowledged - Awaiting upstream fix from SAP
 
 **Description**: qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion  
 **GHSA**: [GHSA-6rw7-vpxm-498p](https://github.com/advisories/GHSA-6rw7-vpxm-498p)  
 **Affected Dependencies**:
-- `@sap/ux-ui5-tooling` (development dependency)
-- `@sap/cds-dk` (development dependency)
-- `@ui5/cli` (development dependency)
+- `@sap/ux-ui5-tooling` → transitive dependency on `qs` < 6.14.1 (development dependency)
+- `@sap/cds-dk` → transitive dependency on `qs` < 6.14.1 (development dependency)
+- `@ui5/cli` → transitive dependency on `qs` < 6.14.1 (development dependency)
+
+**Note**: While the root `qs` package has been updated to 6.14.1, the vulnerabilities persist in transitive dependencies within SAP's development tooling packages. These cannot be automatically fixed and require upstream updates from SAP.
 
 **Impact**: Limited - These are development-time dependencies used for:
 - UI5 application building and tooling
@@ -31,6 +33,7 @@ This document tracks security vulnerabilities found in dependencies and their mi
 **Action Required**:
 - Monitor for updates to `@sap/ux-ui5-tooling`, `@sap/cds-dk`, and `@ui5/cli`
 - These packages are maintained by SAP and will be updated when upstream dependencies are fixed
+- The vulnerabilities are tracked by SAP and will be resolved in future releases
 
 ### Production Dependencies
 

@@ -14,9 +14,9 @@ This PR addresses critical bugs in the CAP TypeScript application across backend
 
 **Problem**: 
 - Functions `daysAgo()`, `daysFromNow()`, and `today()` used `toISOString().split('T')[0]`
-- This approach converts to UTC before splitting, causing date calculation errors
-- Example: In timezone UTC+10, 2026-01-01 23:00 local becomes 2026-01-01 13:00 UTC, but the date part is same day
-- However, in timezone UTC-8, 2026-01-01 02:00 local becomes 2025-12-31 18:00 UTC - wrong date!
+- This approach converts to UTC before splitting, causing date calculation errors in negative UTC offset timezones
+- Expected behavior (UTC+10): 2026-01-01 23:00 local becomes 2026-01-01 13:00 UTC, and the date part remains 2026-01-01 ✓
+- Problematic behavior (UTC-8): 2026-01-01 02:00 local becomes 2025-12-31 18:00 UTC, so the date part changes to the previous day ✗
 
 **Solution**:
 - Extract date components directly from local timezone: `getFullYear()`, `getMonth()`, `getDate()`
