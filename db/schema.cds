@@ -21,6 +21,7 @@ type OutboxStatus : String enum {
   PENDING;
   PROCESSING;
   COMPLETED;
+  DELIVERED;
   FAILED;
 };
 
