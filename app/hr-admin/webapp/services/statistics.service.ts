@@ -82,13 +82,8 @@ function buildODataErrorMessage(error: unknown, entityName: string): string {
 function resolveStatisticsPayload(data: Record<string, unknown>): Record<string, unknown> {
   if ("value" in data) {
     const value = (data as { value?: unknown }).value;
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      Object.getPrototypeOf(value) === Object.prototype
-    ) {
-      return value as Record<string, unknown>;
+    if (isPlainObject(value)) {
+      return value;
     }
   }
   return data;
