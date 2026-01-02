@@ -38,7 +38,7 @@ export const prepareEmployeeContext = async (
     event: req.event as 'CREATE' | 'UPDATE',
     data: req.data as Partial<EmployeeEntity>,
     targetId: deriveTargetId(req),
-    tx: cds.transaction(req),
+    tx: cds.tx(req),
     user,
     concurrency: buildConcurrencyContext(req, 'clientmgmt.Employees'),
   });

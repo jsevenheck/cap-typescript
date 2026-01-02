@@ -44,7 +44,7 @@ export class IntegrityValidator {
   private readonly runner: { run: (query: any) => Promise<any> };
 
   constructor(req: Request) {
-    const transaction = cds.transaction(req);
+    const transaction = cds.tx(req);
     if (transaction && typeof (transaction as { run?: unknown }).run === 'function') {
       this.runner = transaction as { run: (query: any) => Promise<any> };
     } else if (typeof (req as unknown as { run?: unknown }).run === 'function') {

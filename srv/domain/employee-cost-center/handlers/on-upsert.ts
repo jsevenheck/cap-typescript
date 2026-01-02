@@ -14,7 +14,7 @@ export const onUpsert = async (req: Request): Promise<void> => {
     throw createServiceError(400, 'Request data is required.');
   }
 
-  const tx = cds.transaction(req);
+  const tx = cds.tx(req);
   const data = req.data as Partial<EmployeeCostCenterAssignmentEntity>;
   const targetId = deriveTargetId(req);
   const isUpdate = req.event === 'UPDATE';
