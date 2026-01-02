@@ -97,7 +97,7 @@ function getDefaultODataModel(): ODataModel {
     );
   }
   if (!(model instanceof ODataModel)) {
-    throw new Error("Default model is not an OData v4 ODataModel");
+    throw new Error("Default model is not an OData V4 ODataModel");
   }
   return model;
 }
