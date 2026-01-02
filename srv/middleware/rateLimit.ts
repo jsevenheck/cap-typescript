@@ -114,9 +114,11 @@ class InMemoryRateLimitStore implements RateLimitStore {
     this.cleanupIntervalMs = Number.isFinite(parsedInterval) && parsedInterval > 0
       ? parsedInterval
       : DEFAULT_CLEANUP_INTERVAL_MS;
-    
-    // Start cleanup timer with validated interval
-    this.startCleanupTimer();
+
+    // Start cleanup timer with validated interval, but avoid creating timers in test runs
+    if (process.env.NODE_ENV !== 'test') {
+      this.startCleanupTimer();
+    }
   }
 
   private startCleanupTimer(): void {
