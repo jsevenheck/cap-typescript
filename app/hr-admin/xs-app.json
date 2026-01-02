@@ -21,13 +21,20 @@
       "target": "/api/$1",
       "destination": "srv-api",
       "authenticationType": "ias",
-      "csrfProtection": false
+      "csrfProtection": true
     },
     {
       "source": "^/health$",
       "target": "/health",
       "destination": "srv-api",
-      "authenticationType": "ias",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/health/(.*)$",
+      "target": "/health/$1",
+      "destination": "srv-api",
+      "authenticationType": "none",
       "csrfProtection": false
     },
     {
