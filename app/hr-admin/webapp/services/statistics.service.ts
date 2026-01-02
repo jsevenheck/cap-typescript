@@ -111,17 +111,12 @@ function getDefaultODataModel(): ODataModel {
 }
 
 /**
- * Type guard to validate that a value is a plain object (not null, not an array, not a class instance).
+ * Type guard to validate that a value is a plain object (not null and not an array).
  * @param value - The value to check
  * @returns true if the value is a plain object, false otherwise
  */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
