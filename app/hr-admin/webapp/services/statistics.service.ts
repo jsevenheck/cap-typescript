@@ -108,6 +108,20 @@ function getDefaultODataModel(): ODataModel {
 }
 
 /**
+ * Type guard to validate that a value is a plain object (not null, not an array, not a class instance).
+ * @param value - The value to check
+ * @returns true if the value is a plain object, false otherwise
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+/**
  * Generic statistics fetcher that handles common fetch logic.
  * @param functionName - The OData function name to call
  * @param clientId - Optional client ID to filter statistics for a specific client
@@ -125,9 +139,20 @@ async function fetchStatistics(
     action.setParameter("clientId", clientId);
   }
 
-  return action.requestObject().catch((error: unknown) => {
-    throw new Error(buildODataErrorMessage(error, entityName), { cause: error });
-  }) as Promise<Record<string, unknown>>;
+  try {
+    const result = await action.requestObject();
+    
+    // Validate that we received a plain object
+    if (!isPlainObject(result)) {
+      throw new Error(
+        `Invalid response from ${entityName}: Expected a plain object, but received ${typeof result}`
+      );
+    }
+    
+    return result;
+  } catch (error: unknown) {
+    throw new Error(buildODataErrorMessage(error, entityName));
+  }
 }
 
 /**
