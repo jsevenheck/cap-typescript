@@ -11,7 +11,7 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 ## 🎯 Key Features
 
 - **Client Management** - Manage multiple company clients with unique company IDs
-- **Employee Management** - Complete lifecycle with auto-generated IDs, manager hierarchy, status tracking, and GDPR-compliant anonymization
+- **Employee Management** - Complete lifecycle with auto-generated IDs (format: NNNN-NNNN, where first 4 digits are company code and last 4 are sequential counter), manager hierarchy, status tracking, and GDPR-compliant anonymization
 - **Cost Center Management** - Time-based validity, responsibility tracking, and employee assignments
 - **Location Management** - Office locations with address details and country associations
 - **Employee-Cost Center Assignments** - Historical tracking with date range validation
@@ -24,7 +24,7 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 ### Tech Stack
 
 **Backend:**
-- SAP CAP 9.4.0 with TypeScript 5.6.3 (strict mode)
+- SAP CAP 9.6.1 with TypeScript 5.6.3 (strict mode)
 - Database: SQLite (dev), SAP HANA (production)
 - OData v4 protocol
 - Authentication: Mocked (dev), SAP IAS (production)
@@ -33,7 +33,7 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 - Scheduling: node-cron for outbox cleanup
 
 **Frontend:**
-- SAPUI5 1.126.1 (OpenUI5) with TypeScript 5.6.3
+- OpenUI5 1.136.0 with TypeScript 5.6.3
 - Single Page Application with hash-based routing
 - OData V4 Model with intelligent caching
 - Responsive design (desktop, tablet, mobile)
@@ -64,7 +64,7 @@ A full-stack TypeScript application built with SAP Cloud Application Programming
 
 **Core Entities:**
 - **Clients** - Company records (UUID key, unique companyId)
-- **Employees** - Employee records with auto-generated IDs (8-char prefix + 6-digit counter)
+- **Employees** - Employee records with auto-generated IDs (format: NNNN-NNNN, e.g., 1010-0001)
 - **CostCenters** - Cost center definitions with time-based validity
 - **Locations** - Office locations with country associations
 - **EmployeeCostCenterAssignments** - Historical assignment tracking
