@@ -108,7 +108,7 @@ class InMemoryRateLimitStore implements RateLimitStore {
 
   constructor(private readonly options: InMemoryStoreOptions) {
     this.effectiveMaxKeys = parseMaxKeys(options.maxKeys);
-    // Run cleanup every 5 minutes by default, or use RATE_LIMIT_CLEANUP_INTERVAL_MS env var
+    // Run cleanup every 5 minutes by default (configurable via RATE_LIMIT_CLEANUP_INTERVAL_MS).
     const envInterval = process.env.RATE_LIMIT_CLEANUP_INTERVAL_MS;
     const parsedInterval = envInterval ? Number.parseInt(envInterval, 10) : NaN;
     this.cleanupIntervalMs = Number.isFinite(parsedInterval) && parsedInterval > 0
