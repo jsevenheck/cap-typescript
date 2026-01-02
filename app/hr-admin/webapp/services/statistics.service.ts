@@ -61,7 +61,7 @@ function extractErrorMessage(error: ODataErrorResponse, fallback: string): strin
     }
   }
 
-  return error.statusText ?? fallback;
+  return error.statusText || fallback;
 }
 
 function buildODataErrorMessage(error: unknown, entityName: string): string {
