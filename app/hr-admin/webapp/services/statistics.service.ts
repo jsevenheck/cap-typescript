@@ -153,12 +153,6 @@ async function fetchStatistics(
     }
     return result;
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      const enhancedError = new Error(buildODataErrorMessage(error, entityName), {
-        cause: error,
-      });
-      throw enhancedError;
-    }
     throw new Error(buildODataErrorMessage(error, entityName), { cause: error });
   }
 }
