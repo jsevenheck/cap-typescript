@@ -126,7 +126,7 @@ async function fetchStatistics(
   }
 
   return action.requestObject().catch((error: unknown) => {
-    throw new Error(buildODataErrorMessage(error, entityName));
+    throw new Error(buildODataErrorMessage(error, entityName), { cause: error });
   }) as Promise<Record<string, unknown>>;
 }
 
