@@ -3,6 +3,9 @@ import { CompanyAuthorization } from '../../middleware/company-authorization';
 import * as AuthUtils from '../../shared/utils/auth';
 
 // Mock cds.tx and cds.transaction manually
+// Note: Using direct assignment instead of jest.mock() to avoid Jest hoisting issues
+// with variables defined outside the factory function. The production code uses cds.tx,
+// and cds.transaction is an alias that we mock for completeness.
 const mockRun = jest.fn();
 const mockTransaction = { run: mockRun };
 const mockTx = jest.fn(() => mockTransaction);
