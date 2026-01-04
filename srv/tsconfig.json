@@ -3,12 +3,12 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./dist",
-    "types": ["node", "@cap-js/cds-types"],
+    "types": ["node"],
     "baseUrl": "./",
     "paths": {
       "@types/*": ["types/*"]
     },
-    "typeRoots": ["../types", "../node_modules", "../node_modules/@types", "./node_modules/@types"]
+    "typeRoots": ["../types", "../node_modules/@types", "./node_modules/@types"]
   },
   "include": [
     "./**/*.ts",

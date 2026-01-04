@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node", "jest", "@cap-js/cds-types"]
+    "types": ["node", "jest"]
   },
   "include": [
     "./**/*.ts",
