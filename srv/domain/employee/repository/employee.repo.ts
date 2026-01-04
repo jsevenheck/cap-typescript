@@ -9,11 +9,6 @@ import {
   selectColumns,
 } from '../../cost-center/repository/cost-center.repo';
 
-const ql = cds.ql as typeof cds.ql & {
-  UPDATE: typeof cds.ql.UPDATE;
-  INSERT: typeof cds.ql.INSERT;
-};
-
 export const findEmployeeById = async (
   tx: Transaction,
   employeeId: string,
@@ -22,7 +17,7 @@ export const findEmployeeById = async (
   const required: Array<keyof EmployeeEntity> = ['ID', 'client_ID'];
   const selection = selectColumns<EmployeeEntity>(columns, required);
   const row = await tx.run(
-    ql.SELECT.one
+    cds.ql.SELECT.one
       .from('clientmgmt.Employees')
       .columns(...(selection as string[]))
       .where({ ID: employeeId}),
@@ -51,7 +46,7 @@ export const findEmployeeByEmployeeId = async (
   }
 
   return (await tx.run(
-    ql.SELECT.one
+    cds.ql.SELECT.one
       .from('clientmgmt.Employees')
       .columns('ID', 'employeeId')
       .where(whereClause),
@@ -63,7 +58,7 @@ export const findEmployeeIdCounter = async (
   clientId: string,
 ): Promise<{ lastCounter?: number } | undefined> =>
   (await tx.run(
-    ql.SELECT.one
+    cds.ql.SELECT.one
       .from('clientmgmt.EmployeeIdCounters')
       .columns('lastCounter')
       .where({ client_ID: clientId }),
@@ -75,7 +70,7 @@ export const findEmployeeIdCounterForUpdate = async (
 ): Promise<{ lastCounter?: number } | undefined> =>
   (await tx.run(
     withForUpdate(
-      ql.SELECT.one
+      cds.ql.SELECT.one
         .from('clientmgmt.EmployeeIdCounters')
         .columns('lastCounter')
         .where({ client_ID: clientId }) as unknown as Record<string, unknown>,
@@ -88,7 +83,7 @@ export const updateEmployeeIdCounter = async (
   nextCounter: number,
 ): Promise<void> => {
   await tx.run(
-    ql.UPDATE('clientmgmt.EmployeeIdCounters')
+    cds.ql.UPDATE.entity('clientmgmt.EmployeeIdCounters')
       .set({ lastCounter: nextCounter })
       .where({ client_ID: clientId }),
   );
@@ -100,7 +95,7 @@ export const insertEmployeeIdCounter = async (
   counter: number,
 ): Promise<void> => {
   await tx.run(
-    ql.INSERT.into('clientmgmt.EmployeeIdCounters').entries({
+    cds.ql.INSERT.into('clientmgmt.EmployeeIdCounters').entries({
       client_ID: clientId,
       lastCounter: counter,
       }),
@@ -121,7 +116,7 @@ export const findCostCenterById = async <K extends keyof CostCenterEntity = 'res
   >;
 
   const row = await tx.run(
-    ql.SELECT.one
+    cds.ql.SELECT.one
       .from('clientmgmt.CostCenters')
       .columns(...(selection as string[]))
       .where({ ID: costCenterId}),
@@ -148,7 +143,7 @@ export const findLocationById = async <K extends keyof LocationEntity = 'ID' | '
   >;
 
   const row = await tx.run(
-    ql.SELECT.one
+    cds.ql.SELECT.one
       .from('clientmgmt.Locations')
       .columns(...(selection as string[]))
       .where({ ID: locationId}),
@@ -174,7 +169,7 @@ export const listEmployeesForAnonymization = async (
   whereClause: Record<string, unknown>,
 ): Promise<Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>> =>
   (await tx.run(
-    ql.SELECT.from('clientmgmt.Employees')
+    cds.ql.SELECT.from('clientmgmt.Employees')
       .columns('ID', 'employeeId')
       .where({ ...whereClause }),
   )) as Array<Pick<EmployeeEntity, 'ID' | 'employeeId'>>;
@@ -186,7 +181,7 @@ export const anonymizeEmployeeRecord = async (
   placeholder: string,
 ): Promise<void> => {
   await tx.run(
-    ql.UPDATE('clientmgmt.Employees')
+    cds.ql.UPDATE.entity('clientmgmt.Employees')
       .set({
         firstName: placeholder,
         lastName: placeholder,

@@ -2,8 +2,6 @@ import cds from '@sap/cds';
 import type { Transaction } from '@sap/cds';
 import { normalizeDateToMidnight, todayAtMidnight } from '../../../shared/utils/date';
 
-const ql = cds.ql as typeof cds.ql;
-
 /**
  * Check if an assignment period is currently active (contains today's date)
  */
@@ -38,7 +36,7 @@ export const updateCostCenterResponsible = async (
 ): Promise<void> => {
   // Update the cost center's responsible_ID to point to this employee
   await tx.run(
-    ql.UPDATE('clientmgmt.CostCenters')
+    cds.ql.UPDATE.entity('clientmgmt.CostCenters')
       .set({ responsible_ID: employeeId })
       .where({ ID: costCenterId }),
   );
@@ -83,7 +81,7 @@ export const getEmployeesInCostCenterDuringPeriod = async (
   });
 
   const assignments = await tx.run(
-    ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
+    cds.ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
       .columns('employee_ID')
       .where({ and: whereConditions }),
   );
@@ -120,7 +118,7 @@ export const assignManagerToEmployeesInCostCenter = async (
   if (employees.length > 0) {
     const employeeIds = employees.map((emp) => emp.employee_ID);
     await tx.run(
-      ql.UPDATE('clientmgmt.Employees')
+      cds.ql.UPDATE.entity('clientmgmt.Employees')
         .set({ manager_ID: managerId })
         .where({ ID: { in: employeeIds } }),
     );
@@ -139,7 +137,7 @@ const findCurrentResponsibleAssignment = async (
 
   // Find all responsible assignments for this cost center
   const assignments = await tx.run(
-    ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
+    cds.ql.SELECT.from('clientmgmt.EmployeeCostCenterAssignments')
       .columns('employee_ID', 'validFrom', 'validTo')
       .where({
         costCenter_ID: costCenterId,

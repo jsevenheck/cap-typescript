@@ -34,12 +34,8 @@ const isCapUserLike = (user: unknown): user is CapUserLike => {
   return true;
 };
 
-interface RequestWithUser extends Request {
-  user?: unknown;
-}
-
 export const requireRequestUser = (req: Request): CapUserLike => {
-  const candidate = (req as RequestWithUser).user;
+  const candidate = (req as Request & { user?: unknown }).user;
   if (!candidate) {
     throw createServiceError(401, 'User context is required.');
   }
