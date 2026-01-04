@@ -10,6 +10,7 @@ const compat = new FlatCompat({
 
 const projectConfigs = [
   path.resolve(__dirname, 'tsconfig.json'),
+  path.resolve(__dirname, 'tsconfig.test.json'),
   path.resolve(__dirname, '../tests/tsconfig.json'),
 ];
 
