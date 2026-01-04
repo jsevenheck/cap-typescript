@@ -2,17 +2,11 @@ import cds, { Request } from '@sap/cds';
 import { CompanyAuthorization } from '../../middleware/company-authorization';
 import * as AuthUtils from '../../shared/utils/auth';
 
-// Mock cds.tx and cds.transaction manually
-// Note: Using direct assignment instead of jest.mock() to avoid Jest hoisting issues
-// with variables defined outside the factory function. The production code uses cds.tx,
-// and cds.transaction is an alias that we mock for completeness.
+// Mock cds.tx using jest.spyOn for proper cleanup and consistency with other tests
 const mockRun = jest.fn();
 const mockTransaction = { run: mockRun };
-const mockTx = jest.fn(() => mockTransaction);
-
-// Replace the actual functions with mocks
-(cds as any).tx = mockTx;
-(cds as any).transaction = mockTx;
+const txSpy = jest.spyOn(cds, 'tx').mockReturnValue(mockTransaction as any);
+const transactionSpy = jest.spyOn(cds, 'transaction').mockReturnValue(mockTransaction as any);
 
 describe('CompanyAuthorization', () => {
   let req: Request;
@@ -75,5 +69,10 @@ describe('CompanyAuthorization', () => {
 
     const auth = new CompanyAuthorization(req);
     await expect(auth.validateEmployeeAccess(employees)).resolves.not.toThrow();
+  });
+
+  afterAll(() => {
+    txSpy.mockRestore();
+    transactionSpy.mockRestore();
   });
 });
