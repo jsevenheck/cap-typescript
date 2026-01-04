@@ -170,7 +170,7 @@ entity EmployeeNotificationDLQ : managed, cuid {
   eventType       : String(60)   not null;
   destinationName : String(500)  not null;
   payload         : LargeString  not null;
-  status          : OutboxStatus default #FAILED;
+  status          : OutboxStatus default 'FAILED';
   attempts        : Integer      not null;
   lastError       : LargeString;
   failedAt        : Timestamp    not null;
