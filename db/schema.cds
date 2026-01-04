@@ -155,7 +155,7 @@ entity EmployeeNotificationOutbox : managed, cuid {
   eventType     : String(60)  not null;
   destinationName: String(500) not null;
   payload       : LargeString not null;
-  status        : OutboxStatus default #PENDING;
+  status        : OutboxStatus default 'PENDING';
   attempts      : Integer     default 0;
   nextAttemptAt : Timestamp;
   claimedAt     : Timestamp;
