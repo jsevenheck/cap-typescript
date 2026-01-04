@@ -1,19 +1,12 @@
-import { Request } from '@sap/cds';
+import cds, { Request } from '@sap/cds';
 import { CompanyAuthorization } from '../../middleware/company-authorization';
 import * as AuthUtils from '../../shared/utils/auth';
 
-// Mock cds.transaction
+// Mock cds.tx using jest.spyOn for proper cleanup and consistency with other tests
 const mockRun = jest.fn();
-jest.mock('@sap/cds', () => ({
-  transaction: () => ({ run: mockRun }),
-  ql: {
-    SELECT: {
-      from: jest.fn().mockReturnThis(),
-      columns: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-    },
-  },
-}));
+const mockTransaction = { run: mockRun };
+const txSpy = jest.spyOn(cds, 'tx').mockReturnValue(mockTransaction as any);
+const transactionSpy = jest.spyOn(cds, 'transaction').mockReturnValue(mockTransaction as any);
 
 describe('CompanyAuthorization', () => {
   let req: Request;
@@ -76,5 +69,10 @@ describe('CompanyAuthorization', () => {
 
     const auth = new CompanyAuthorization(req);
     await expect(auth.validateEmployeeAccess(employees)).resolves.not.toThrow();
+  });
+
+  afterAll(() => {
+    txSpy.mockRestore();
+    transactionSpy.mockRestore();
   });
 });

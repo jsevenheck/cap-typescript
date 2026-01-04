@@ -7,7 +7,7 @@ type EntityMap = Record<string, Record<string, any>>;
 
 const EMPLOYEES_ENTITY = 'clientmgmt.Employees';
 const COST_CENTERS_ENTITY = 'clientmgmt.CostCenters';
-const transactionSpy = jest.spyOn(cds, 'transaction');
+const transactionSpy = jest.spyOn(cds, 'tx');
 
 const extractEntity = (query: any): string => {
   const from = query?.SELECT?.from;
@@ -78,7 +78,7 @@ const createMockRequest = (entities: EntityMap): Request => {
     run,
     commit: jest.fn(),
     rollback: jest.fn(),
-  }));
+  } as any));
 
   return { run } as unknown as Request;
 };
