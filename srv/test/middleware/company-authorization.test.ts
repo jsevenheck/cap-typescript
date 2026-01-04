@@ -1,19 +1,15 @@
-import { Request } from '@sap/cds';
+import cds, { Request } from '@sap/cds';
 import { CompanyAuthorization } from '../../middleware/company-authorization';
 import * as AuthUtils from '../../shared/utils/auth';
 
-// Mock cds.transaction
+// Mock cds.tx and cds.transaction manually
 const mockRun = jest.fn();
-jest.mock('@sap/cds', () => ({
-  transaction: () => ({ run: mockRun }),
-  ql: {
-    SELECT: {
-      from: jest.fn().mockReturnThis(),
-      columns: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-    },
-  },
-}));
+const mockTransaction = { run: mockRun };
+const mockTx = jest.fn(() => mockTransaction);
+
+// Replace the actual functions with mocks
+(cds as any).tx = mockTx;
+(cds as any).transaction = mockTx;
 
 describe('CompanyAuthorization', () => {
   let req: Request;
