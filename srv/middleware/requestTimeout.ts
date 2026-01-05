@@ -42,8 +42,21 @@ function getRequestTimeout(): number {
  * @param timeout - Optional timeout in milliseconds (defaults to environment or 30s)
  */
 export function requestTimeoutMiddleware(timeout?: number): (req: Request, res: Response, next: NextFunction) => void {
-  const timeoutMs = timeout ?? getRequestTimeout();
+  let timeoutMs: number;
 
+  if (typeof timeout === 'number') {
+    if (!Number.isFinite(timeout) || timeout <= 0) {
+      logger.warn({ timeout }, 'Invalid timeout parameter, using environment/default timeout');
+      timeoutMs = getRequestTimeout();
+    } else if (timeout > MAX_TIMEOUT) {
+      logger.warn({ timeout, MAX_TIMEOUT }, 'Timeout parameter exceeds maximum, capping to max');
+      timeoutMs = MAX_TIMEOUT;
+    } else {
+      timeoutMs = timeout;
+    }
+  } else {
+    timeoutMs = getRequestTimeout();
+  }
   return (req: Request, res: Response, next: NextFunction): void => {
     // Skip timeout for health check endpoints
     if (req.path.startsWith('/health')) {
