@@ -36,7 +36,6 @@ entity Clients : managed, cuid {
   @Core.Immutable
   companyId            : String(4) not null;
   @mandatory
-  @assert.range: [1, 120]
   name                 : String(120) not null;
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
