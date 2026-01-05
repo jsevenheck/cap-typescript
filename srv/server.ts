@@ -194,15 +194,14 @@ cds.on('bootstrap', (app: Application) => {
   // Add security headers to all responses
   app.use(securityHeadersMiddleware);
 
-  // Add correlation ID middleware to all routes
-  app.use(correlationIdMiddleware);
-
   // Add input validation middleware to validate request sizes and formats
   app.use(inputValidationMiddleware());
 
   // Add request timeout middleware to prevent long-running requests
   app.use(requestTimeoutMiddleware());
 
+  // Add correlation ID middleware to all routes (after validation and timeout)
+  app.use(correlationIdMiddleware);
   /**
    * Liveness probe endpoint - simple check that the application is running
    * Returns 200 OK immediately without any dependency checks.
