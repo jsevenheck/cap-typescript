@@ -27,13 +27,16 @@ type OutboxStatus : String enum {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'Clients_companyId_idx', elements: ['companyId'] }
+  { name: 'Clients_companyId_idx', unique: true, elements: ['companyId'] },
+  { name: 'Clients_name_idx', elements: ['name'] }
 ]
 entity Clients : managed, cuid {
   @mandatory @assert.unique: { name: 'Clients_companyId_unique' }
   @assert.format: '^[0-9]{4}$'
+  @Core.Immutable
   companyId            : String(4) not null;
   @mandatory
+  @assert.range: [1, 120]
   name                 : String(120) not null;
   employees            : Composition of many Employees on employees.client = $self;
   costCenters          : Composition of many CostCenters on costCenters.client = $self;
@@ -43,17 +46,23 @@ entity Clients : managed, cuid {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
+  { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] },
+  { name: 'Locations_client_city_idx', elements: ['client_ID', 'city'] },
+  { name: 'Locations_country_idx', elements: ['country_code'] }
 ]
 entity Locations : managed, cuid {
   @mandatory
+  @assert.range: [1, 100]
   city          : String(100) not null;
   @mandatory
   country       : Association to CommonCountries not null;
   @mandatory
+  @assert.range: [1, 20]
   zipCode       : String(20) not null;
   @mandatory
+  @assert.range: [1, 200]
   street        : String(200) not null;
+  @assert.range: [0, 200]
   addressSupplement : String(200);
   @mandatory
   validFrom     : Date not null;
@@ -66,18 +75,25 @@ entity Locations : managed, cuid {
 @odata.etag: 'modifiedAt'
 @personalData: { dataSubject: 'Employee' }
 @cds.persistence.indices: [
+  { name: 'Employees_employeeId_idx', unique: true, elements: ['employeeId'] },
   { name: 'Employees_status_idx', elements: ['status'] },
   { name: 'Employees_employmentType_idx', elements: ['employmentType'] },
-  { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] }
+  { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] },
+  { name: 'Employees_email_idx', elements: ['email'] },
+  { name: 'Employees_entryDate_idx', elements: ['entryDate'] },
+  { name: 'Employees_manager_idx', elements: ['manager_ID'] }
 ]
 entity Employees : managed, cuid {
   @assert.unique: { name: 'Employees_employeeId_unique' }
   @mandatory
   @assert.format: '^[0-9]{4}-[0-9]{4}$'
+  @Core.Immutable
   employeeId    : String(9)  not null;
   @mandatory
+  @assert.range: [1, 60]
   firstName     : String(60)  not null;
   @mandatory
+  @assert.range: [1, 60]
   lastName      : String(60)  not null;
   @mandatory @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
@@ -86,6 +102,7 @@ entity Employees : managed, cuid {
   phoneNumber   : String(30);
   @mandatory
   location      : Association to Locations not null;
+  @assert.range: [0, 40]
   positionLevel : String(40);
   @mandatory
   entryDate     : Date not null;
@@ -110,13 +127,18 @@ entity EmployeeIdCounters {
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
   { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] },
-  { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
+  { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] },
+  { name: 'CostCenters_responsible_idx', elements: ['responsible_ID'] },
+  { name: 'CostCenters_client_valid_idx', elements: ['client_ID', 'validFrom', 'validTo'] }
 ]
 entity CostCenters : managed, cuid {
   @mandatory
+  @assert.range: [1, 40]
   code         : String(40)  not null;
   @mandatory
+  @assert.range: [1, 120]
   name         : String(120) not null;
+  @assert.range: [0, 255]
   description  : String(255);
   @mandatory
   validFrom    : Date not null;
