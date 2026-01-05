@@ -31,7 +31,7 @@ type OutboxStatus : String enum {
   { name: 'Clients_name_idx', elements: ['name'] }
 ]
 entity Clients : managed, cuid {
-  @mandatory @assert.unique: { name: 'Clients_companyId_unique' }
+  @mandatory
   @assert.format: '^[0-9]{4}$'
   @Core.Immutable
   companyId            : String(4) not null;
