@@ -131,12 +131,9 @@ entity EmployeeIdCounters {
 ]
 entity CostCenters : managed, cuid {
   @mandatory
-  @assert.range: [1, 40]
   code         : String(40)  not null;
   @mandatory
-  @assert.range: [1, 120]
   name         : String(120) not null;
-  @assert.range: [0, 255]
   description  : String(255);
   @mandatory
   validFrom    : Date not null;
