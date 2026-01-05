@@ -32,7 +32,7 @@ const validateEmployeeIntegrity = async (req: Request): Promise<void> => {
   await validator.validateEmployeeRelations(entries);
 };
 
-type ServiceHandler = (req: Request) => Promise<void> | void;
+type ServiceHandler = (...args: unknown[]) => Promise<unknown> | unknown;
 
 type ServiceWithOn = Service & {
   on: (
