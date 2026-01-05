@@ -175,11 +175,11 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
       }
 
       // Validate Content-Length for JSON payloads
-      const contentLength = req.get('content-length');
-      const contentType = req.get('content-type');
+      const jsonContentLength = req.get('content-length');
+      const jsonContentType = req.get('content-type');
       
-      if (contentLength && contentType?.includes('application/json')) {
-        const size = parseInt(contentLength, 10);
+      if (jsonContentLength && jsonContentType?.includes('application/json')) {
+        const size = parseInt(jsonContentLength, 10);
         if (size > maxJsonSize) {
           logger.warn(
             {
