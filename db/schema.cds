@@ -82,7 +82,6 @@ entity Locations : managed, cuid {
   { name: 'Employees_manager_idx', elements: ['manager_ID'] }
 ]
 entity Employees : managed, cuid {
-  @assert.unique: { name: 'Employees_employeeId_unique' }
   @mandatory
   @assert.format: '^[0-9]{4}-[0-9]{4}$'
   @Core.Immutable
