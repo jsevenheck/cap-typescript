@@ -101,28 +101,41 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
       }
 
       // Validate Content-Type for requests with body
+      // POST, PUT, PATCH typically carry a body and should have Content-Type
+      // DELETE can have a body in HTTP spec but is uncommon, so we exclude it
       if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {
         const contentType = req.get('content-type');
+        const contentLength = req.get('content-length');
+        const contentLengthValue = contentLength ? parseInt(contentLength, 10) : undefined;
         
-        // Check if Content-Type is present for body-bearing methods
-        if (!contentType && req.get('content-length') && parseInt(req.get('content-length') || '0', 10) > 0) {
+        // Determine if request likely has a body
+        // If Content-Length is present and > 0, definitely has a body
+        // If Content-Length is 0, no body
+        // If Content-Length is missing on POST/PUT/PATCH, we should require Content-Type as a safety measure
+        const hasOrMightHaveBody = 
+          (contentLengthValue !== undefined && contentLengthValue > 0) || 
+          (contentLengthValue === undefined);
+        
+        // Require Content-Type for POST/PUT/PATCH requests that have or might have a body
+        if (hasOrMightHaveBody && !contentType) {
           logger.warn(
             {
               method: req.method,
               path: req.path,
+              contentLength: contentLengthValue,
               correlationId: (req as { correlationId?: string }).correlationId,
             },
-            'Missing Content-Type header for request with body',
+            'Missing Content-Type header for request that may contain a body',
           );
           res.status(400).json({
             error: 'Bad Request',
-            message: 'Content-Type header is required for requests with a body',
+            message: 'Content-Type header is required for POST, PUT, and PATCH requests',
             code: 400,
           });
           return;
         }
 
-        // Validate Content-Type against allowed types
+        // Validate Content-Type against allowed types when present
         if (contentType) {
           const baseContentType = contentType.split(';')[0].trim().toLowerCase();
           const isAllowed = allowedContentTypes.some(
