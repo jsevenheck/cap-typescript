@@ -187,7 +187,7 @@ Employee records with auto-generated IDs and status tracking.
 ```typescript
 {
   ID: string;                    // UUID
-  employeeId: string;            // Auto-generated (NNNN-NNNN)
+  employeeId: string;            // Auto-generated company+counter (CCCC-NNNN), e.g. 1010-0001
   firstName: string;             // Max 60 chars
   lastName: string;              // Max 60 chars
   email: string;                 // RFC 5322 format, max 120 chars
