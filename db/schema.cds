@@ -61,7 +61,6 @@ entity Locations : managed, cuid {
   @mandatory
   @assert.range: [1, 200]
   street        : String(200) not null;
-  @assert.range: [0, 200]
   addressSupplement : String(200);
   @mandatory
   validFrom     : Date not null;
