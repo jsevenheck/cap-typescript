@@ -14,6 +14,7 @@ import apiKeyMiddleware, {
 } from './middleware/apiKey';
 import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
+import { requestTimeoutMiddleware } from './middleware/requestTimeout';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import {
@@ -194,6 +195,9 @@ cds.on('bootstrap', (app: Application) => {
 
   // Add correlation ID middleware to all routes
   app.use(correlationIdMiddleware);
+
+  // Add request timeout middleware to prevent long-running requests
+  app.use(requestTimeoutMiddleware());
 
   /**
    * Liveness probe endpoint - simple check that the application is running
