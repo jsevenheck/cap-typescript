@@ -31,6 +31,13 @@ type LocationRow = {
   client_ID: string;
 };
 
+type RequestData = Record<string, unknown>;
+
+// Type-safe query runner interface
+interface QueryRunner {
+  run<T = unknown>(query: unknown): Promise<T>;
+}
+
 const EMPLOYEES_ENTITY = 'clientmgmt.Employees';
 const COST_CENTERS_ENTITY = 'clientmgmt.CostCenters';
 const LOCATIONS_ENTITY = 'clientmgmt.Locations';
@@ -41,14 +48,14 @@ export class IntegrityValidator {
     clientIds: new Map(),
     relationIds: new Map(),
   };
-  private readonly runner: { run: (query: any) => Promise<any> };
+  private readonly runner: QueryRunner;
 
   constructor(req: Request) {
     const transaction = cds.tx(req);
     if (transaction && typeof (transaction as { run?: unknown }).run === 'function') {
-      this.runner = transaction as { run: (query: any) => Promise<any> };
+      this.runner = transaction as QueryRunner;
     } else if (typeof (req as unknown as { run?: unknown }).run === 'function') {
-      this.runner = req as unknown as { run: (query: any) => Promise<any> };
+      this.runner = req as unknown as QueryRunner;
     } else {
       throw createServiceError(500, 'Unable to obtain database runner for integrity validation.');
     }
@@ -57,7 +64,7 @@ export class IntegrityValidator {
   /**
    * Validates employee relations ensuring managers and cost centers belong to the same client.
    */
-  async validateEmployeeRelations(employees: any[]): Promise<void> {
+  async validateEmployeeRelations(employees: RequestData[]): Promise<void> {
     if (!employees.length) {
       return;
     }
@@ -112,7 +119,7 @@ export class IntegrityValidator {
   /**
    * Validates location relations ensuring locations belong to a valid client.
    */
-  async validateLocationRelations(locations: any[]): Promise<void> {
+  async validateLocationRelations(locations: RequestData[]): Promise<void> {
     if (!locations.length) {
       return;
     }
@@ -133,7 +140,7 @@ export class IntegrityValidator {
   /**
    * Validates cost center responsible assignments ensuring responsible employees belong to the same client.
    */
-  async validateCostCenterRelations(costCenters: any[]): Promise<void> {
+  async validateCostCenterRelations(costCenters: RequestData[]): Promise<void> {
     if (!costCenters.length) {
       return;
     }
@@ -164,7 +171,7 @@ export class IntegrityValidator {
     }
   }
 
-  private async loadExistingEmployees(employees: any[]): Promise<Map<string, EmployeeRow>> {
+  private async loadExistingEmployees(employees: RequestData[]): Promise<Map<string, EmployeeRow>> {
     const ids = employees
       .map((employee) => extractEntityId(employee))
       .filter((id): id is string => Boolean(id));
@@ -173,7 +180,7 @@ export class IntegrityValidator {
       return new Map();
     }
 
-    const rows = (await this.runner.run(
+    const rows = (await this.runner.run<EmployeeRow[]>(
       SELECT.from(EMPLOYEES_ENTITY)
         .columns('ID', 'client_ID', 'manager_ID', 'costCenter_ID', 'location_ID')
         .where({ ID: { in: ids } }),
@@ -187,7 +194,7 @@ export class IntegrityValidator {
     return map;
   }
 
-  private async loadExistingLocations(locations: any[]): Promise<Map<string, LocationRow>> {
+  private async loadExistingLocations(locations: RequestData[]): Promise<Map<string, LocationRow>> {
     const ids = locations
       .map((location) => extractEntityId(location))
       .filter((id): id is string => Boolean(id));
@@ -196,7 +203,7 @@ export class IntegrityValidator {
       return new Map();
     }
 
-    const rows = (await this.runner.run(
+    const rows = (await this.runner.run<LocationRow[]>(
       SELECT.from(LOCATIONS_ENTITY)
         .columns('ID', 'client_ID')
         .where({ ID: { in: ids } }),
@@ -210,7 +217,7 @@ export class IntegrityValidator {
     return map;
   }
 
-  private async loadExistingCostCenters(costCenters: any[]): Promise<Map<string, CostCenterRow>> {
+  private async loadExistingCostCenters(costCenters: RequestData[]): Promise<Map<string, CostCenterRow>> {
     const ids = costCenters
       .map((costCenter) => extractEntityId(costCenter))
       .filter((id): id is string => Boolean(id));
@@ -219,7 +226,7 @@ export class IntegrityValidator {
       return new Map();
     }
 
-    const rows = (await this.runner.run(
+    const rows = (await this.runner.run<CostCenterRow[]>(
       SELECT.from(COST_CENTERS_ENTITY)
         .columns('ID', 'client_ID', 'responsible_ID')
         .where({ ID: { in: ids } }),

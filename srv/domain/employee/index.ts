@@ -7,12 +7,19 @@ import { onCreateEvent } from './handlers/on-create.after';
 import { onAnonymizeFormerEmployees } from './handlers/anonymize-former-employees.action';
 import { createIntegrityValidator } from '../shared/integrity-handler';
 
-const collectPayloads = (req: Request): any[] => {
-  const data = (req.data ?? (req as any).query?.UPDATE?.data) ?? [];
+type RequestData = Record<string, unknown>;
+
+/**
+ * Extracts payloads from the request data or UPDATE query
+ * @param req - The CAP request object
+ * @returns Array of data payloads to process
+ */
+const collectPayloads = (req: Request): RequestData[] => {
+  const data = (req.data ?? (req as { query?: { UPDATE?: { data?: unknown } } }).query?.UPDATE?.data) ?? [];
   if (Array.isArray(data)) {
-    return data;
+    return data as RequestData[];
   }
-  return data ? [data] : [];
+  return data ? [data as RequestData] : [];
 };
 
 const validateEmployeeIntegrity = async (req: Request): Promise<void> => {
@@ -25,11 +32,13 @@ const validateEmployeeIntegrity = async (req: Request): Promise<void> => {
   await validator.validateEmployeeRelations(entries);
 };
 
+type ServiceHandler = (req: Request) => Promise<void> | void;
+
 type ServiceWithOn = Service & {
   on: (
     event: string | string[],
-    entityOrHandler: string | ((...args: any[]) => unknown),
-    maybeHandler?: (...args: any[]) => unknown,
+    entityOrHandler: string | ServiceHandler,
+    maybeHandler?: ServiceHandler,
   ) => unknown;
 };
 
