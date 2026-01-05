@@ -15,6 +15,7 @@ import apiKeyMiddleware, {
 import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import { requestTimeoutMiddleware } from './middleware/requestTimeout';
+import { inputValidationMiddleware } from './middleware/inputValidation';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import {
@@ -195,6 +196,9 @@ cds.on('bootstrap', (app: Application) => {
 
   // Add correlation ID middleware to all routes
   app.use(correlationIdMiddleware);
+
+  // Add input validation middleware to validate request sizes and formats
+  app.use(inputValidationMiddleware());
 
   // Add request timeout middleware to prevent long-running requests
   app.use(requestTimeoutMiddleware());
