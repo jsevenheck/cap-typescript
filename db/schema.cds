@@ -51,15 +51,12 @@ entity Clients : managed, cuid {
 ]
 entity Locations : managed, cuid {
   @mandatory
-  @assert.range: [1, 100]
   city          : String(100) not null;
   @mandatory
   country       : Association to CommonCountries not null;
   @mandatory
-  @assert.range: [1, 20]
   zipCode       : String(20) not null;
   @mandatory
-  @assert.range: [1, 200]
   street        : String(200) not null;
   addressSupplement : String(200);
   @mandatory
@@ -87,10 +84,8 @@ entity Employees : managed, cuid {
   @Core.Immutable
   employeeId    : String(9)  not null;
   @mandatory
-  @assert.range: [1, 60]
   firstName     : String(60)  not null;
   @mandatory
-  @assert.range: [1, 60]
   lastName      : String(60)  not null;
   @mandatory @assert.format: '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
   email         : String(120) not null;
@@ -99,7 +94,6 @@ entity Employees : managed, cuid {
   phoneNumber   : String(30);
   @mandatory
   location      : Association to Locations not null;
-  @assert.range: [0, 40]
   positionLevel : String(40);
   @mandatory
   entryDate     : Date not null;

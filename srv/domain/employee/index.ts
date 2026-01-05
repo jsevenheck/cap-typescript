@@ -17,9 +17,16 @@ type RequestData = Record<string, unknown>;
 const collectPayloads = (req: Request): RequestData[] => {
   const data = (req.data ?? (req as { query?: { UPDATE?: { data?: unknown } } }).query?.UPDATE?.data) ?? [];
   if (Array.isArray(data)) {
-    return data as RequestData[];
+    // Validate that each element is an object
+    return data.filter((item): item is RequestData => 
+      item !== null && typeof item === 'object' && !Array.isArray(item)
+    );
   }
-  return data ? [data as RequestData] : [];
+  // Single object case
+  if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
+    return [data as RequestData];
+  }
+  return [];
 };
 
 const validateEmployeeIntegrity = async (req: Request): Promise<void> => {

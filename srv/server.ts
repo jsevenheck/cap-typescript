@@ -16,6 +16,7 @@ import { apiRateLimiter } from './middleware/rateLimit';
 import { securityHeadersMiddleware } from './middleware/securityHeaders';
 import { requestTimeoutMiddleware } from './middleware/requestTimeout';
 import { inputValidationMiddleware } from './middleware/inputValidation';
+import { errorHandlerMiddleware } from './middleware/errorHandler';
 import activeEmployeesHandler from './domain/employee/handlers/active-employees.read';
 
 import {
@@ -281,6 +282,10 @@ cds.on('bootstrap', (app: Application) => {
     failureStatus: 'unhealthy',
     logContext: 'Health check',
   })));
+
+  // Register error handler middleware AFTER all routes
+  // Error handlers must have the signature (err, req, res, next) and be registered last
+  app.use(errorHandlerMiddleware);
 
   logger.info('Application bootstrap complete');
 });
