@@ -80,8 +80,19 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
         return;
       }
 
-      // Validate header size (approximate)
-      const headersSize = JSON.stringify(req.headers).length;
+      // Validate header size (calculate actual HTTP header byte size)
+      let headersSize = 0;
+      for (const [name, value] of Object.entries(req.headers)) {
+        if (Array.isArray(value)) {
+          // Multiple headers with same name
+          for (const v of value) {
+            headersSize += Buffer.byteLength(`${name}: ${v}\r\n`, 'utf8');
+          }
+        } else if (value) {
+          headersSize += Buffer.byteLength(`${name}: ${value}\r\n`, 'utf8');
+        }
+      }
+      
       if (headersSize > maxHeaderSize) {
         logger.warn(
           {
@@ -199,10 +210,14 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
 
 /**
  * Sanitizes string input by removing potentially dangerous characters
- * Used for user-supplied strings that will be logged or displayed
+ * 
+ * NOTE: This function provides basic sanitization for logging and display purposes only.
+ * It is NOT sufficient for comprehensive XSS protection. For user-generated content
+ * displayed in HTML, use proper context-aware encoding (HTML escaping, JavaScript escaping, etc.)
+ * or a dedicated HTML sanitization library like DOMPurify or xss.
  * 
  * @param input - The string to sanitize
- * @returns Sanitized string
+ * @returns Sanitized string with control characters and angle brackets removed
  */
 export function sanitizeString(input: string): string {
   if (!input || typeof input !== 'string') {
