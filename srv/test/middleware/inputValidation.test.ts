@@ -401,7 +401,7 @@ describe('inputValidationMiddleware', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('should handle invalid Content-Length values', () => {
+    it('should reject malformed Content-Length values (NaN)', () => {
       const middleware = inputValidationMiddleware();
       const req = createMockRequest({
         method: 'POST',
@@ -414,7 +414,35 @@ describe('inputValidationMiddleware', () => {
 
       middleware(req, res, mockNext);
 
-      expect(mockNext).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: "Invalid 'Content-Length' header value",
+        code: 400,
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should reject negative Content-Length values', () => {
+      const middleware = inputValidationMiddleware();
+      const req = createMockRequest({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '-100',
+        },
+      });
+      const res = createMockResponse();
+
+      middleware(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: "Invalid 'Content-Length' header value",
+        code: 400,
+      });
+      expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should handle correlation ID in request context', () => {

@@ -180,6 +180,25 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
       
       if (jsonContentLength && jsonContentType?.includes('application/json')) {
         const size = parseInt(jsonContentLength, 10);
+
+        // Reject malformed or invalid Content-Length values
+        if (Number.isNaN(size) || size < 0) {
+          logger.warn(
+            {
+              rawContentLength: jsonContentLength,
+              path: req.path,
+              correlationId: (req as { correlationId?: string }).correlationId,
+            },
+            'Invalid Content-Length header for JSON payload',
+          );
+          res.status(400).json({
+            error: 'Bad Request',
+            message: "Invalid 'Content-Length' header value",
+            code: 400,
+          });
+          return;
+        }
+
         if (size > maxJsonSize) {
           logger.warn(
             {
