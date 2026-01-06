@@ -118,8 +118,7 @@ entity EmployeeIdCounters {
 @cds.persistence.indices: [
   { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] },
   { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] },
-  { name: 'CostCenters_responsible_idx', elements: ['responsible_ID'] },
-  { name: 'CostCenters_client_valid_idx', elements: ['client_ID', 'validFrom', 'validTo'] }
+  { name: 'CostCenters_responsible_idx', elements: ['responsible_ID'] }
 ]
 entity CostCenters : managed, cuid {
   @mandatory
