@@ -66,7 +66,6 @@ export function requestTimeoutMiddleware(timeout?: number): (req: Request, res: 
     // Skip timeout for health check endpoints
     if (req.path.startsWith('/health')) {
       next();
-      return;
     }
 
     // Set timeout on the request
