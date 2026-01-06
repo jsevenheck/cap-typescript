@@ -33,13 +33,18 @@ function getRequestTimeout(): number {
 }
 
 /**
- * Middleware to enforce request timeouts and prevent long-running operations
- * from consuming resources indefinitely.
+ * Middleware to configure the HTTP socket timeout for incoming requests.
+ * 
+ * This uses `req.setTimeout()` to limit how long the underlying socket may stay
+ * open without completing the request. It does NOT terminate long-running
+ * synchronous processing that happens after the full request body has been
+ * received; such handlers must implement their own cancellation/timeout logic
+ * if needed.
  * 
  * SAP CAP Best Practice: Always set reasonable timeouts for HTTP requests
  * to prevent resource exhaustion and improve system resilience.
  * 
- * @param timeout - Optional timeout in milliseconds (defaults to environment or 30s)
+ * @param timeout - Optional socket timeout in milliseconds (defaults to environment or 30s)
  */
 export function requestTimeoutMiddleware(timeout?: number): (req: Request, res: Response, next: NextFunction) => void {
   let timeoutMs: number;
