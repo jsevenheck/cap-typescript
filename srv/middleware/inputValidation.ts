@@ -192,7 +192,7 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
         const size = parseInt(jsonContentLength, 10);
 
         // Reject malformed or invalid Content-Length values
-        if (Number.isNaN(size) || size < 0) {
+        if (!Number.isFinite(size) || size < 0) {
           logger.warn(
             {
               rawContentLength: jsonContentLength,
