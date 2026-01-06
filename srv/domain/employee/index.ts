@@ -31,9 +31,13 @@ const collectPayloads = (req: Request): RequestData[] => {
     
     // Log warning if non-object elements were filtered to aid debugging
     if (filteredCount > 0) {
-      console.warn(
-        `collectPayloads: filtered out ${filteredCount} non-object item(s) from request data array`
-      );
+      const message = `collectPayloads: filtered out ${filteredCount} non-object item(s) from request data array`;
+      const anyReq = req as any;
+      if (anyReq.log?.warn) {
+        anyReq.log.warn(message);
+      } else if (anyReq.warn) {
+        anyReq.warn(message);
+      }
     }
     
     return validItems;
