@@ -100,7 +100,7 @@ describe('inputValidation utility functions', () => {
     });
 
     it('should reject UUID with wrong version digit', () => {
-      const uuid = '550e8400-e29b-61d4-a716-446655440000'; // version 6 doesn't exist in standard
+      const uuid = '550e8400-e29b-61d4-a716-446655440000'; // validator only supports UUID versions 1–5; version 6 is treated as invalid here
       expect(isValidUUID(uuid)).toBe(false);
     });
 
