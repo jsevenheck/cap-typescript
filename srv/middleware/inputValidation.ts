@@ -122,25 +122,30 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
         // Determine if request likely has a body
         // If Content-Length is present and > 0, definitely has a body
         // If Content-Length is 0, no body
-        // If Content-Length is missing on POST/PUT/PATCH, we should require Content-Type as a safety measure
+        // Note: For chunked transfer encoding (Transfer-Encoding: chunked), Content-Length
+        // is typically omitted. However, CAP applications typically use Content-Length.
+        // This validation requires Content-Type when Content-Length is missing to ensure
+        // proper handling of body-bearing requests in standard CAP scenarios.
         const hasOrMightHaveBody = 
           (contentLengthValue !== undefined && contentLengthValue > 0) || 
           (contentLengthValue === undefined);
         
         // Require Content-Type for POST/PUT/PATCH requests that have or might have a body
+        // This helps ensure proper body parsing and prevents silent failures
         if (hasOrMightHaveBody && !contentType) {
           logger.warn(
             {
               method: req.method,
               path: req.path,
               contentLength: contentLengthValue,
+              transferEncoding: req.get('transfer-encoding'),
               correlationId: (req as { correlationId?: string }).correlationId,
             },
             'Missing Content-Type header for request that may contain a body',
           );
           res.status(400).json({
             error: 'Bad Request',
-            message: 'Content-Type header is required for POST, PUT, and PATCH requests',
+            message: 'Content-Type header is required for POST, PUT, and PATCH requests with a body',
             code: 400,
           });
           return;
@@ -252,10 +257,15 @@ export function sanitizeString(input: string): string {
 }
 
 /**
- * Validates if a string is a valid UUID
+ * Validates if a string is a valid UUID (versions 1-5 per RFC 4122)
+ * 
+ * Note: This validator supports UUID versions 1-5. Variants 8-b are accepted
+ * for broader compatibility with Microsoft GUIDs and other implementations.
+ * For strict RFC 4122 compliance (variants 8-9 only), the regex would need
+ * to be tightened to [89] instead of [89ab].
  * 
  * @param value - The value to validate
- * @returns True if valid UUID, false otherwise
+ * @returns True if valid UUID (v1-5), false otherwise
  */
 export function isValidUUID(value: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

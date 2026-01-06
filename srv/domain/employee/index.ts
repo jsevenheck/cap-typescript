@@ -17,10 +17,26 @@ type RequestData = Record<string, unknown>;
 const collectPayloads = (req: Request): RequestData[] => {
   const data = (req.data ?? (req as { query?: { UPDATE?: { data?: unknown } } }).query?.UPDATE?.data) ?? [];
   if (Array.isArray(data)) {
-    // Validate that each element is an object
-    return data.filter((item): item is RequestData => 
-      item !== null && typeof item === 'object' && !Array.isArray(item)
-    );
+    // Validate that each element is an object and filter out invalid items
+    const validItems: RequestData[] = [];
+    let filteredCount = 0;
+    
+    for (const item of data) {
+      if (item !== null && typeof item === 'object' && !Array.isArray(item)) {
+        validItems.push(item as RequestData);
+      } else {
+        filteredCount++;
+      }
+    }
+    
+    // Log warning if non-object elements were filtered to aid debugging
+    if (filteredCount > 0) {
+      console.warn(
+        `collectPayloads: filtered out ${filteredCount} non-object item(s) from request data array`
+      );
+    }
+    
+    return validItems;
   }
   // Single object case
   if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
