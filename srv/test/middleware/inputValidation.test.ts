@@ -423,6 +423,50 @@ describe('inputValidationMiddleware', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
+    it('should reject Infinity Content-Length values', () => {
+      const middleware = inputValidationMiddleware();
+      const req = createMockRequest({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': 'Infinity',
+        },
+      });
+      const res = createMockResponse();
+
+      middleware(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: "Invalid 'Content-Length' header value",
+        code: 400,
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should reject -Infinity Content-Length values', () => {
+      const middleware = inputValidationMiddleware();
+      const req = createMockRequest({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '-Infinity',
+        },
+      });
+      const res = createMockResponse();
+
+      middleware(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: "Invalid 'Content-Length' header value",
+        code: 400,
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
     it('should reject negative Content-Length values', () => {
       const middleware = inputValidationMiddleware();
       const req = createMockRequest({

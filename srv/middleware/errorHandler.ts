@@ -61,7 +61,7 @@ function extractErrorInfo(error: unknown): { status: number; message: string; de
  * @param next - Express next function
  */
 export function errorHandlerMiddleware(
-  err: unknown,
+  error: unknown,
   req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -73,7 +73,7 @@ export function errorHandlerMiddleware(
     return;
   }
 
-  const { status, message, details } = extractErrorInfo(err);
+  const { status, message, details } = extractErrorInfo(error);
   const correlationId = (req as { correlationId?: string }).correlationId;
 
   // Log error with context
@@ -84,7 +84,7 @@ export function errorHandlerMiddleware(
     correlationId,
     path: req.path,
     method: req.method,
-    error: err,
+    error,
   };
 
   if (status >= 500) {

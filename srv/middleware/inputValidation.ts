@@ -131,7 +131,12 @@ export function inputValidationMiddleware(options: ValidationOptions = {}) {
           (contentLengthValue === undefined);
         
         // Require Content-Type for POST/PUT/PATCH requests that have or might have a body
-        // This helps ensure proper body parsing and prevents silent failures
+        // This helps ensure proper body parsing and prevents silent failures.
+        // 
+        // NOTE: In typical SAP CAP applications, Content-Length is usually provided.
+        // For chunked transfer encoding scenarios (where Content-Length is omitted),
+        // the Transfer-Encoding header should be present. This validation ensures
+        // Content-Type is specified when a body is expected, improving request clarity.
         if (hasOrMightHaveBody && !contentType) {
           logger.warn(
             {

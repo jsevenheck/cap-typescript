@@ -67,6 +67,18 @@ describe('requestTimeoutMiddleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
+    it('should set timeout for non-health endpoints', () => {
+      const req = createMockRequest({ path: '/api/users' });
+      const res = createMockResponse();
+      const next = jest.fn();
+      const middleware = requestTimeoutMiddleware();
+
+      middleware(req, res, next);
+
+      expect(req.setTimeout).toHaveBeenCalled();
+      expect(next).toHaveBeenCalled();
+    });
+
     it('should skip timeout for health sub-paths', () => {
       const req = createMockRequest({ path: '/health/liveness' });
       const res = createMockResponse();
