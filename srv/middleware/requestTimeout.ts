@@ -19,7 +19,7 @@ function getRequestTimeout(): number {
   }
 
   const timeout = parseInt(envTimeout, 10);
-  if (Number.isNaN(timeout) || timeout <= 0) {
+  if (!Number.isFinite(timeout) || timeout <= 0) {
     logger.warn({ envTimeout }, 'Invalid REQUEST_TIMEOUT_MS value, using default');
     return DEFAULT_TIMEOUT;
   }
