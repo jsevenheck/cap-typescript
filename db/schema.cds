@@ -75,8 +75,7 @@ entity Locations : managed, cuid {
   { name: 'Employees_employmentType_idx', elements: ['employmentType'] },
   { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] },
   { name: 'Employees_email_idx', elements: ['email'] },
-  { name: 'Employees_entryDate_idx', elements: ['entryDate'] },
-  { name: 'Employees_manager_idx', elements: ['manager_ID'] }
+  { name: 'Employees_entryDate_idx', elements: ['entryDate'] }
 ]
 entity Employees : managed, cuid {
   @mandatory
