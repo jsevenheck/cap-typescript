@@ -516,4 +516,118 @@ describe('inputValidationMiddleware', () => {
       expect(mockNext).toHaveBeenCalled();
     });
   });
+
+  describe('Combined limit scenarios', () => {
+    it('should handle all three limits at maximum simultaneously', () => {
+      // Test with max URL (2KB), near-max headers (7KB), and near-max payload (900KB)
+      // This validates behavior when multiple size limits are approached together
+      const maxUrlLength = 2048;
+      const largeUrl = '/api/test?' + 'x'.repeat(maxUrlLength - 20);
+      
+      // Create large but valid headers (below 8KB limit)
+      const largeHeaderValue = 'h'.repeat(1000);
+      const largeHeaders: Record<string, string> = {
+        'content-type': 'application/json',
+        'content-length': '900000', // 900KB - near 1MB limit
+        'x-custom-1': largeHeaderValue,
+        'x-custom-2': largeHeaderValue,
+        'x-custom-3': largeHeaderValue,
+        'x-custom-4': largeHeaderValue,
+        'x-custom-5': largeHeaderValue,
+        'x-custom-6': largeHeaderValue,
+      };
+
+      const req = createMockRequest({
+        method: 'POST',
+        originalUrl: largeUrl,
+        headers: largeHeaders,
+      });
+      const res = createMockResponse();
+
+      const middleware = inputValidationMiddleware();
+      middleware(req, res, mockNext);
+
+      // All limits are approached but not exceeded, so request should pass
+      expect(mockNext).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should reject when URL exceeds limit with large headers and payload', () => {
+      // Test rejection when URL exceeds limit even with other large values
+      const tooLongUrl = '/api/test?' + 'x'.repeat(3000); // Exceeds 2KB
+      
+      const largeHeaders: Record<string, string> = {
+        'content-type': 'application/json',
+        'content-length': '900000',
+        'x-custom': 'h'.repeat(1000),
+      };
+
+      const req = createMockRequest({
+        method: 'POST',
+        originalUrl: tooLongUrl,
+        headers: largeHeaders,
+      });
+      const res = createMockResponse();
+
+      const middleware = inputValidationMiddleware();
+      middleware(req, res, mockNext);
+
+      // URL limit exceeded - should reject before checking other limits
+      expect(res.status).toHaveBeenCalledWith(414);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should reject when headers exceed limit with large URL and payload', () => {
+      // Test rejection when headers exceed limit even with other large values
+      const largeUrl = '/api/test?' + 'x'.repeat(1900);
+      
+      // Create a single very large header that exceeds 8KB limit (8192 bytes)
+      const veryLargeHeaderValue = 'h'.repeat(9000); // Single header > 8KB
+      const tooLargeHeaders: Record<string, string> = {
+        'content-type': 'application/json',
+        'content-length': '900000',
+        'x-very-large-custom-header': veryLargeHeaderValue,
+      };
+
+      const req = createMockRequest({
+        method: 'POST',
+        originalUrl: largeUrl,
+        path: '/api/test', // Explicitly set path to avoid any issues
+        headers: tooLargeHeaders,
+      });
+      const res = createMockResponse();
+
+      const middleware = inputValidationMiddleware();
+      middleware(req, res, mockNext);
+
+      // Headers limit exceeded - should reject with 431 (Request Header Fields Too Large)
+      expect(res.status).toHaveBeenCalledWith(431);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should reject when payload exceeds limit with large URL and headers', () => {
+      // Test rejection when payload exceeds limit even with other large values
+      const largeUrl = '/api/test?' + 'x'.repeat(1900);
+      
+      const largeHeaders: Record<string, string> = {
+        'content-type': 'application/json',
+        'content-length': '2000000', // 2MB - exceeds 1MB limit
+        'x-custom': 'h'.repeat(1000),
+      };
+
+      const req = createMockRequest({
+        method: 'POST',
+        originalUrl: largeUrl,
+        headers: largeHeaders,
+      });
+      const res = createMockResponse();
+
+      const middleware = inputValidationMiddleware();
+      middleware(req, res, mockNext);
+
+      // Payload limit exceeded - should reject
+      expect(res.status).toHaveBeenCalledWith(413);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+  });
 });
