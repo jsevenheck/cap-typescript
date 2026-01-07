@@ -27,11 +27,13 @@ type OutboxStatus : String enum {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'Clients_companyId_idx', elements: ['companyId'] }
+  { name: 'Clients_companyId_idx', unique: true, elements: ['companyId'] },
+  { name: 'Clients_name_idx', elements: ['name'] }
 ]
 entity Clients : managed, cuid {
-  @mandatory @assert.unique: { name: 'Clients_companyId_unique' }
+  @mandatory
   @assert.format: '^[0-9]{4}$'
+  @Core.Immutable
   companyId            : String(4) not null;
   @mandatory
   name                 : String(120) not null;
@@ -43,7 +45,9 @@ entity Clients : managed, cuid {
 
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
-  { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
+  { name: 'Locations_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] },
+  { name: 'Locations_client_city_idx', elements: ['client_ID', 'city'] },
+  { name: 'Locations_country_idx', elements: ['country_code'] }
 ]
 entity Locations : managed, cuid {
   @mandatory
@@ -66,14 +70,17 @@ entity Locations : managed, cuid {
 @odata.etag: 'modifiedAt'
 @personalData: { dataSubject: 'Employee' }
 @cds.persistence.indices: [
+  { name: 'Employees_employeeId_idx', unique: true, elements: ['employeeId'] },
   { name: 'Employees_status_idx', elements: ['status'] },
   { name: 'Employees_employmentType_idx', elements: ['employmentType'] },
-  { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] }
+  { name: 'Employees_client_status_idx', elements: ['client_ID', 'status'] },
+  { name: 'Employees_email_idx', elements: ['email'] },
+  { name: 'Employees_entryDate_idx', elements: ['entryDate'] }
 ]
 entity Employees : managed, cuid {
-  @assert.unique: { name: 'Employees_employeeId_unique' }
   @mandatory
   @assert.format: '^[0-9]{4}-[0-9]{4}$'
+  @Core.Immutable
   employeeId    : String(9)  not null;
   @mandatory
   firstName     : String(60)  not null;
@@ -110,7 +117,8 @@ entity EmployeeIdCounters {
 @odata.etag: 'modifiedAt'
 @cds.persistence.indices: [
   { name: 'CostCenters_code_client_unique', unique: true, elements: ['client_ID', 'code'] },
-  { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] }
+  { name: 'CostCenters_validFrom_validTo_idx', elements: ['validFrom', 'validTo'] },
+  { name: 'CostCenters_responsible_idx', elements: ['responsible_ID'] }
 ]
 entity CostCenters : managed, cuid {
   @mandatory
