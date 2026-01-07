@@ -1,10 +1,12 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { errorHandlerMiddleware, createErrorHandler } from '../../middleware/errorHandler';
 
 type MockResponse = Response & {
   statusCode?: number;
   jsonData?: unknown;
   headersSent?: boolean;
+  statusMock: jest.Mock;
+  jsonMock: jest.Mock;
 };
 
 const createMockRequest = (overrides: Partial<Request> = {}): Request => {
@@ -18,19 +20,23 @@ const createMockRequest = (overrides: Partial<Request> = {}): Request => {
 };
 
 const createMockResponse = (): MockResponse => {
+  const statusMock = jest.fn().mockReturnThis();
+  const jsonMock = jest.fn().mockReturnThis();
   const res: MockResponse = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
+    status: statusMock,
+    json: jsonMock,
     headersSent: false,
+    statusMock,
+    jsonMock,
   } as unknown as MockResponse;
 
   // Capture status code and JSON data for assertions
-  (res.status as jest.Mock).mockImplementation((code: number) => {
+  statusMock.mockImplementation((code: number) => {
     res.statusCode = code;
     return res;
   });
 
-  (res.json as jest.Mock).mockImplementation((data: unknown) => {
+  jsonMock.mockImplementation((data: unknown) => {
     res.jsonData = data;
     return res;
   });
@@ -58,8 +64,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(500);
+      expect(res.jsonMock).toHaveBeenCalled();
       expect(res.jsonData).toMatchObject({
         error: 'Internal Server Error',
         message: 'Test error message',
@@ -79,8 +85,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(400);
+      expect(res.jsonMock).toHaveBeenCalled();
       expect(res.jsonData).toMatchObject({
         error: 'Request Error',
         message: 'Bad request error',
@@ -99,7 +105,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.statusMock).toHaveBeenCalledWith(404);
       expect(res.jsonData).toMatchObject({
         message: 'Resource not found',
         code: 404,
@@ -114,8 +120,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(500);
+      expect(res.jsonMock).toHaveBeenCalled();
       expect(res.jsonData).toMatchObject({
         error: 'Internal Server Error',
         message: 'An unexpected error occurred',
@@ -131,8 +137,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(500);
+      expect(res.jsonMock).toHaveBeenCalled();
     });
 
     it('should handle undefined error', () => {
@@ -143,8 +149,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(500);
+      expect(res.jsonMock).toHaveBeenCalled();
     });
   });
 
@@ -253,8 +259,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
+      expect(res.jsonMock).not.toHaveBeenCalled();
     });
 
     it('should send response when headers not yet sent', () => {
@@ -266,8 +272,8 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalled();
+      expect(res.jsonMock).toHaveBeenCalled();
     });
   });
 
@@ -324,7 +330,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.statusMock).toHaveBeenCalledWith(400);
       expect(res.jsonData).toMatchObject({
         error: 'Request Error',
       });
@@ -338,7 +344,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.statusMock).toHaveBeenCalledWith(401);
       expect(res.jsonData).toMatchObject({
         error: 'Request Error',
       });
@@ -352,7 +358,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.statusMock).toHaveBeenCalledWith(403);
       expect(res.jsonData).toMatchObject({
         error: 'Request Error',
       });
@@ -366,7 +372,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.statusMock).toHaveBeenCalledWith(404);
       expect(res.jsonData).toMatchObject({
         error: 'Request Error',
       });
@@ -380,7 +386,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.statusMock).toHaveBeenCalledWith(500);
       expect(res.jsonData).toMatchObject({
         error: 'Internal Server Error',
       });
@@ -394,7 +400,7 @@ describe('errorHandlerMiddleware', () => {
 
       errorHandlerMiddleware(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.statusMock).toHaveBeenCalledWith(503);
       expect(res.jsonData).toMatchObject({
         error: 'Internal Server Error',
       });
@@ -411,8 +417,8 @@ describe('errorHandlerMiddleware', () => {
 
       handler(error, req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(500);
+      expect(res.jsonMock).toHaveBeenCalled();
     });
 
     it('should return a function with correct signature', () => {
@@ -436,7 +442,7 @@ describe('errorHandlerMiddleware', () => {
       errorHandlerMiddleware(error, req, res, next);
 
       // Error was logged with context (verified by no throw)
-      expect(res.status).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalled();
     });
   });
 });

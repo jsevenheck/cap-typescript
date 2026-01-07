@@ -1,10 +1,12 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { requestTimeoutMiddleware } from '../../middleware/requestTimeout';
 
 type MockResponse = Response & {
   statusCode?: number;
   jsonData?: unknown;
   headersSent?: boolean;
+  statusMock: jest.Mock;
+  jsonMock: jest.Mock;
 };
 
 const createMockRequest = (overrides: Partial<Request> = {}): Request => {
@@ -19,19 +21,23 @@ const createMockRequest = (overrides: Partial<Request> = {}): Request => {
 };
 
 const createMockResponse = (): MockResponse => {
+  const statusMock = jest.fn().mockReturnThis();
+  const jsonMock = jest.fn().mockReturnThis();
   const res: MockResponse = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
+    status: statusMock,
+    json: jsonMock,
     headersSent: false,
+    statusMock,
+    jsonMock,
   } as unknown as MockResponse;
 
   // Capture status code and JSON data for assertions
-  (res.status as jest.Mock).mockImplementation((code: number) => {
+  statusMock.mockImplementation((code: number) => {
     res.statusCode = code;
     return res;
   });
 
-  (res.json as jest.Mock).mockImplementation((data: unknown) => {
+  jsonMock.mockImplementation((data: unknown) => {
     res.jsonData = data;
     return res;
   });
@@ -199,8 +205,8 @@ describe('requestTimeoutMiddleware', () => {
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).toHaveBeenCalledWith(408);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(408);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Request Timeout',
         message: 'Request exceeded the timeout of 1000ms',
         code: 408,
@@ -222,8 +228,8 @@ describe('requestTimeoutMiddleware', () => {
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
+      expect(res.jsonMock).not.toHaveBeenCalled();
     });
 
     it('should include correlation ID in timeout log context', () => {
@@ -245,8 +251,8 @@ describe('requestTimeoutMiddleware', () => {
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).toHaveBeenCalledWith(408);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(408);
+      expect(res.jsonMock).toHaveBeenCalled();
     });
   });
 
