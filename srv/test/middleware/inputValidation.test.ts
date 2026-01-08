@@ -1,9 +1,11 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { inputValidationMiddleware } from '../../middleware/inputValidation';
 
 type MockResponse = Response & {
   statusCode?: number;
   jsonData?: unknown;
+  statusMock: jest.Mock;
+  jsonMock: jest.Mock;
 };
 
 const createMockRequest = (overrides: Partial<Request> = {}): Request => {
@@ -28,18 +30,22 @@ const createMockRequest = (overrides: Partial<Request> = {}): Request => {
 };
 
 const createMockResponse = (): MockResponse => {
+  const statusMock = jest.fn().mockReturnThis();
+  const jsonMock = jest.fn().mockReturnThis();
   const res: MockResponse = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
+    status: statusMock,
+    json: jsonMock,
+    statusMock,
+    jsonMock,
   } as unknown as MockResponse;
 
   // Capture status code and JSON data for assertions
-  (res.status as jest.Mock).mockImplementation((code: number) => {
+  statusMock.mockImplementation((code: number) => {
     res.statusCode = code;
     return res;
   });
 
-  (res.json as jest.Mock).mockImplementation((data: unknown) => {
+  jsonMock.mockImplementation((data: unknown) => {
     res.jsonData = data;
     return res;
   });
@@ -63,7 +69,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should skip validation for health check sub-paths', () => {
@@ -74,7 +80,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
   });
 
@@ -87,7 +93,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should reject URLs exceeding the maximum length', () => {
@@ -132,7 +138,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should reject requests with headers exceeding the maximum size', () => {
@@ -231,7 +237,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should validate Content-Type against allowed types', () => {
@@ -398,7 +404,7 @@ describe('inputValidationMiddleware', () => {
       // Content-Length validation is secondary - primary enforcement is via Express body parser
       // This middleware only validates if Content-Length is explicitly provided
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should reject malformed Content-Length values (NaN)', () => {
@@ -414,8 +420,8 @@ describe('inputValidationMiddleware', () => {
 
       middleware(req, res, mockNext);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(400);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Bad Request',
         message: "Invalid 'Content-Length' header value",
         code: 400,
@@ -436,8 +442,8 @@ describe('inputValidationMiddleware', () => {
 
       middleware(req, res, mockNext);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(400);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Bad Request',
         message: "Invalid 'Content-Length' header value",
         code: 400,
@@ -458,8 +464,8 @@ describe('inputValidationMiddleware', () => {
 
       middleware(req, res, mockNext);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(400);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Bad Request',
         message: "Invalid 'Content-Length' header value",
         code: 400,
@@ -480,8 +486,8 @@ describe('inputValidationMiddleware', () => {
 
       middleware(req, res, mockNext);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(400);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Bad Request',
         message: "Invalid 'Content-Length' header value",
         code: 400,
@@ -593,7 +599,7 @@ describe('inputValidationMiddleware', () => {
 
       // All limits are approached but not exceeded, so request should pass
       expect(mockNext).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
     });
 
     it('should reject when URL exceeds limit with large headers and payload', () => {
@@ -617,7 +623,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       // URL limit exceeded - should reject before checking other limits
-      expect(res.status).toHaveBeenCalledWith(414);
+      expect(res.statusMock).toHaveBeenCalledWith(414);
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -645,7 +651,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       // Headers limit exceeded - should reject with 431 (Request Header Fields Too Large)
-      expect(res.status).toHaveBeenCalledWith(431);
+      expect(res.statusMock).toHaveBeenCalledWith(431);
       expect(mockNext).not.toHaveBeenCalled();
     });
 
@@ -670,7 +676,7 @@ describe('inputValidationMiddleware', () => {
       middleware(req, res, mockNext);
 
       // Payload limit exceeded - should reject
-      expect(res.status).toHaveBeenCalledWith(413);
+      expect(res.statusMock).toHaveBeenCalledWith(413);
       expect(mockNext).not.toHaveBeenCalled();
     });
   });

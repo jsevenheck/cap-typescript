@@ -1,37 +1,49 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { requestTimeoutMiddleware } from '../../middleware/requestTimeout';
 
 type MockResponse = Response & {
   statusCode?: number;
   jsonData?: unknown;
   headersSent?: boolean;
+  statusMock: jest.Mock;
+  jsonMock: jest.Mock;
 };
 
-const createMockRequest = (overrides: Partial<Request> = {}): Request => {
+type MockRequest = Request & {
+  setTimeoutMock: jest.Mock;
+};
+
+const createMockRequest = (overrides: Partial<Request> = {}): MockRequest => {
+  const setTimeoutMock = jest.fn();
   const req = {
     path: '/test',
     method: 'GET',
-    setTimeout: jest.fn(),
+    setTimeout: setTimeoutMock,
+    setTimeoutMock,
     ...overrides,
-  } as unknown as Request;
+  } as unknown as MockRequest;
 
   return req;
 };
 
 const createMockResponse = (): MockResponse => {
+  const statusMock = jest.fn().mockReturnThis();
+  const jsonMock = jest.fn().mockReturnThis();
   const res: MockResponse = {
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
+    status: statusMock,
+    json: jsonMock,
     headersSent: false,
+    statusMock,
+    jsonMock,
   } as unknown as MockResponse;
 
   // Capture status code and JSON data for assertions
-  (res.status as jest.Mock).mockImplementation((code: number) => {
+  statusMock.mockImplementation((code: number) => {
     res.statusCode = code;
     return res;
   });
 
-  (res.json as jest.Mock).mockImplementation((data: unknown) => {
+  jsonMock.mockImplementation((data: unknown) => {
     res.jsonData = data;
     return res;
   });
@@ -63,7 +75,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).not.toHaveBeenCalled();
+      expect(req.setTimeoutMock).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalled();
     });
 
@@ -75,7 +87,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalled();
+      expect(req.setTimeoutMock).toHaveBeenCalled();
       expect(next).toHaveBeenCalled();
     });
 
@@ -87,7 +99,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).not.toHaveBeenCalled();
+      expect(req.setTimeoutMock).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalled();
     });
   });
@@ -102,7 +114,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(30000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(30000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
 
@@ -115,7 +127,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(60000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(60000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
 
@@ -127,7 +139,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(45000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(45000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
 
@@ -140,7 +152,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(300000, expect.any(Function)); // Capped to 5 min
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(300000, expect.any(Function)); // Capped to 5 min
       expect(next).toHaveBeenCalled();
     });
 
@@ -153,7 +165,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(30000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(30000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
 
@@ -166,7 +178,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(30000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(30000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
 
@@ -179,7 +191,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(30000, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(30000, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
   });
@@ -194,13 +206,13 @@ describe('requestTimeoutMiddleware', () => {
       middleware(req, res, next);
 
       // Get the timeout callback
-      const timeoutCallback = (req.setTimeout as jest.Mock).mock.calls[0][1];
+      const timeoutCallback = req.setTimeoutMock.mock.calls[0][1];
       
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).toHaveBeenCalledWith(408);
-      expect(res.json).toHaveBeenCalledWith({
+      expect(res.statusMock).toHaveBeenCalledWith(408);
+      expect(res.jsonMock).toHaveBeenCalledWith({
         error: 'Request Timeout',
         message: 'Request exceeded the timeout of 1000ms',
         code: 408,
@@ -217,20 +229,20 @@ describe('requestTimeoutMiddleware', () => {
       middleware(req, res, next);
 
       // Get the timeout callback
-      const timeoutCallback = (req.setTimeout as jest.Mock).mock.calls[0][1];
+      const timeoutCallback = req.setTimeoutMock.mock.calls[0][1];
       
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json).not.toHaveBeenCalled();
+      expect(res.statusMock).not.toHaveBeenCalled();
+      expect(res.jsonMock).not.toHaveBeenCalled();
     });
 
     it('should include correlation ID in timeout log context', () => {
-      const req = createMockRequest({ 
-        path: '/api/test', 
+      const req = createMockRequest({
+        path: '/api/test',
         method: 'GET',
-      }) as Request & { correlationId?: string };
+      }) as MockRequest & { correlationId?: string };
       req.correlationId = 'test-correlation-id';
       
       const res = createMockResponse();
@@ -240,13 +252,13 @@ describe('requestTimeoutMiddleware', () => {
       middleware(req, res, next);
 
       // Get the timeout callback
-      const timeoutCallback = (req.setTimeout as jest.Mock).mock.calls[0][1];
+      const timeoutCallback = req.setTimeoutMock.mock.calls[0][1];
       
       // Invoke the timeout callback
       timeoutCallback();
 
-      expect(res.status).toHaveBeenCalledWith(408);
-      expect(res.json).toHaveBeenCalled();
+      expect(res.statusMock).toHaveBeenCalledWith(408);
+      expect(res.jsonMock).toHaveBeenCalled();
     });
   });
 
@@ -270,7 +282,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalled();
+      expect(req.setTimeoutMock).toHaveBeenCalled();
       expect(next).toHaveBeenCalled();
     });
   });
@@ -284,7 +296,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalled();
+      expect(req.setTimeoutMock).toHaveBeenCalled();
       expect(next).toHaveBeenCalled();
     });
 
@@ -302,8 +314,8 @@ describe('requestTimeoutMiddleware', () => {
       middleware(req1, res1, next1);
       middleware(req2, res2, next2);
 
-      expect(req1.setTimeout).toHaveBeenCalledWith(5000, expect.any(Function));
-      expect(req2.setTimeout).toHaveBeenCalledWith(5000, expect.any(Function));
+      expect(req1.setTimeoutMock).toHaveBeenCalledWith(5000, expect.any(Function));
+      expect(req2.setTimeoutMock).toHaveBeenCalledWith(5000, expect.any(Function));
       expect(next1).toHaveBeenCalled();
       expect(next2).toHaveBeenCalled();
     });
@@ -316,7 +328,7 @@ describe('requestTimeoutMiddleware', () => {
 
       middleware(req, res, next);
 
-      expect(req.setTimeout).toHaveBeenCalledWith(1, expect.any(Function));
+      expect(req.setTimeoutMock).toHaveBeenCalledWith(1, expect.any(Function));
       expect(next).toHaveBeenCalled();
     });
   });

@@ -63,14 +63,8 @@ const validateEmployeeIntegrity = async (req: Request): Promise<void> => {
   await validator.validateEmployeeRelations(entries);
 };
 
-type ServiceHandler = (...args: unknown[]) => Promise<unknown> | unknown;
-
 type ServiceWithOn = Service & {
-  on: (
-    event: string | string[],
-    entityOrHandler: string | ServiceHandler,
-    maybeHandler?: ServiceHandler,
-  ) => unknown;
+  on: (...args: unknown[]) => unknown;
 };
 
 export const registerEmployeeHandlers = (srv: Service): void => {
