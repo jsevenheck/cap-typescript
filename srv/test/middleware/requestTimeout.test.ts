@@ -239,10 +239,10 @@ describe('requestTimeoutMiddleware', () => {
     });
 
     it('should include correlation ID in timeout log context', () => {
-      const req = createMockRequest({ 
-        path: '/api/test', 
+      const req = createMockRequest({
+        path: '/api/test',
         method: 'GET',
-      }) as Request & { correlationId?: string };
+      }) as MockRequest & { correlationId?: string };
       req.correlationId = 'test-correlation-id';
       
       const res = createMockResponse();
